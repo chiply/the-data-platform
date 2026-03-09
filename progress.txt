@@ -47,3 +47,8 @@ PRD: tasks/prd-kubernetes-local-development.json
 - What was implemented: smoke-test.sh that deploys nginx to smoke-test namespace, tests HTTP via Traefik ingress with curl --resolve, cleans up via trap.
 - Files changed: monorepo/infra/scripts/smoke-test.sh
 ---
+
+## US-008 - Implement Linode k3s cluster provider [NEEDS HUMAN REVIEW]
+- What was implemented: linode-k3s.ts provider using @pulumi/linode for Nanode 2GB instance with k3s, firewall (80/443/6443), kubeconfig retrieval with IP rewriting. Pulumi.production.yaml stack config.
+- Files changed: monorepo/infra/cluster/providers/linode-k3s.ts, index.ts, providers/index.ts, package.json, Pulumi.production.yaml
+---
