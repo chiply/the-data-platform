@@ -1,0 +1,28 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/post-release-ci",
+  "description": "Add a post-release CI job that builds and pushes container images for released components when release-please creates a GitHub Release.",
+  "sourceDesignDoc": "docs/design/002-release-management.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-002-05",
+      "title": "Add post-release CI job for artifact builds",
+      "description": "As a developer, I want a GitHub Actions workflow triggered by release events that builds and pushes container images for released components, so that tagged releases automatically produce deployable artifacts.\n\nAdd a job (or a new workflow) in .github/workflows/ that:\n- Triggers on GitHub release published events\n- Parses the release tag to determine which component was released (e.g., platform-v0.2.0 → component 'platform', path 'monorepo')\n- Builds a container image for the released component using its Dockerfile (if one exists)\n- Pushes the image to GitHub Container Registry (ghcr.io)\n- Tags the image with the release version and 'latest'\n\nSince no services with Dockerfiles exist yet, the workflow should:\n1. Detect whether a Dockerfile exists for the released component\n2. If yes: build and push the image\n3. If no: skip gracefully with a log message\n\nThis is the bridge between 'a release was tagged' and 'an artifact exists in the registry'. The workflow should be extensible — as new components are added with Dockerfiles, they automatically get built on release.\n\nComponent-to-path mapping should be derived from release-please-config.json so there's a single source of truth.",
+      "acceptanceCriteria": [
+        "A GitHub Actions workflow exists that triggers on release published events",
+        "The workflow parses the release tag to extract component name and version",
+        "The workflow reads release-please-config.json to map component names to paths",
+        "If a Dockerfile exists at the component path, the workflow builds and pushes to ghcr.io",
+        "If no Dockerfile exists, the workflow skips gracefully with a log message",
+        "Container images are tagged with both the version and 'latest'",
+        "The workflow YAML is valid and follows the existing workflow conventions in .github/workflows/",
+        "The workflow has appropriate permissions (packages: write for ghcr.io)"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    }
+  ]
+}

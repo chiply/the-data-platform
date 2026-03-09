@@ -1,6 +1,6 @@
 #+TITLE: 002 - Release Management with release-please
 #+AUTHOR: Charlie Holland
-#+STATUS: Active
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-09]
 #+LAST_MODIFIED: [2026-03-09]
@@ -275,9 +275,11 @@ Add a "Release Management" section to =ARCHITECTURE.md= documenting:
 - How to add a new component
 - How Argo CD references tags
 
-** TODO [TDP-002-05] Add post-release CI job for artifact builds         :p2:
+** DONE [TDP-002-05] Add post-release CI job for artifact builds         :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Add a workflow triggered by =release= events that builds and pushes container

@@ -1,0 +1,23 @@
+# Ralph Progress Log
+Started: 2026-03-09
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-post-release-ci.json
+
+## Codebase Patterns
+- Monorepo root is `monorepo/` within the git repo root
+- Bazel 7.6.1 with bzlmod (MODULE.bazel, not WORKSPACE)
+- CI workflows in `.github/workflows/`
+- D2 diagrams with ELK layout engine for architecture diagrams
+- CI scripts in `monorepo/scripts/` are bash with `set -euo pipefail`
+- Design docs in `docs/design/*.org`, backlog in `backlog.org`
+- release-please-config.json maps component names to paths
+- Existing workflows: release.yml (release-please), commitlint.yml
+---
+
+## US-001 - Add post-release CI job for artifact builds
+- What was implemented: New workflow `.github/workflows/post-release.yml` triggered on release published events. Parses release tag to extract component/version, resolves path from release-please-config.json via jq, checks for Dockerfile, builds and pushes to ghcr.io if found, skips gracefully if not.
+- Files changed: .github/workflows/post-release.yml (new)
+- Learnings:
+  - Docker actions: login-action@v3, setup-buildx-action@v3, build-push-action@v6
+  - packages: write permission needed for ghcr.io
+  - Existing workflows use actions/checkout@v4 and ubuntu-latest consistently
