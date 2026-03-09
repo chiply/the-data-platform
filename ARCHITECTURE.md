@@ -92,15 +92,117 @@ room for differentiation at each level. Each layer can override or extend the la
 
 ---
 
+## Release Management
+
+The platform uses [release-please](https://github.com/googleapis/release-please) in **manifest
+mode** to automate versioning, changelogs, and GitHub Releases from conventional commits.
+
+### Conventional Commits
+
+All commits to `main` **must** follow the
+[Conventional Commits](https://www.conventionalcommits.org/) specification. release-please parses
+these prefixes to determine the next semantic version bump automatically.
+
+| Prefix       | Version Bump | Example                                                   |
+|--------------|--------------|-----------------------------------------------------------|
+| `feat:`      | Minor        | `feat: add feed polling scheduler`                        |
+| `fix:`       | Patch        | `fix: correct retry backoff in feed fetcher`              |
+| `feat!:` / `fix!:` / `BREAKING CHANGE` | Major | `feat!: redesign schema registry API` |
+| `chore:`     | None         | `chore: update dev dependencies`                          |
+| `docs:`      | None         | `docs: add ADR for broker design`                         |
+| `ci:`        | None         | `ci: add Bazel remote cache to pipeline`                  |
+| `refactor:`  | None         | `refactor: extract shared OTel helpers to lib`            |
+| `test:`      | None         | `test: add property-based tests for feed parser`          |
+
+Scopes are optional but encouraged for monorepo clarity:
+
+```
+feat(feed-service): add OPML import endpoint
+fix(schema-registry): handle concurrent registration race
+```
+
+### How release-please Works
+
+1. **On every push to `main`**, a GitHub Action runs release-please.
+2. release-please scans commits since the last release and determines the next version for each
+   component based on conventional commit prefixes.
+3. It opens (or updates) a **Release PR** that contains:
+   - Bumped version numbers
+   - An auto-generated `CHANGELOG.md` update
+4. **Merging the Release PR** triggers release-please to:
+   - Create a Git **tag** for each component with a new version
+   - Create a **GitHub Release** with the changelog entry
+
+Because the repository uses `"separate-pull-requests": false`, all components are batched into a
+single combined Release PR.
+
+### Configuration Files
+
+| File                            | Purpose                                                   |
+|---------------------------------|-----------------------------------------------------------|
+| `release-please-config.json`   | Defines components, release type, and behaviour settings  |
+| `.release-please-manifest.json`| Tracks the current released version of each component     |
+
+Both files live at the repository root.
+
+### Tag Naming Convention
+
+Tags follow the pattern **`<component>-v<MAJOR>.<MINOR>.<PATCH>`**:
+
+```
+platform-v0.2.0
+feed-service-v1.0.0
+schema-registry-v0.3.1
+```
+
+The component name comes from the `packages` key in `release-please-config.json`. The `platform`
+component covers the monorepo root (path `"."`).
+
+### Adding a New Component
+
+To register a new releasable component (e.g., a new service or library):
+
+1. **Add to `release-please-config.json`** under `"packages"`:
+   ```json
+   {
+     "packages": {
+       ".": { "component": "platform" },
+       "monorepo/services/feed-service": { "component": "feed-service" }
+     }
+   }
+   ```
+2. **Add the initial version** to `.release-please-manifest.json`:
+   ```json
+   {
+     ".": "0.2.0",
+     "monorepo/services/feed-service": "0.0.0"
+   }
+   ```
+3. Commit both changes. The next time release-please runs, it will begin tracking that component.
+
+### Argo CD and Release Tags
+
+[Argo CD](https://argo-cd.readthedocs.io/) references component tags to determine which version
+to deploy:
+
+- Each Argo CD `Application` manifest specifies a **`targetRevision`** pointing to a component tag
+  (e.g., `feed-service-v1.2.0`).
+- When release-please creates a new tag, Argo CD can detect the change (via Git polling or webhook)
+  and either auto-sync or present the new version for manual promotion.
+- This provides a clear, auditable link between a Git tag and what is running in each environment
+  (dev, staging, production).
+
+---
+
 ## Architecture Diagram
 
 A **single architecture diagram** serves as the source of truth for the entire system.
 
-- **Technology:** [Mermaid C4](https://mermaid.js.org/syntax/c4.html) (starting point)
-- **Why Mermaid C4:** The C4 model (Context, Container, Component, Code) provides structured zoom
-  levels for the architecture. Mermaid renders in Markdown, PRs, and most documentation tools with
-  zero infrastructure. Can graduate to interactive tooling (e.g., Cytoscape.js, Structurizr) as
-  the system grows in complexity.
+- **Technology:** [D2](https://d2lang.com/) with the ELK layout engine
+- **Why D2:** D2 is a modern, declarative diagramming language purpose-built for software
+  architecture. It produces clean SVG output, supports the C4 model's zoom levels (Context,
+  Container, Component, Code) via nested containers, and integrates into CI pipelines as a
+  standalone CLI. The ELK layout engine provides automatic, high-quality graph layouts.
 
 ---
 
@@ -253,4 +355,4 @@ Collected from above for easy tracking:
 - [x] **Schema registry:** Custom-built, explicit registration (no auto-extraction)
 - [x] **Standard logging format:** JSON structured logs with OpenTelemetry trace/span IDs
 - [x] **Monorepo directory structure:** Defined (services, libs, schemas, sdks, workflows, pipelines, infra, deploy, tools, scripts, third_party)
-- [x] **Architecture diagram tooling:** Mermaid C4 (starting point)
+- [x] **Architecture diagram tooling:** D2 with ELK layout engine
