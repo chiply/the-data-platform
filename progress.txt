@@ -19,3 +19,9 @@ PRD: tasks/prd-kubernetes-local-development.json
 - Files changed: monorepo/infra/cluster/providers/k3d.ts (full implementation), monorepo/infra/cluster/index.ts (updated exports)
 - Learnings: K3dClusterResult interface with kubeconfig/registryUrl/clusterName outputs is the contract for downstream stack references.
 ---
+
+## US-003 - Initialize Pulumi platform project
+- What was implemented: tdp-platform Pulumi project at monorepo/infra/platform/ with StackReference to tdp-cluster for kubeconfig, k8s.Provider creation.
+- Files changed: monorepo/infra/platform/{Pulumi.yaml, Pulumi.local.yaml, package.json, package-lock.json, tsconfig.json, index.ts}
+- Learnings: Config keys namespaced by project name (tdp-platform:clusterStackRef). k8sProvider exported for downstream chart modules.
+---
