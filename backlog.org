@@ -8,6 +8,16 @@ Active tasks checked out from design docs.
 ** Active
 # Queue tasks here with /task-queue or M-x backlog/task-queue
 
+*** WIP [Ralph] Design doc 001 - Monorepo Bootstrap
+:PROPERTIES:
+:DESIGN: [[file:docs/design/001-monorepo-bootstrap.org][001 Monorepo Bootstrap]]
+:DELEGATED_TO: ralph
+:PRD_FILES: tasks/prd-monorepo-bootstrap.json
+:END:
+
+Tasks from this design doc are being executed autonomously via Ralph.
+Track progress in tasks/prd-monorepo-bootstrap.json and progress.txt.
+
 ** Blocked
 # Tasks waiting on external dependency
 
