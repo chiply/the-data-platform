@@ -37,3 +37,28 @@ mermaid_cli_bin.mmdc(
     },
     visibility = ["//visibility:public"],
 )
+
+# Render the C4 Context diagram to SVG using mermaid-cli.
+# Usage: bazel build //tools/architecture-diagram:c4_context_svg
+mermaid_cli_bin.mmdc(
+    name = "c4_context_svg",
+    srcs = [
+        "diagrams/c4-context.mmd",
+        "mermaidrc.json",
+    ],
+    outs = ["c4-context.svg"],
+    args = [
+        "-i",
+        "tools/architecture-diagram/diagrams/c4-context.mmd",
+        "-o",
+        "tools/architecture-diagram/c4-context.svg",
+        "-c",
+        "tools/architecture-diagram/mermaidrc.json",
+        "--quiet",
+    ],
+    # Puppeteer needs access to cached Chrome browser outside the sandbox.
+    execution_requirements = {
+        "no-sandbox": "1",
+    },
+    visibility = ["//visibility:public"],
+)

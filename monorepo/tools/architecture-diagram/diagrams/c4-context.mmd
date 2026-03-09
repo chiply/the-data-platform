@@ -1,0 +1,13 @@
+C4Context
+    title System Context diagram for The Data Platform
+
+    Person(user, "Platform User", "Developer or content consumer who submits feeds and views aggregated content")
+
+    System(platform, "The Data Platform", "Data platform that ingests RSS/Atom feeds, extracts content, summarizes articles, and serves a personalized front page")
+
+    System_Ext(rss, "RSS Feed Sources", "External content sources: YouTube, Reddit, X, PubMed, blogs, newsletters")
+    System_Ext(cloud, "Cloud Infrastructure Provider", "Kubernetes compute, object storage, managed databases, messaging")
+
+    Rel(user, platform, "Submits feed URLs, views aggregated content")
+    Rel(platform, rss, "Ingests feeds from")
+    Rel(platform, cloud, "Deployed on")
