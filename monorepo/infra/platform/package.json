@@ -1,0 +1,14 @@
+{
+  "name": "tdp-platform",
+  "version": "0.1.0",
+  "description": "Platform services layer for The Data Platform",
+  "main": "index.ts",
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@pulumi/kubernetes": "^4.0.0",
+    "@pulumi/pulumi": "^3.0.0"
+  }
+}
