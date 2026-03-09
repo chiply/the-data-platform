@@ -34,7 +34,7 @@
         "Outputs releases_created and paths_released for downstream jobs to consume"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
