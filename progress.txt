@@ -34,3 +34,9 @@ PRD: tasks/prd-monorepo-bootstrap.json
   - diagrams/ should NOT have its own BUILD.bazel to avoid subpackage boundary issues with copy_to_bin
   - Args paths in js_run_binary are relative to execroot — use full package-relative paths
 ---
+
+## US-004 - Create CI wrapper scripts
+- What was implemented: build.sh, test.sh, render-diagrams.sh in monorepo/scripts/
+- Files changed: monorepo/scripts/{build.sh,test.sh,render-diagrams.sh}
+- Learnings: bazel test //... returns exit code 4 when no test targets exist (expected, not failure); diagram target is //tools/architecture-diagram:sample_svg
+---

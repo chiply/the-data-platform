@@ -67,9 +67,9 @@
         "All scripts work locally with no special environment beyond Bazel"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
-      "notes": "Effort: 1:00. Priority: p1. Depends on US-002."
+      "notes": "Effort: 1:00. Priority: p1. Depends on US-002. COMPLETED: build.sh, test.sh, render-diagrams.sh created."
     },
     {
       "id": "US-005",
