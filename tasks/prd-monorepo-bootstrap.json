@@ -50,9 +50,9 @@
         "bazel build //tools/architecture-diagram/... succeeds and produces SVG/PNG output"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
-      "notes": "Effort: 4:00. Priority: p0. Depends on US-002."
+      "notes": "Effort: 4:00. Priority: p0. Depends on US-002. COMPLETED: Full Mermaid pipeline with rules_js, ELK layout, sample diagram renders to SVG via bazel build."
     },
     {
       "id": "US-004",

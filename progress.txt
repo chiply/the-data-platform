@@ -22,3 +22,15 @@ PRD: tasks/prd-monorepo-bootstrap.json
 - Files changed: 22 files (BUILD.bazel + README.md for each of: services, libs, schemas, sdks, workflows, pipelines, infra, deploy, tools, scripts, third_party)
 - Learnings: Empty/comment-only BUILD.bazel files work fine; Bazel 7.6.1 handles 12 packages with no issues
 ---
+
+## US-003 - Set up architecture-diagram tool with Mermaid CLI
+- What was implemented: Full Mermaid rendering pipeline with aspect_rules_js, ELK layout, sample diagram
+- Files changed: MODULE.bazel (npm extension), .bazelignore, tools/architecture-diagram/{BUILD.bazel,package.json,pnpm-lock.yaml,mermaidrc.json,diagrams/sample.mmd,README.md}
+- Learnings:
+  - aspect_rules_js 2.1.2 with pnpm v9 requires pnpm.onlyBuiltDependencies in package.json
+  - bins config in npm_translate_lock uses string list with = separator: ["mmdc=./src/cli.js"]
+  - Generated bzl files are namespaced under root_package path: @npm//tools/architecture-diagram:@mermaid-js/mermaid-cli/package_json.bzl
+  - Puppeteer needs execution_requirements = {"no-sandbox": "1"} for Chrome outside sandbox
+  - diagrams/ should NOT have its own BUILD.bazel to avoid subpackage boundary issues with copy_to_bin
+  - Args paths in js_run_binary are relative to execroot — use full package-relative paths
+---
