@@ -241,6 +241,7 @@ Human-only task — the agent cannot do these for you.
 - [[https://www.pulumi.com/docs/install/][Pulumi CLI]] (=brew install pulumi= or =curl -fsSL https://get.pulumi.com | sh=)
 - [[https://nodejs.org/][Node.js]] (for TypeScript Pulumi projects)
 - [[https://kubernetes.io/docs/tasks/tools/][kubectl]] (=brew install kubectl=)
+- [[https://k9scli.io/][k9s]] (=brew install derailed/k9s/k9s=) — terminal UI for Kubernetes cluster management
 
 These installs should be codified in a setup script (e.g., =~/setup.sh= or a
 dotfiles bootstrap) so new developers can onboard quickly and the same installs
