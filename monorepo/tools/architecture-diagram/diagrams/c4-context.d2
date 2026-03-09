@@ -1,0 +1,56 @@
+direction: down
+
+title: |md
+  # System Context: The Data Platform
+|
+
+# Persons
+user: Platform User {
+  shape: person
+  style: {
+    fill: "#08427B"
+    font-color: "#ffffff"
+    stroke: "#073B6F"
+  }
+  tooltip: "Developer or content consumer who submits feeds and views aggregated content"
+}
+
+# Central system
+platform: The Data Platform {
+  shape: rectangle
+  style: {
+    fill: "#1168BD"
+    font-color: "#ffffff"
+    stroke: "#0B4884"
+    border-radius: 8
+  }
+  tooltip: "Data platform that ingests RSS/Atom feeds, extracts content, summarizes articles, and serves a personalized front page"
+}
+
+# External systems
+rss: RSS Feed Sources {
+  shape: rectangle
+  style: {
+    fill: "#999999"
+    font-color: "#ffffff"
+    stroke: "#6B6B6B"
+    border-radius: 8
+  }
+  tooltip: "External content sources: YouTube, Reddit, X, PubMed, blogs, newsletters"
+}
+
+cloud: Cloud Infrastructure Provider {
+  shape: rectangle
+  style: {
+    fill: "#999999"
+    font-color: "#ffffff"
+    stroke: "#6B6B6B"
+    border-radius: 8
+  }
+  tooltip: "Kubernetes compute, object storage, managed databases, messaging"
+}
+
+# Relationships
+user -> platform: "Submits feed URLs,\nviews aggregated content"
+platform -> rss: "Ingests feeds from"
+platform -> cloud: "Deployed on"

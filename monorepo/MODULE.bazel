@@ -7,18 +7,3 @@ module(
 
 # Python rules
 bazel_dep(name = "rules_python", version = "1.1.0")
-
-# JavaScript/Node.js rules (Aspect)
-bazel_dep(name = "aspect_rules_js", version = "2.1.2")
-
-# npm dependencies for architecture-diagram tool
-npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
-npm.npm_translate_lock(
-    name = "npm",
-    bins = {
-        "@mermaid-js/mermaid-cli": ["mmdc=./src/cli.js"],
-    },
-    pnpm_lock = "//tools/architecture-diagram:pnpm-lock.yaml",
-    verify_node_modules_ignored = "//:.bazelignore",
-)
-use_repo(npm, "npm")

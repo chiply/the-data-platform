@@ -6,5 +6,9 @@ cd "${SCRIPT_DIR}/.."
 
 TARGET="${1:-//tools/architecture-diagram/...}"
 
-echo "Rendering diagrams (${TARGET})..."
+echo "Rendering D2 diagrams (${TARGET})..."
 bazel build "${TARGET}"
+
+echo ""
+echo "SVG outputs:"
+bazel cquery "${TARGET}" --output=files 2>/dev/null || true

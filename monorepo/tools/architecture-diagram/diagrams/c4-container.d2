@@ -1,0 +1,143 @@
+direction: down
+
+title: |md
+  # Container Diagram: The Data Platform
+|
+
+# External actors
+user: Platform User {
+  shape: person
+  style: {
+    fill: "#08427B"
+    font-color: "#ffffff"
+    stroke: "#073B6F"
+  }
+}
+
+rss: RSS Feed Sources {
+  shape: rectangle
+  style: {
+    fill: "#999999"
+    font-color: "#ffffff"
+    stroke: "#6B6B6B"
+    border-radius: 8
+  }
+  tooltip: "YouTube, Reddit, X, PubMed, blogs, newsletters"
+}
+
+# System boundary
+platform: The Data Platform {
+  style: {
+    fill: "#ffffff"
+    stroke: "#1168BD"
+    stroke-width: 2
+    border-radius: 8
+  }
+
+  # Application services
+  feed_reader: "Feed Reader Service\n[FastAPI]" {
+    style: {
+      fill: "#438DD5"
+      font-color: "#ffffff"
+      stroke: "#3C7FC0"
+      border-radius: 8
+    }
+    tooltip: "Ingests RSS/Atom feeds, extracts content, and summarizes articles"
+  }
+
+  schema_registry: "Schema Registry\n[FastAPI]" {
+    style: {
+      fill: "#438DD5"
+      font-color: "#ffffff"
+      stroke: "#3C7FC0"
+      border-radius: 8
+    }
+    tooltip: "Centralized schema versioning and compatibility checks for Avro/Protobuf schemas"
+  }
+
+  broker: "Intelligent Broker\n[Python]" {
+    style: {
+      fill: "#438DD5"
+      font-color: "#ffffff"
+      stroke: "#3C7FC0"
+      border-radius: 8
+    }
+    tooltip: "Schema-to-schema transformation between services"
+  }
+
+  search: "Search Service\n[FastAPI]" {
+    style: {
+      fill: "#438DD5"
+      font-color: "#ffffff"
+      stroke: "#3C7FC0"
+      border-radius: 8
+    }
+    tooltip: "Semantic search across ingested and summarized content"
+  }
+
+  # Orchestration
+  temporal: "Temporal\n[Workflow Engine]" {
+    style: {
+      fill: "#438DD5"
+      font-color: "#ffffff"
+      stroke: "#3C7FC0"
+      border-radius: 8
+    }
+    tooltip: "Event-driven and long-running durable workflow orchestration"
+  }
+
+  dagster: "Dagster\n[Pipeline Orchestrator]" {
+    style: {
+      fill: "#438DD5"
+      font-color: "#ffffff"
+      stroke: "#3C7FC0"
+      border-radius: 8
+    }
+    tooltip: "Batch and data pipeline orchestration with asset-based lineage"
+  }
+
+  # Infrastructure layer
+  infrastructure: Infrastructure {
+    style: {
+      fill: "#E8E8E8"
+      stroke: "#AAAAAA"
+      stroke-dash: 4
+      border-radius: 8
+    }
+
+    k8s: "Kubernetes\n[Container Orchestration]" {
+      style: {
+        fill: "#85BBF0"
+        font-color: "#000000"
+        stroke: "#5D99CF"
+        border-radius: 8
+      }
+      tooltip: "Shared compute layer for all deployed services and workers"
+    }
+
+    pulumi: "Pulumi\n[Infrastructure as Code]" {
+      style: {
+        fill: "#85BBF0"
+        font-color: "#000000"
+        stroke: "#5D99CF"
+        border-radius: 8
+      }
+      tooltip: "Defines and provisions shared infrastructure: clusters, networking, storage, observability"
+    }
+  }
+
+  # Internal relationships
+  feed_reader -> temporal: "Triggers content extraction\nand summarization workflows"
+  feed_reader -> schema_registry: "Publishes and\nresolves schemas"
+  feed_reader -> broker: "Routes events through\nfor schema transformation"
+  temporal -> dagster: "Triggers batch pipelines\nfor digest generation"
+  dagster -> feed_reader: "Reads ingested content\nfor pipeline assets"
+  broker -> schema_registry: "Resolves schema mappings"
+  search -> feed_reader: "Indexes content from"
+  pulumi -> k8s: "Provisions and manages"
+}
+
+# External relationships
+user -> platform.feed_reader: "Submits feed URLs,\nviews content"
+user -> platform.search: "Searches across\ningested content"
+platform.feed_reader -> rss: "Fetches feeds from"
