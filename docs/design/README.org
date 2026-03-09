@@ -42,7 +42,7 @@ this table to determine valid categories.
 | Doc | Title              | Status |
 |-----+--------------------+--------|
 | 000 | [[file:000-template.org][Template]]           | N/A    |
-| 001 | [[file:001-monorepo-bootstrap.org][Monorepo Bootstrap]] | Active |
+| 001 | [[file:001-monorepo-bootstrap.org][Monorepo Bootstrap]] | Complete |
 
 * Elisp Setup
 :PROPERTIES:

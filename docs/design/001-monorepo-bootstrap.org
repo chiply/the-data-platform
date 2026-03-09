@@ -1,6 +1,6 @@
 #+TITLE: 001 - Monorepo Bootstrap
 #+AUTHOR: Charlie Holland
-#+STATUS: Active
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-09]
 #+LAST_MODIFIED: [2026-03-09]
@@ -160,62 +160,76 @@ Developers can run the same scoped checks locally:
 :CATEGORY: tasks
 :END:
 
-** TODO [TDP-001-01] Initialize MODULE.bazel and Bazel configuration        :p0:
+** DONE [TDP-001-01] Initialize MODULE.bazel and Bazel configuration        :p0:
 :PROPERTIES:
 :EFFORT: 4:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Create =MODULE.bazel= with module name and initial =bazel_dep= entries (rules_python,
 rules_nodejs). Create =.bazelrc= with common settings. Create =.bazelversion= pinning
 Bazel version. Create root =BUILD.bazel=.
 
-** TODO [TDP-001-02] Scaffold monorepo directory structure                  :p0:
+** DONE [TDP-001-02] Scaffold monorepo directory structure                  :p0:
 :PROPERTIES:
 :EFFORT: 1:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Create all directories defined in ARCHITECTURE.md (services, libs, schemas, sdks,
 workflows, pipelines, infra, deploy, tools, scripts, third_party). Each gets an empty
 =BUILD.bazel= and a brief =README.md=.
 
-** TODO [TDP-001-03] Set up architecture-diagram tool with Mermaid CLI      :p0:
+** DONE [TDP-001-03] Set up architecture-diagram tool with Mermaid CLI      :p0:
 :PROPERTIES:
 :EFFORT: 4:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Create =tools/architecture-diagram/= with =package.json= (mermaid-cli, elk dependency),
 =mermaidrc.json= (ELK layout, theme config), =BUILD.bazel= with render targets, and
 =README.md=. Verify =bazel build= produces SVG/PNG output.
 
-** TODO [TDP-001-04] Create initial C4 Context diagram                      :p1:
+** DONE [TDP-001-04] Create initial C4 Context diagram                      :p1:
 :PROPERTIES:
 :EFFORT: 2:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Write =diagrams/c4-context.mmd= showing the platform, its users, and external systems
 (RSS feed sources, cloud providers). Use Mermaid C4 syntax with ELK layout.
 
-** TODO [TDP-001-05] Create initial C4 Container diagram                    :p1:
+** DONE [TDP-001-05] Create initial C4 Container diagram                    :p1:
 :PROPERTIES:
 :EFFORT: 4:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Write =diagrams/c4-container.mmd= zooming into the platform internals: FastAPI services,
 Temporal orchestration, Dagster pipelines, schema registry, intelligent broker, search,
 k8s compute, Pulumi infra. Use Mermaid C4 syntax with ELK layout.
 
-** TODO [TDP-001-06] Create CI wrapper scripts                              :p1:
+** DONE [TDP-001-06] Create CI wrapper scripts                              :p1:
 :PROPERTIES:
 :EFFORT: 1:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Create =scripts/build.sh=, =scripts/test.sh=, and =scripts/render-diagrams.sh=. Each
 wraps the corresponding Bazel command. All must be runnable locally. Scripts should accept
 an optional Bazel target pattern to support scoped execution.
 
-** TODO [TDP-001-08] Implement affected-targets detection script            :p0:
+** DONE [TDP-001-08] Implement affected-targets detection script            :p0:
 :PROPERTIES:
 :EFFORT: 4:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Create =scripts/affected.sh= that computes affected Bazel targets from the git diff
@@ -223,9 +237,11 @@ against the base branch. Use =bazel query rdeps(//..., set(...))= to walk the de
 graph. Output should be consumable by =build.sh= and =test.sh=. Must work locally
 (diffing against main) and in CI (diffing against the PR base).
 
-** TODO [TDP-001-09] Migrate diagram tool from Mermaid to D2               :p0:
+** DONE [TDP-001-09] Migrate diagram tool from Mermaid to D2               :p0:
 :PROPERTIES:
 :EFFORT: 4:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Replace Mermaid CLI with D2 for architecture diagrams. D2 provides better auto-layout,
@@ -233,9 +249,11 @@ proper arrow routing, first-class C4 support with layers, and eliminates the Pup
 dependency. Rewrite =.mmd= diagram files as =.d2= files, update BUILD.bazel to use a D2
 genrule, remove the Mermaid npm dependencies from MODULE.bazel, and update =render-diagrams.sh=.
 
-** TODO [TDP-001-07] Validate end-to-end: build, test, render               :p0:
+** DONE [TDP-001-07] Validate end-to-end: build, test, render               :p0:
 :PROPERTIES:
 :EFFORT: 2:00
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
 :END:
 
 Run the full cycle locally: =bazel build //...=, =bazel test //...=, and diagram rendering.
