@@ -1,3 +1,3 @@
 name: tdp-platform
 runtime: nodejs
-description: Platform services layer for The Data Platform
+description: Platform layer — installs core services (ingress verification, cert-manager, monitoring) onto any cluster provisioned by the cluster layer.

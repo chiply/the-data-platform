@@ -6,11 +6,17 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "sourceMap": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "experimentalDecorators": true,
+    "pretty": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
   },
-  "include": [
+  "files": [
     "index.ts"
+  ],
+  "include": [
+    "charts/**/*.ts"
   ]
 }
