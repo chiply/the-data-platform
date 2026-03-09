@@ -1,0 +1,330 @@
+#+TITLE: 002 - Release Management with release-please
+#+AUTHOR: Charlie Holland
+#+STATUS: Active
+#+CATEGORY: infra
+#+CREATED: [2026-03-09]
+#+LAST_MODIFIED: [2026-03-09]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Introduce [[https://github.com/googleapis/release-please][release-please]] in manifest mode to manage versioning, changelogs, and GitHub
+Releases for the monorepo. The repo gets a single platform-level release plus
+independent per-component releases as services and libraries are added. Argo CD
+reads component-level tags from this repo directly — no external repos.
+
+* Motivation
+
+The monorepo currently has no release or versioning strategy. As services, libraries,
+and schemas are added, we need:
+
+- Automated, conventional-commit-driven version bumps (semver)
+- Per-component changelogs so consumers know what changed in their dependency
+- GitHub Releases as the human-readable record of what shipped
+- Git tags that Argo CD (and other tooling) can reference for deployments
+- A single source of truth — everything stays in this repo
+
+Without this, versioning will be ad-hoc, changelogs manual, and deployment
+references fragile.
+
+* Design
+
+** How release-please Works
+
+release-please reads [[https://www.conventionalcommits.org/][conventional commits]] since the last release and:
+
+1. Opens a "Release PR" that bumps versions and updates CHANGELOG.md
+2. When merged, tags the commit and creates a GitHub Release
+
+In *manifest mode*, a single GitHub Action manages multiple components independently.
+Each component has its own version, changelog, and release tag.
+
+** Manifest Configuration
+
+Two files at the repo root control the manifest:
+
+*** =release-please-config.json=
+
+Defines which paths are independently versioned components and how they behave.
+
+#+begin_src json
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "monorepo": {
+      "release-type": "simple",
+      "component": "platform",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
+    }
+  },
+  "separate-pull-requests": false,
+  "sequential-calls": false
+}
+#+end_src
+
+This starts with a single =platform= component covering the entire =monorepo/= tree.
+As services and libraries are added, they get their own entries:
+
+#+begin_src json
+{
+  "packages": {
+    "monorepo": {
+      "release-type": "simple",
+      "component": "platform",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true
+    },
+    "monorepo/services/feed-reader": {
+      "release-type": "python",
+      "component": "feed-reader",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["pyproject.toml"]
+    },
+    "monorepo/libs/common": {
+      "release-type": "python",
+      "component": "common",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["pyproject.toml"]
+    },
+    "monorepo/schemas": {
+      "release-type": "simple",
+      "component": "schemas",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}
+#+end_src
+
+*** =.release-please-manifest.json=
+
+Tracks current versions. Starts as:
+
+#+begin_src json
+{
+  "monorepo": "0.1.0"
+}
+#+end_src
+
+release-please updates this file automatically on each release.
+
+** Tagging Strategy
+
+| Component | Tag Pattern | Example |
+|-----------+---------------------------+-------------------------|
+| Platform | =platform-vX.Y.Z= | =platform-v0.2.0= |
+| Service | =feed-reader-vX.Y.Z= | =feed-reader-v1.0.0= |
+| Library | =common-vX.Y.Z= | =common-v0.3.1= |
+| Schemas | =schemas-vX.Y.Z= | =schemas-v1.1.0= |
+
+Each tag is a scoped identifier. The =component= field in the config controls the
+tag prefix.
+
+** Commit Convention
+
+All commits to =main= must follow [[https://www.conventionalcommits.org/][Conventional Commits]]:
+
+#+begin_example
+feat(feed-reader): add RSS polling endpoint
+fix(common): handle empty response in retry logic
+chore: update bazel dependencies
+feat!: redesign schema registry API
+#+end_example
+
+The optional scope in parentheses maps to a component. release-please uses the
+*path* of changed files (not the scope) to determine which component is affected,
+but scopes improve readability.
+
+Breaking changes (=feat!=, =BREAKING CHANGE:= footer) trigger major version bumps.
+
+** GitHub Actions Workflow
+
+#+begin_src yaml
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          manifest-file: .release-please-manifest.json
+          config-file: release-please-config.json
+#+end_src
+
+This action:
+- On every push to =main=, checks for releasable changes
+- Opens/updates a Release PR with version bumps and changelog entries
+- When the Release PR is merged, creates GitHub Releases and tags
+
+** How Argo CD Consumes Tags
+
+Argo CD can reference component-level tags directly from this repo:
+
+#+begin_example
+# In an Argo Application manifest
+spec:
+  source:
+    repoURL: https://github.com/chiply/the-data-platform.git
+    targetRevision: feed-reader-v1.2.0
+    path: monorepo/deploy/feed-reader
+#+end_example
+
+Since tags are scoped per component, Argo can pin each service's deployment to its
+own release independently. No separate repos needed.
+
+** Changelog Structure
+
+Each component gets its own =CHANGELOG.md= within its directory:
+
+#+begin_example
+monorepo/CHANGELOG.md                          # platform-level
+monorepo/services/feed-reader/CHANGELOG.md     # service-level
+monorepo/libs/common/CHANGELOG.md              # library-level
+#+end_example
+
+release-please generates these automatically from conventional commits.
+
+** Adding a New Component
+
+When a new service or library is created:
+
+1. Add an entry to =release-please-config.json= under =packages=
+2. Add an initial version to =.release-please-manifest.json=
+3. Commit: =chore: register feed-reader as release-please component=
+
+This is a one-time, low-ceremony step per component.
+
+** What release-please Does NOT Do
+
+- It does not build or publish artifacts (that's CI's job, triggered by release events)
+- It does not deploy (Argo CD handles that by reading tags)
+- It does not enforce commit conventions (a separate linter like =commitlint= does that)
+
+* Decision
+
+Use release-please in manifest mode with:
+- =simple= release type for the platform root and schemas
+- =python= release type for Python services and libraries (bumps =pyproject.toml=)
+- One Release PR combining all pending component releases (=separate-pull-requests: false=)
+- Conventional commits enforced via commitlint in CI
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+Implementation tasks with IDs in format =[TDP-002-XX]=.
+
+** DONE [TDP-002-01] Add release-please manifest config                  :p1:
+:PROPERTIES:
+:EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
+:END:
+
+Create =release-please-config.json= and =.release-please-manifest.json= at the repo
+root with the initial =platform= component covering =monorepo/=.
+
+** DONE [TDP-002-02] Add release-please GitHub Action                    :p1:
+:PROPERTIES:
+:EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
+:END:
+
+Create =.github/workflows/release.yml= using =googleapis/release-please-action@v4=
+in manifest mode. Trigger on push to =main=.
+
+** DONE [TDP-002-03] Add commitlint to enforce conventional commits      :p1:
+:PROPERTIES:
+:EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
+:END:
+
+Add a CI check (GitHub Action) that validates PR titles and/or commit messages
+against the conventional commits spec. Use =@commitlint/config-conventional=
+or equivalent. This prevents non-conventional commits from reaching =main= and
+breaking release-please's changelog generation.
+
+** DONE [TDP-002-04] Document release workflow in ARCHITECTURE.md        :p2:
+:PROPERTIES:
+:EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
+:END:
+
+Add a "Release Management" section to =ARCHITECTURE.md= documenting:
+- Conventional commit requirements
+- How release-please works
+- Tag naming convention
+- How to add a new component
+- How Argo CD references tags
+
+** TODO [TDP-002-05] Add post-release CI job for artifact builds         :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Add a workflow triggered by =release= events that builds and pushes container
+images / Python packages for released components. This is the bridge between
+"a release was tagged" and "an artifact exists in the registry."
+
+** DONE [TDP-002-06] Validate release setup with a dry-run release       :p1:
+:PROPERTIES:
+:EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-09]
+:END:
+
+After TDP-002-01 and TDP-002-02 are merged, push a conventional commit to =main=
+and verify that release-please opens a Release PR with the correct version bump,
+changelog, and tag prefix.
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Use combined Release PR (single PR for all components)
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Combined (=separate-pull-requests: false=). Only one component exists today. Splitting
+into separate PRs is a one-line config change if needed later when multiple components
+ship on different cadences.
+
+** DECIDED Schemas do not trigger downstream component releases
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Services adopt new schemas deliberately and release independently. Schema versioning
+will be managed carefully (compatibility checks, semver on the =schemas= component)
+so consumers can pin and upgrade on their own schedule. Automation may be revisited
+when the schema registry and compatibility tooling are in place.
+
+** DECIDED Use release-please over alternatives (semantic-release, manual tags)
+
+release-please is purpose-built for monorepo manifest mode, maintained by Google,
+has first-class GitHub Actions support, and generates clean Release PRs that serve
+as human review gates. semantic-release is powerful but more complex to configure
+for multi-component monorepos.
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
