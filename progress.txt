@@ -57,3 +57,8 @@ PRD: tasks/prd-kubernetes-local-development.json
 - What was implemented: Multi-stage Python 3.12 base Dockerfile, example FastAPI service with Dockerfile, README with build+push workflow docs.
 - Files changed: monorepo/services/{Dockerfile.base, requirements-base.txt, README.md, example/Dockerfile, example/main.py, example/requirements.txt}
 ---
+
+## US-010 - Document local development workflow [NEEDS HUMAN REVIEW]
+- What was implemented: Comprehensive infra/README.md covering prerequisites, quick start, deploying services, ingress access, teardown, registry, troubleshooting.
+- Files changed: monorepo/infra/README.md
+---
