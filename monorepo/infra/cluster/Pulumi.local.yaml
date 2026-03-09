@@ -1,0 +1,3 @@
+config:
+  tdp-cluster:clusterType: k3d
+  tdp-cluster:clusterName: tdp-local
