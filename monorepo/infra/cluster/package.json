@@ -1,18 +1,14 @@
 {
   "name": "tdp-cluster",
-  "version": "0.0.1",
-  "description": "Kubernetes cluster provisioning for The Data Platform",
+  "version": "0.1.0",
+  "description": "Cluster provisioning layer for The Data Platform",
   "main": "index.ts",
-  "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@pulumi/pulumi": "^3.0.0",
-    "@pulumi/command": "^1.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "@pulumi/command": "^1.0.0",
+    "@pulumi/pulumi": "^3.0.0"
   }
 }

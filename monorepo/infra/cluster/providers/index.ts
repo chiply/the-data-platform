@@ -1,1 +1,1 @@
-export { createK3dCluster, K3dClusterArgs } from "./k3d";
+export { createK3dCluster, K3dClusterResult } from "./k3d";
