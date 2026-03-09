@@ -1,0 +1,18 @@
+# Ralph Progress Log
+Started: 2026-03-09
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-monorepo-bootstrap.json
+
+## Codebase Patterns
+- bazelisk is used (installed via brew); .bazelversion controls Bazel version
+- aspect_rules_js 2.1.2 transitively brings in rules_nodejs 6.3.0 — no separate rules_nodejs dep needed
+- rules_python 1.1.0 and aspect_rules_js 2.1.2 resolve cleanly with Bazel 7.6.1
+- All monorepo files live under monorepo/ relative to repo root
+- bazel build //... succeeds with 0 targets for empty BUILD files (expected)
+---
+
+## US-001 - Initialize MODULE.bazel and Bazel configuration
+- What was implemented: Complete Bazel build foundation with bzlmod
+- Files changed: monorepo/MODULE.bazel, monorepo/.bazelversion, monorepo/.bazelrc, monorepo/BUILD.bazel
+- Learnings: aspect_rules_js 2.1.2 brings rules_nodejs transitively; rules_python 1.1.0 works with Bazel 7.6.1
+---
