@@ -1,0 +1,12 @@
+{
+  "layout": "elk",
+  "theme": "default",
+  "themeVariables": {
+    "fontFamily": "Inter, system-ui, sans-serif",
+    "fontSize": "14px"
+  },
+  "elk": {
+    "mergeEdges": true,
+    "nodePlacementStrategy": "NETWORK_SIMPLEX"
+  }
+}
