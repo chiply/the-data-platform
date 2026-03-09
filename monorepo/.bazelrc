@@ -8,7 +8,7 @@ test --test_output=errors
 build --verbose_failures
 
 # Use a shared disk cache for faster rebuilds
-build --disk_cache=~/.cache/bazel-disk
+build --disk_cache=${HOME}/.cache/bazel-disk
 
 # Platform: enable modern toolchain resolution
 build --incompatible_enable_cc_toolchain_resolution

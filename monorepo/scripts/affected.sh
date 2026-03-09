@@ -47,17 +47,23 @@ if echo "${RELATIVE_FILES}" | grep -q '^scripts/'; then
 fi
 
 # Collect Bazel packages from changed files
+declare -A SEEN_PACKAGES
 PACKAGES=()
+
+_add_package() {
+  local pkg="$1"
+  if [[ -z "${SEEN_PACKAGES[$pkg]+x}" ]]; then
+    SEEN_PACKAGES[$pkg]=1
+    PACKAGES+=("${pkg}")
+  fi
+}
+
 while IFS= read -r file; do
   # Find the Bazel package directory (nearest parent with a BUILD or BUILD.bazel)
   dir="$(dirname "${file}")"
   while [[ "${dir}" != "." ]]; do
     if [[ -f "${dir}/BUILD.bazel" ]] || [[ -f "${dir}/BUILD" ]]; then
-      pkg="//${dir}"
-      # Deduplicate
-      if [[ ! " ${PACKAGES[*]+"${PACKAGES[*]}"} " =~ " ${pkg} " ]]; then
-        PACKAGES+=("${pkg}")
-      fi
+      _add_package "//${dir}"
       break
     fi
     dir="$(dirname "${dir}")"
@@ -65,9 +71,7 @@ while IFS= read -r file; do
   # Check root BUILD
   if [[ "${dir}" == "." ]]; then
     if [[ -f "BUILD.bazel" ]] || [[ -f "BUILD" ]]; then
-      if [[ ! " ${PACKAGES[*]+"${PACKAGES[*]}"} " =~ " //. " ]]; then
-        PACKAGES+=("//.")
-      fi
+      _add_package "//."
     fi
   fi
 done <<< "${RELATIVE_FILES}"
