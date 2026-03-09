@@ -1,0 +1,96 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/release-management",
+  "description": "Introduce release-please in manifest mode to manage versioning, changelogs, and GitHub Releases for the monorepo. Starts with a single platform component covering monorepo/, with conventional commits enforced by commitlint.",
+  "sourceDesignDoc": "docs/design/002-release-management.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-002-01",
+      "title": "Add release-please manifest config",
+      "description": "As a developer, I want release-please manifest configuration files at the repo root so that versioning and changelog generation are automated.\n\nCreate two files at the repo root:\n\n1. `release-please-config.json` with:\n   - `$schema` pointing to the release-please config schema\n   - A single `packages` entry for `monorepo` with `release-type: simple`, `component: platform`, `changelog-path: CHANGELOG.md`, `bump-minor-pre-major: true`, `bump-patch-for-minor-pre-major: true`\n   - `separate-pull-requests: false`\n   - `sequential-calls: false`\n\n2. `.release-please-manifest.json` with:\n   - `{ \"monorepo\": \"0.1.0\" }`",
+      "acceptanceCriteria": [
+        "release-please-config.json exists at repo root with valid JSON matching the release-please config schema",
+        ".release-please-manifest.json exists at repo root with initial version 0.1.0 for monorepo",
+        "Config uses release-type 'simple' and component name 'platform'",
+        "separate-pull-requests is false",
+        "Both files are valid JSON (parseable without errors)"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-002-02",
+      "title": "Add release-please GitHub Action",
+      "description": "As a developer, I want a GitHub Actions workflow that runs release-please on every push to main so that Release PRs are created and GitHub Releases are published automatically.\n\nCreate `.github/workflows/release.yml` that:\n- Triggers on push to main branch\n- Has contents: write and pull-requests: write permissions\n- Uses googleapis/release-please-action@v4\n- References the manifest and config files from US-001",
+      "acceptanceCriteria": [
+        ".github/workflows/release.yml exists and is valid YAML",
+        "Workflow triggers on push to main branch only",
+        "Workflow has contents: write and pull-requests: write permissions",
+        "Uses googleapis/release-please-action@v4 with manifest-file and config-file inputs",
+        "Outputs releases_created and paths_released for downstream jobs to consume"
+      ],
+      "priority": 2,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-002-03",
+      "title": "Add commitlint to enforce conventional commits",
+      "description": "As a developer, I want CI to validate that PR titles follow the Conventional Commits spec so that non-conventional commits cannot reach main and break release-please changelog generation.\n\nAdd a GitHub Actions workflow that:\n- Runs on pull_request events\n- Validates the PR title against @commitlint/config-conventional (or equivalent lightweight check)\n- Fails the check if the title doesn't conform\n\nNote: Since we use squash-merge, validating the PR title is sufficient (it becomes the commit message on main). Avoid heavy Node.js dependencies if possible — a simple regex-based check or a lightweight action is preferred.",
+      "acceptanceCriteria": [
+        "A CI check runs on pull_request events that validates the PR title",
+        "PR titles following conventional commits spec (feat:, fix:, chore:, etc.) pass the check",
+        "PR titles not following the spec fail the check with a clear error message",
+        "Breaking change indicators (feat!:, fix!:, BREAKING CHANGE footer) are accepted",
+        "Scoped commits like feat(feed-reader): are accepted",
+        "The check does not require installing Node.js or heavy dependencies if avoidable"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-002-04",
+      "title": "Document release workflow in ARCHITECTURE.md",
+      "description": "As a developer, I want the release management strategy documented in ARCHITECTURE.md so that all contributors understand the versioning, tagging, and release process.\n\nAdd a 'Release Management' section to ARCHITECTURE.md covering:\n- Conventional commit requirements and examples\n- How release-please works (Release PRs, auto-tagging, GitHub Releases)\n- Tag naming convention (component-vX.Y.Z)\n- How to add a new component to release-please\n- How Argo CD references component tags for deployments\n\nAlso update the Architecture Diagram section to reference D2 instead of Mermaid C4 (it still says Mermaid).",
+      "acceptanceCriteria": [
+        "ARCHITECTURE.md contains a 'Release Management' section",
+        "Section documents conventional commit format with examples",
+        "Section explains release-please manifest mode and the Release PR workflow",
+        "Section lists the tag naming convention (platform-vX.Y.Z, service-vX.Y.Z, etc.)",
+        "Section explains how to register a new component",
+        "Section explains how Argo CD consumes tags",
+        "Architecture Diagram section updated to reference D2 instead of Mermaid C4"
+      ],
+      "priority": 4,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "sourceTaskId": "TDP-002-06",
+      "title": "Validate release setup with a dry-run release",
+      "description": "As a developer, I want to verify that release-please correctly opens a Release PR after a conventional commit is pushed to main.\n\nThis is a validation step: after the previous stories are merged to main, push a conventional commit and verify that:\n1. The release-please action runs\n2. A Release PR is opened with correct version bump (0.1.0 → 0.2.0 for a feat, or 0.1.1 for a fix)\n3. The PR updates CHANGELOG.md in monorepo/\n4. The PR updates .release-please-manifest.json\n5. The tag prefix is 'platform-v'",
+      "acceptanceCriteria": [
+        "release-please GitHub Action runs successfully on push to main",
+        "A Release PR is opened automatically by release-please",
+        "The Release PR contains a CHANGELOG.md update in monorepo/",
+        "The Release PR updates .release-please-manifest.json with the new version",
+        "The proposed tag uses the platform-v prefix"
+      ],
+      "priority": 5,
+      "passes": false,
+      "humanReview": true,
+      "notes": "This task requires merging to main and observing release-please behavior. Human review needed to verify the Release PR looks correct."
+    }
+  ]
+}
