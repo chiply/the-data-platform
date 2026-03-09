@@ -97,7 +97,7 @@
         "Typecheck passes (npx tsc --noEmit)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: M. Depends on US-001."
     },

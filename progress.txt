@@ -31,3 +31,9 @@ PRD: tasks/prd-kubernetes-local-development.json
 - Files changed: monorepo/infra/platform/{index.ts, charts/cert-manager.ts, charts/monitoring.ts}
 - Learnings: Chart modules accept { provider, environment } as a clean interface pattern for future chart additions.
 ---
+
+## US-005 - Create ServiceDeployment component resource
+- What was implemented: ServiceDeployment ComponentResource at monorepo/infra/components/ with Deployment + Service + optional Ingress. Consistent app.kubernetes.io/* labels.
+- Files changed: monorepo/infra/components/{package.json, package-lock.json, tsconfig.json, service-deployment.ts, index.ts}
+- Learnings: ComponentResource type strings follow `tdp:components:<ClassName>` convention. pulumi.Input<T> wrapping needed for args from other outputs.
+---
