@@ -24,11 +24,11 @@ jobs:
 
           # release-please tags follow the pattern: component-vX.Y.Z
           # Extract component name (everything before the last -vX.Y.Z)
-          if echo "$TAG_NAME" | grep -qE '^.+-v[0-9]+\.[0-9]+\.[0-9]+'; then
+          if echo "$TAG_NAME" | grep -qE '^.+-v[0-9]+\.[0-9]+\.[0-9]+$'; then
             component=$(echo "$TAG_NAME" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+$//')
             version=$(echo "$TAG_NAME" | sed -E 's/^.+-v//')
           else
-            echo "ERROR: Tag '$TAG_NAME' does not match expected pattern: <component>-v<version>"
+            echo "ERROR: Tag '$TAG_NAME' does not match expected pattern: <component>-vMAJOR.MINOR.PATCH (e.g. my-service-v1.2.3)"
             exit 1
           fi
 
