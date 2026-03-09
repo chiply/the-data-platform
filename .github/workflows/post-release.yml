@@ -1,0 +1,97 @@
+name: Post-Release Artifacts
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-container:
+    name: Build Container Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse release tag
+        id: parse
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          echo "Release tag: $TAG_NAME"
+
+          # release-please tags follow the pattern: component-vX.Y.Z
+          # Extract component name (everything before the last -vX.Y.Z)
+          if echo "$TAG_NAME" | grep -qE '^.+-v[0-9]+\.[0-9]+\.[0-9]+'; then
+            component=$(echo "$TAG_NAME" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+$//')
+            version=$(echo "$TAG_NAME" | sed -E 's/^.+-v//')
+          else
+            echo "ERROR: Tag '$TAG_NAME' does not match expected pattern: <component>-v<version>"
+            exit 1
+          fi
+
+          echo "Component: $component"
+          echo "Version: $version"
+          echo "component=$component" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve component path from release-please-config.json
+        id: resolve
+        env:
+          COMPONENT: ${{ steps.parse.outputs.component }}
+        run: |
+          config_file="release-please-config.json"
+          if [ ! -f "$config_file" ]; then
+            echo "ERROR: $config_file not found"
+            exit 1
+          fi
+
+          # Find the path whose component name matches the release tag component
+          path=$(jq -r --arg comp "$COMPONENT" \
+            '.packages | to_entries[] | select(.value.component == $comp) | .key' \
+            "$config_file")
+
+          if [ -z "$path" ]; then
+            echo "ERROR: No package found with component '$COMPONENT' in $config_file"
+            exit 1
+          fi
+
+          echo "Resolved component '$COMPONENT' to path: $path"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Check for Dockerfile
+        id: dockerfile
+        env:
+          COMPONENT_PATH: ${{ steps.resolve.outputs.path }}
+        run: |
+          if [ -f "$COMPONENT_PATH/Dockerfile" ]; then
+            echo "Dockerfile found at $COMPONENT_PATH/Dockerfile"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile found at $COMPONENT_PATH/Dockerfile — skipping container build."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to GitHub Container Registry
+        if: steps.dockerfile.outputs.exists == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        if: steps.dockerfile.outputs.exists == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push container image
+        if: steps.dockerfile.outputs.exists == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.resolve.outputs.path }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
+            ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:latest
