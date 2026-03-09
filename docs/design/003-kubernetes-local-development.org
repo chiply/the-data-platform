@@ -47,7 +47,7 @@ a single interface: the kubeconfig.
 │    sealed-secrets, etc.)             │
 ├──────────────────────────────────────┤
 │        Cluster Layer                 │  Different providers per environment
-│   k3d / kind  │  EKS / GKE / AKS    │  (this is the abstraction seam)
+│   k3d / kind  │  k3s on Linode       │  (this is the abstraction seam)
 └──────────────────────────────────────┘
 #+end_src
 
@@ -181,14 +181,14 @@ TypeScript aligns with:
 
 | Concern                 | Local                           | Production                        |
 |-------------------------+---------------------------------+-----------------------------------|
-| Cluster provisioning    | k3d CLI                         | EKS/GKE API                      |
+| Cluster provisioning    | k3d CLI                         | Linode API + k3s install          |
 | Ingress                 | Traefik (bundled with k3d)      | Traefik (bundled with k3s)        |
 | TLS                     | Self-signed / none              | Let's Encrypt                     |
 | DNS                     | =*.localhost=                   | Real domains                      |
-| Container registry      | =k3d-registry:5111=            | ECR/GCR/ACR                       |
+| Container registry      | =k3d-registry:5111=            | GitHub Container Registry (ghcr.io) |
 | Resource requests       | Minimal (100m CPU, 128Mi)       | Production-sized                  |
-| Replica count           | 1                               | 3+                                |
-| PV provisioner          | local-path                      | EBS/PD CSI driver                 |
+| Replica count           | 1                               | 1 (single node, scale later)      |
+| PV provisioner          | local-path                      | Linode CSI driver / local-path    |
 | Monitoring retention    | 6h                              | 30d+                              |
 
 ** Argo CD Readiness
@@ -384,6 +384,21 @@ Update =monorepo/infra/README.md= with:
 - How to access services (ingress, port-forwarding)
 - Teardown (=./scripts/local-down.sh=)
 
+** TODO [TDP-003-11] Add Tilt for local development inner loop          :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create a Tiltfile at =monorepo/Tiltfile= (or =monorepo/infra/Tiltfile=) for fast
+local development iteration:
+- Configure =docker_build()= for the example service Dockerfile with =live_update= rules
+- Point at the local k3d cluster and registry
+- Define resources for platform services (mark as =k8s_resource= with auto_init=False for optional ones)
+- Wire up the =ServiceDeployment= Pulumi component output (rendered K8s YAML) or define
+  K8s resources directly for dev-mode deployments
+- Verify =tilt up= works end-to-end: file change → image rebuild → pod restart in <5s
+- Document Tilt usage in =monorepo/infra/README.md=
+
 * Questions
 :PROPERTIES:
 :CATEGORY: questions
@@ -400,9 +415,13 @@ provisions the Linode instance via =@pulumi/linode= and installs k3s via the Com
 provider — same pattern as the local k3d cluster provider.
 
 Single-node k3s runs the control plane (API server, scheduler, controller manager,
-SQLite datastore) and worker on the same machine. This is appropriate for dev/staging.
-For production HA, additional nodes can be added to the k3s cluster, or migration to
-LKE (managed control plane) is straightforward.
+SQLite datastore) and worker on the same machine. 4GB provides headroom for the
+platform services (Traefik, cert-manager, monitoring) alongside application workloads.
+This is appropriate for dev/staging. For production HA, additional nodes can be added
+to the k3s cluster, or migration to LKE (managed control plane) is straightforward.
+
+Container images are stored on GitHub Container Registry (ghcr.io), which is free for
+public images and included with GitHub plans for private images.
 
 Cost comparison considered: Hetzner (~$22/mo, EU-only), DigitalOcean (~$87/mo),
 Vultr (~$82/mo), AWS EKS (~$180/mo). Linode at $24/mo (4GB single node, no NodeBalancer)

@@ -144,7 +144,7 @@
       "description": "As a developer, I want a Linode k3s cluster provider so that I can provision a production Kubernetes cluster on Linode using the same Pulumi infrastructure code.",
       "acceptanceCriteria": [
         "monorepo/infra/cluster/providers/linode-k3s.ts exists and exports a function or class that provisions a Linode instance with k3s",
-        "Uses @pulumi/linode to create a Linode 2GB instance",
+        "Uses @pulumi/linode to create a Linode 4GB instance",
         "Uses @pulumi/command remote provisioner to install k3s via curl -sfL https://get.k3s.io | sh -",
         "Configures Linode firewall rules to allow ports 80, 443, and 6443 (K8s API)",
         "Exports kubeconfig as a Pulumi output",
