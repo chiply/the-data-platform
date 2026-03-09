@@ -135,9 +135,9 @@
         "Rendered diagrams have clean layout with no overlapping arrows"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
-      "notes": "Effort: 4:00. Priority: p0. Replaces Mermaid due to poor C4 layout. D2 eliminates Puppeteer/Chrome dependency."
+      "notes": "Effort: 4:00. Priority: p0. COMPLETED: Full migration — D2 genrules, Mermaid/npm removed, diagrams rewritten, ~300ms builds."
     },
     {
       "id": "US-008",

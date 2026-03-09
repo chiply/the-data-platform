@@ -58,3 +58,14 @@ PRD: tasks/prd-monorepo-bootstrap.json
 - Files changed: monorepo/tools/architecture-diagram/diagrams/c4-container.mmd, BUILD.bazel updated
 - Learnings: C4Container uses System_Boundary + Container(); builds in ~3s when cache warm
 ---
+
+## US-009 - Migrate diagram tool from Mermaid to D2
+- What was implemented: Full Mermaid→D2 migration. D2 genrules replace js_run_binary/Puppeteer. npm deps removed from MODULE.bazel.
+- Files changed: MODULE.bazel, BUILD.bazel, new .d2 files, deleted .mmd/package.json/pnpm-lock.yaml/mermaidrc.json/.bazelignore
+- Learnings:
+  - D2 genrules are dramatically simpler — no Puppeteer, Chrome, npm, sandbox workarounds
+  - D2 ELK layout works out of box with --layout=elk flag
+  - Build time ~300ms per diagram vs seconds with Mermaid/Puppeteer
+  - MODULE.bazel.lock auto-regenerates when deps change; commit alongside MODULE.bazel
+  - aspect_rules_js no longer needed after removing Mermaid
+---
