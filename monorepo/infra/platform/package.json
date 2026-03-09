@@ -1,0 +1,16 @@
+{
+  "name": "tdp-platform",
+  "version": "0.0.1",
+  "description": "Platform layer for The Data Platform — core services bootstrapping",
+  "main": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/kubernetes": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
