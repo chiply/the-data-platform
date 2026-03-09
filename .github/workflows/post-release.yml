@@ -53,7 +53,7 @@ jobs:
             '.packages | to_entries[] | select(.value.component == $comp) | .key' \
             "$config_file")
 
-          if [ -z "$path" ]; then
+          if [ -z "$path" ] || [ "$path" = "null" ]; then
             echo "ERROR: No package found with component '$COMPONENT' in $config_file"
             exit 1
           fi
