@@ -1,0 +1,15 @@
+# Ralph Progress Log
+Started: 2026-03-09
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-kubernetes-local-development.json
+
+## Codebase Patterns
+- Pulumi config keys are namespaced by project name (e.g., `tdp-cluster:clusterType`), so stack config files must use the `config:` top-level key with fully qualified names.
+- The provider dispatch pattern (switch on clusterType in index.ts, delegate to provider modules in `providers/`) is extensible.
+- @pulumi/command is useful for wrapping CLI tools (like k3d) that don't have native Pulumi providers.
+---
+
+## US-001 - Initialize Pulumi cluster project
+- What was implemented: Complete Pulumi project for cluster provisioning at monorepo/infra/cluster/. Includes Pulumi.yaml, Pulumi.local.yaml, package.json, tsconfig.json, index.ts with provider dispatch, and a k3d provider stub.
+- Files changed: monorepo/infra/cluster/{Pulumi.yaml, Pulumi.local.yaml, package.json, package-lock.json, tsconfig.json, index.ts, providers/index.ts, providers/k3d.ts}
+---

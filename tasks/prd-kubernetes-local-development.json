@@ -19,7 +19,7 @@
         "Typecheck passes (npx tsc --noEmit)"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: M. This is the foundation — all other infra tasks depend on this."
     },
