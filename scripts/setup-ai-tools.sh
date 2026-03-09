@@ -1,12 +1,31 @@
 #!/usr/bin/env bash
 # setup-ai-tools.sh — Install Claude Code skills and configure MCP servers
 #
-# Usage: ./scripts/setup-ai-tools.sh
+# Usage: ./scripts/setup-ai-tools.sh [--upgrade]
 #
 # Installs all agent skills into .agents/skills/ (symlinked to .claude/skills/)
 # and creates .claude/settings.local.json with MCP server configuration.
+#
+# Options:
+#   --upgrade   Re-install all skills even if already present
 
 set -euo pipefail
+
+UPGRADE=0
+for arg in "$@"; do
+  case "$arg" in
+    --upgrade) UPGRADE=1 ;;
+    -h|--help)
+      echo "Usage: ./scripts/setup-ai-tools.sh [--upgrade]"
+      echo "  --upgrade   Re-install all skills even if already present"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $arg" >&2
+      exit 1
+      ;;
+  esac
+done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -92,12 +111,18 @@ declare -A SKILLS=(
 INSTALLED=0
 SKIPPED=0
 
+UPGRADED=0
+
 for skill in "${!SKILLS[@]}"; do
   repo="${SKILLS[$skill]}"
-  if [[ -d ".agents/skills/$skill" ]]; then
+  if [[ -d ".agents/skills/$skill" ]] && [[ $UPGRADE -eq 0 ]]; then
     ok "$skill (already installed)"
     SKIPPED=$((SKIPPED + 1))
   else
+    if [[ -d ".agents/skills/$skill" ]]; then
+      rm -rf ".agents/skills/$skill"
+      UPGRADED=$((UPGRADED + 1))
+    fi
     info "Installing $skill..."
     if npx skills add "$repo" --skill "$skill" -y >/dev/null 2>&1; then
       ok "$skill"
@@ -109,7 +134,7 @@ for skill in "${!SKILLS[@]}"; do
 done
 
 echo ""
-echo "Skills: $INSTALLED installed, $SKIPPED already present"
+echo "Skills: $INSTALLED installed, $UPGRADED upgraded, $SKIPPED already present"
 echo ""
 
 # ---------- MCP servers ----------
