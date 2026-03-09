@@ -40,3 +40,9 @@ PRD: tasks/prd-monorepo-bootstrap.json
 - Files changed: monorepo/scripts/{build.sh,test.sh,render-diagrams.sh}
 - Learnings: bazel test //... returns exit code 4 when no test targets exist (expected, not failure); diagram target is //tools/architecture-diagram:sample_svg
 ---
+
+## US-005 - Implement affected-targets detection script
+- What was implemented: affected.sh with git diff, scoping rules, rdeps query, CI_BASE_BRANCH support
+- Files changed: monorepo/scripts/affected.sh (103 lines)
+- Learnings: macOS lacks GNU realpath --relative-to; use pwd -P and string stripping instead
+---

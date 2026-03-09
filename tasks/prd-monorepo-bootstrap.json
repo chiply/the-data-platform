@@ -85,9 +85,9 @@
         "Follows scoping rules from the design doc (e.g., scripts/ changes trigger full CI run)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
-      "notes": "Effort: 4:00. Priority: p0. Depends on US-004 (CI wrapper scripts)."
+      "notes": "Effort: 4:00. Priority: p0. Depends on US-004. COMPLETED: affected.sh with scoping rules, rdeps query, CI_BASE_BRANCH support."
     },
     {
       "id": "US-006",
