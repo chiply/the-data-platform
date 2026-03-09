@@ -52,3 +52,8 @@ PRD: tasks/prd-kubernetes-local-development.json
 - What was implemented: linode-k3s.ts provider using @pulumi/linode for Nanode 2GB instance with k3s, firewall (80/443/6443), kubeconfig retrieval with IP rewriting. Pulumi.production.yaml stack config.
 - Files changed: monorepo/infra/cluster/providers/linode-k3s.ts, index.ts, providers/index.ts, package.json, Pulumi.production.yaml
 ---
+
+## US-009 - Create base Dockerfile and example service image
+- What was implemented: Multi-stage Python 3.12 base Dockerfile, example FastAPI service with Dockerfile, README with build+push workflow docs.
+- Files changed: monorepo/services/{Dockerfile.base, requirements-base.txt, README.md, example/Dockerfile, example/main.py, example/requirements.txt}
+---
