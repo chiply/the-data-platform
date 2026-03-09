@@ -120,6 +120,26 @@
       "notes": "Effort: 4:00. Priority: p1. Depends on US-003. COMPLETED: c4-container.mmd with all platform internals, renders to SVG."
     },
     {
+      "id": "US-009",
+      "sourceTaskId": "TDP-001-09",
+      "title": "Migrate diagram tool from Mermaid to D2",
+      "description": "As a developer, I want to replace Mermaid with D2 for architecture diagrams so that diagrams have better auto-layout, proper arrow routing, and first-class C4 support. Remove the Mermaid npm dependencies from MODULE.bazel, rewrite .mmd diagram files as .d2 files, update BUILD.bazel to use a D2 genrule, and update render-diagrams.sh.",
+      "acceptanceCriteria": [
+        "D2 CLI is available (installed via brew or toolchain)",
+        "tools/architecture-diagram/diagrams/c4-context.d2 exists with valid D2 syntax",
+        "tools/architecture-diagram/diagrams/c4-container.d2 exists with valid D2 syntax",
+        "BUILD.bazel uses D2 genrule targets instead of Mermaid/mmdc",
+        "Mermaid npm dependencies removed from MODULE.bazel (npm_translate_lock, package.json, pnpm-lock.yaml)",
+        "bazel build //tools/architecture-diagram/... produces SVG output",
+        "render-diagrams.sh updated to work with new targets",
+        "Rendered diagrams have clean layout with no overlapping arrows"
+      ],
+      "priority": 8,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: 4:00. Priority: p0. Replaces Mermaid due to poor C4 layout. D2 eliminates Puppeteer/Chrome dependency."
+    },
+    {
       "id": "US-008",
       "sourceTaskId": "TDP-001-07",
       "title": "Validate end-to-end: build, test, render",
@@ -131,7 +151,7 @@
         "scripts/build.sh, scripts/test.sh, and scripts/render-diagrams.sh all work correctly",
         "scripts/affected.sh correctly identifies affected targets"
       ],
-      "priority": 8,
+      "priority": 9,
       "passes": false,
       "humanReview": true,
       "notes": "Effort: 2:00. Priority: p0. Final validation — depends on all other tasks. Natural human review checkpoint."

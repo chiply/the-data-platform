@@ -223,6 +223,16 @@ against the base branch. Use =bazel query rdeps(//..., set(...))= to walk the de
 graph. Output should be consumable by =build.sh= and =test.sh=. Must work locally
 (diffing against main) and in CI (diffing against the PR base).
 
+** TODO [TDP-001-09] Migrate diagram tool from Mermaid to D2               :p0:
+:PROPERTIES:
+:EFFORT: 4:00
+:END:
+
+Replace Mermaid CLI with D2 for architecture diagrams. D2 provides better auto-layout,
+proper arrow routing, first-class C4 support with layers, and eliminates the Puppeteer/Chrome
+dependency. Rewrite =.mmd= diagram files as =.d2= files, update BUILD.bazel to use a D2
+genrule, remove the Mermaid npm dependencies from MODULE.bazel, and update =render-diagrams.sh=.
+
 ** TODO [TDP-001-07] Validate end-to-end: build, test, render               :p0:
 :PROPERTIES:
 :EFFORT: 2:00
@@ -261,7 +271,10 @@ bzlmod. Modern approach, actively developed, avoids deprecated WORKSPACE.
 ** DECIDED Diagram rendering approach
 :PROPERTIES:
 :DECIDED: [2026-03-09]
+:UPDATED: [2026-03-09]
 :END:
 
-Source =.mmd= files committed. Rendered output generated on demand via Bazel, not
-committed. ELK layout engine required for complex diagrams. Presentation layer deferred.
+Migrated from Mermaid to D2. Mermaid's C4 diagram types had poor layout control
+(ELK didn't apply, arrows overlapped). D2 provides better auto-layout, first-class
+C4 support with layers, and eliminates the Puppeteer/Chrome dependency. Source =.d2=
+files committed, rendered output generated on demand via Bazel.
