@@ -1,0 +1,15 @@
+{
+  "name": "tdp-cluster",
+  "version": "0.1.0",
+  "description": "Cluster provisioning layer for The Data Platform",
+  "main": "index.ts",
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@pulumi/command": "^1.0.0",
+    "@pulumi/linode": "^4.0.0",
+    "@pulumi/pulumi": "^3.0.0"
+  }
+}
