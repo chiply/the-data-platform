@@ -1,0 +1,17 @@
+{
+  "name": "tdp-components",
+  "version": "0.1.0",
+  "description": "Reusable Pulumi component resources for The Data Platform",
+  "main": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/kubernetes": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.0.0"
+  }
+}
