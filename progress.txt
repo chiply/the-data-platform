@@ -46,3 +46,9 @@ PRD: tasks/prd-monorepo-bootstrap.json
 - Files changed: monorepo/scripts/affected.sh (103 lines)
 - Learnings: macOS lacks GNU realpath --relative-to; use pwd -P and string stripping instead
 ---
+
+## US-006 - Create initial C4 Context diagram
+- What was implemented: c4-context.mmd with platform, users, RSS sources, cloud provider; c4_context_svg Bazel target
+- Files changed: monorepo/tools/architecture-diagram/diagrams/c4-context.mmd, BUILD.bazel updated
+- Learnings: C4Context syntax doesn't use frontmatter; BUILD target pattern is straightforward duplication; builds in ~7s
+---
