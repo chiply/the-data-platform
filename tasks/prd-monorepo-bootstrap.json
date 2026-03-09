@@ -152,7 +152,7 @@
         "scripts/affected.sh correctly identifies affected targets"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Effort: 2:00. Priority: p0. Final validation — depends on all other tasks. Natural human review checkpoint."
     }

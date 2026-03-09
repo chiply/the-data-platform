@@ -69,3 +69,9 @@ PRD: tasks/prd-monorepo-bootstrap.json
   - MODULE.bazel.lock auto-regenerates when deps change; commit alongside MODULE.bazel
   - aspect_rules_js no longer needed after removing Mermaid
 ---
+
+## US-008 - Validate end-to-end: build, test, render (post-D2 migration)
+- What was implemented: All 8 validation checks passed. No fixes needed.
+- Files changed: none
+- Learnings: D2 genrules compile cleanly, disk cache hits make rebuilds fast
+---
