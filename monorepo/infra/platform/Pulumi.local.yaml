@@ -1,0 +1,2 @@
+config:
+  tdp-platform:clusterStackRef: organization/tdp-cluster/local
