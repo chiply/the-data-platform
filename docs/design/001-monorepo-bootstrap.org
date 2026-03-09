@@ -1,0 +1,267 @@
+#+TITLE: 001 - Monorepo Bootstrap
+#+AUTHOR: Charlie Holland
+#+STATUS: Accepted
+#+CATEGORY: infra
+#+CREATED: [2026-03-09]
+#+LAST_MODIFIED: [2026-03-09]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Initialize the Bazel monorepo with bzlmod, scaffold the directory structure defined in
+[[file:../../ARCHITECTURE.md][ARCHITECTURE.md]], and create the first sub-repo: a Mermaid C4
+diagram tool for rendering the platform's architecture diagrams.
+
+* Motivation
+
+The monorepo is the foundation everything else builds on. Nothing can be implemented until
+the build system is in place and the directory structure exists. The C4 diagram tool is a
+good first sub-repo because it's small, self-contained, exercises both the Node.js and Bazel
+toolchains, and produces an immediately useful artifact — the platform's architecture diagram.
+
+* Design
+
+** Bazel Setup (bzlmod)
+
+Use bzlmod (=MODULE.bazel=) as the dependency management approach. This is the modern Bazel
+direction and avoids the deprecated =WORKSPACE= file.
+
+Key files at =monorepo/= root:
+
+- =MODULE.bazel= — declares module name, bazel_dep entries for rules_python, rules_nodejs, etc.
+- =.bazelrc= — common build settings (remote caching, test output verbosity, platform flags)
+- =.bazelversion= — pins the Bazel version
+- =BUILD.bazel= — root BUILD file
+
+** Directory Structure
+
+Scaffold all directories from ARCHITECTURE.md, each with an empty =BUILD.bazel= and a brief
+=README.md= explaining the directory's purpose:
+
+#+begin_example
+monorepo/
+├── MODULE.bazel
+├── .bazelrc
+├── .bazelversion
+├── BUILD.bazel
+├── services/
+├── libs/
+├── schemas/
+├── sdks/
+├── workflows/
+├── pipelines/
+├── infra/
+├── deploy/
+├── tools/
+│   └── architecture-diagram/
+├── scripts/
+└── third_party/
+#+end_example
+
+** C4 Diagram Tool
+
+Located at =monorepo/tools/architecture-diagram/=.
+
+*** Approach
+
+- Mermaid =.mmd= source files are committed to the repo (diagrams-as-code)
+- Rendered SVG/PNG output is *not* committed — generated on demand via Bazel target
+- Uses ELK layout engine (=elk= renderer in Mermaid) for clean rendering of complex diagrams
+- Mermaid CLI (=@mermaid-js/mermaid-cli=) handles rendering, managed via rules_nodejs
+
+*** File Structure
+
+#+begin_example
+tools/architecture-diagram/
+├── BUILD.bazel           # Bazel targets for rendering
+├── package.json          # mermaid-cli + elk dependency
+├── mermaidrc.json        # Mermaid config (elk layout, theme)
+├── diagrams/
+│   ├── c4-context.mmd    # C4 Level 1 — System Context
+│   └── c4-container.mmd  # C4 Level 2 — Container
+└── README.md
+#+end_example
+
+*** Mermaid Configuration
+
+=mermaidrc.json= should configure:
+- ELK as the layout engine
+- Consistent theme across all diagrams
+- SVG and PNG as output formats
+
+*** Initial Diagrams
+
+Two starting diagrams:
+
+1. *C4 Context* — the platform as a whole, its users, and external systems (RSS sources,
+   cloud providers)
+2. *C4 Container* — zoom into the platform showing: services, orchestration (Temporal,
+   Dagster), schema registry, intelligent broker, search, and infrastructure
+
+** CI Scripts
+
+Initial scripts in =monorepo/scripts/=:
+
+- =build.sh= — wraps =bazel build //...=
+- =test.sh= — wraps =bazel test //...=
+- =render-diagrams.sh= — wraps the diagram Bazel target for convenience
+
+All scripts must be runnable locally with no special environment beyond Bazel.
+
+** Scoped CI
+
+CI actions must support path-based scoping — only fire when files in a given directory
+have changed. This is critical for monorepo efficiency; a change to a single service
+should not trigger builds/tests for every other service.
+
+*** Approach
+
+- Bazel already understands the dependency graph — =bazel query= and
+  =bazel cquery rdeps(//..., set(<changed targets>))= can determine affected targets
+  from a set of changed files.
+- CI scripts should accept an optional scope (directory or Bazel package) and default to
+  detecting changed files from the git diff against the base branch.
+- A =scripts/affected.sh= script computes the set of affected Bazel targets from the
+  commit diff and feeds them to =build.sh= and =test.sh=.
+
+*** Scoping Rules
+
+| Change Path                        | Triggers                                              |
+|------------------------------------+-------------------------------------------------------|
+| =monorepo/services/<svc>/=          | Build + test for that service and its reverse deps    |
+| =monorepo/libs/<lib>/=              | Build + test for the lib and all services depending on it |
+| =monorepo/schemas/=                 | Compatibility checks, SDK regeneration, affected services |
+| =monorepo/tools/architecture-diagram/= | Diagram rendering only                             |
+| =monorepo/infra/=                   | Pulumi preview/plan                                   |
+| =monorepo/deploy/=                  | Deploy manifest validation                            |
+| =monorepo/scripts/=                 | Full CI run (changes to CI itself should validate everything) |
+
+*** Local Usage
+
+Developers can run the same scoped checks locally:
+
+#+begin_example
+# Run only affected targets
+./scripts/affected.sh | xargs ./scripts/test.sh
+
+# Or scope manually
+./scripts/test.sh //services/feed-reader/...
+#+end_example
+
+* Decision
+
+- bzlmod over WORKSPACE (modern, actively developed)
+- ELK layout for Mermaid (necessary for complex diagram readability)
+- Diagram source committed, rendered output not committed (generated on demand)
+- Presentation layer deferred to a future design doc
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+** TODO [TDP-001-01] Initialize MODULE.bazel and Bazel configuration        :p0:
+:PROPERTIES:
+:EFFORT: 4:00
+:END:
+
+Create =MODULE.bazel= with module name and initial =bazel_dep= entries (rules_python,
+rules_nodejs). Create =.bazelrc= with common settings. Create =.bazelversion= pinning
+Bazel version. Create root =BUILD.bazel=.
+
+** TODO [TDP-001-02] Scaffold monorepo directory structure                  :p0:
+:PROPERTIES:
+:EFFORT: 1:00
+:END:
+
+Create all directories defined in ARCHITECTURE.md (services, libs, schemas, sdks,
+workflows, pipelines, infra, deploy, tools, scripts, third_party). Each gets an empty
+=BUILD.bazel= and a brief =README.md=.
+
+** TODO [TDP-001-03] Set up architecture-diagram tool with Mermaid CLI      :p0:
+:PROPERTIES:
+:EFFORT: 4:00
+:END:
+
+Create =tools/architecture-diagram/= with =package.json= (mermaid-cli, elk dependency),
+=mermaidrc.json= (ELK layout, theme config), =BUILD.bazel= with render targets, and
+=README.md=. Verify =bazel build= produces SVG/PNG output.
+
+** TODO [TDP-001-04] Create initial C4 Context diagram                      :p1:
+:PROPERTIES:
+:EFFORT: 2:00
+:END:
+
+Write =diagrams/c4-context.mmd= showing the platform, its users, and external systems
+(RSS feed sources, cloud providers). Use Mermaid C4 syntax with ELK layout.
+
+** TODO [TDP-001-05] Create initial C4 Container diagram                    :p1:
+:PROPERTIES:
+:EFFORT: 4:00
+:END:
+
+Write =diagrams/c4-container.mmd= zooming into the platform internals: FastAPI services,
+Temporal orchestration, Dagster pipelines, schema registry, intelligent broker, search,
+k8s compute, Pulumi infra. Use Mermaid C4 syntax with ELK layout.
+
+** TODO [TDP-001-06] Create CI wrapper scripts                              :p1:
+:PROPERTIES:
+:EFFORT: 1:00
+:END:
+
+Create =scripts/build.sh=, =scripts/test.sh=, and =scripts/render-diagrams.sh=. Each
+wraps the corresponding Bazel command. All must be runnable locally. Scripts should accept
+an optional Bazel target pattern to support scoped execution.
+
+** TODO [TDP-001-08] Implement affected-targets detection script            :p0:
+:PROPERTIES:
+:EFFORT: 4:00
+:END:
+
+Create =scripts/affected.sh= that computes affected Bazel targets from the git diff
+against the base branch. Use =bazel query rdeps(//..., set(...))= to walk the dependency
+graph. Output should be consumable by =build.sh= and =test.sh=. Must work locally
+(diffing against main) and in CI (diffing against the PR base).
+
+** TODO [TDP-001-07] Validate end-to-end: build, test, render               :p0:
+:PROPERTIES:
+:EFFORT: 2:00
+:END:
+
+Run the full cycle locally: =bazel build //...=, =bazel test //...=, and diagram rendering.
+Fix any issues. This validates the monorepo foundation works before building on it.
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Which Bazel version to pin?
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Bazel 7 LTS. bzlmod enabled by default, stable, well-documented.
+
+** DECIDED rules_js approach for mermaid-cli
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+rules_js from Aspect. Actively maintained, better bzlmod support, pnpm-style lockfiles,
+aligned with modern Bazel direction.
+
+** DECIDED bzlmod vs WORKSPACE
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+bzlmod. Modern approach, actively developed, avoids deprecated WORKSPACE.
+
+** DECIDED Diagram rendering approach
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Source =.mmd= files committed. Rendered output generated on demand via Bazel, not
+committed. ELK layout engine required for complex diagrams. Presentation layer deferred.
