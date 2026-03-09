@@ -42,3 +42,8 @@ PRD: tasks/prd-kubernetes-local-development.json
 - What was implemented: local-up.sh and local-down.sh scripts with prerequisite validation, pulumi up/destroy sequencing, and cluster access info output.
 - Files changed: monorepo/infra/scripts/{local-up.sh, local-down.sh}
 ---
+
+## US-007 - Add smoke test for local cluster [NEEDS HUMAN REVIEW]
+- What was implemented: smoke-test.sh that deploys nginx to smoke-test namespace, tests HTTP via Traefik ingress with curl --resolve, cleans up via trap.
+- Files changed: monorepo/infra/scripts/smoke-test.sh
+---
