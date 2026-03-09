@@ -13,3 +13,9 @@ PRD: tasks/prd-kubernetes-local-development.json
 - What was implemented: Complete Pulumi project for cluster provisioning at monorepo/infra/cluster/. Includes Pulumi.yaml, Pulumi.local.yaml, package.json, tsconfig.json, index.ts with provider dispatch, and a k3d provider stub.
 - Files changed: monorepo/infra/cluster/{Pulumi.yaml, Pulumi.local.yaml, package.json, package-lock.json, tsconfig.json, index.ts, providers/index.ts, providers/k3d.ts}
 ---
+
+## US-002 - Implement k3d cluster provider
+- What was implemented: Full k3d provider using @pulumi/command. Creates local registry, k3d cluster with port mappings (80/443), configurable worker count, kubeconfig export. Includes cleanup commands.
+- Files changed: monorepo/infra/cluster/providers/k3d.ts (full implementation), monorepo/infra/cluster/index.ts (updated exports)
+- Learnings: K3dClusterResult interface with kubeconfig/registryUrl/clusterName outputs is the contract for downstream stack references.
+---
