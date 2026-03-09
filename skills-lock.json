@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "skills": {
+    "api-security-best-practices": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "ce16d10df486a28a3ba894d646de3243fc2bf9990f563fc7a9b074fd720e24d5"
+    },
+    "cost-optimization": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "b0b1d4e8aa01a3befa06323cf244497b62bbc450d8b96f8085187ac04a3de9d6"
+    },
+    "devops-engineer": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "41795f38a0cc207a5336a60313b84df732b5be2ed9215b3a0f8202f9e0e932fe"
+    },
+    "docker-best-practices": {
+      "source": "josiahsiegel/claude-plugin-marketplace",
+      "sourceType": "github",
+      "computedHash": "1018a8d7e4d63fa1659d1a7845ca6511a6c020b517e396893636070716c7169b"
+    },
+    "github-actions-templates": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "8604814828637308a8cdc45c53e647f0029395328184937312330e4b8e8c587f"
+    },
+    "gitops-workflow": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "e8df22024090440fce624e6a99faca4b66aa267a428b5a63a0c0416fa4eb2629"
+    },
+    "helm-chart-development": {
+      "source": "laurigates/claude-plugins",
+      "sourceType": "github",
+      "computedHash": "099a4787dfaee7be61be4a95bac95f5308243650dd5b4461d00e2fa6cb12ac83"
+    },
+    "incident-runbook-templates": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "6f57be2635c18509c6f1e36ec8175d69f5fecd50c6356332935a568f13fbd820"
+    },
+    "k8s-security-policies": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "47d2fe175423c7bc4f26019b3acf0ea7d3f37159172a217466c50b8d1b83cbb4"
+    },
+    "kubernetes-specialist": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "0201bb26821bd6de6ea341f45da863ef70bba0b44363da72f26b7bf7c86869e9"
+    },
+    "monitoring-expert": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "d455f9afce9b628e130785d0159d10f446732b71ec9d9fe3571e1ba4eb0bfa4d"
+    },
+    "pulumi-best-practices": {
+      "source": "pulumi/agent-skills",
+      "sourceType": "github",
+      "computedHash": "cd48dc6635221399fb4b2aec3853feaa00181e65c7392d1fa6af573e5b027f90"
+    },
+    "pulumi-esc": {
+      "source": "pulumi/agent-skills",
+      "sourceType": "github",
+      "computedHash": "9f13f9307a31bb897bab3f94f46da302ee7033dbeb30cae38f8cab5203ddcd7d"
+    },
+    "pulumi-typescript": {
+      "source": "dirien/claude-skills",
+      "sourceType": "github",
+      "computedHash": "5bcb152d8a3b1fe4bfd5d03ce48fca08260c6907e0a397a750c5933d89294504"
+    },
+    "sre-engineer": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "88ee9a1685f0416eefd64ba82736e69a56ec14890ffda6dc1f878b99e451da11"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "computedHash": "72e9ab72627e4fd8ed26a582e82309a98ecdc4f6e1c99418430ac05682c9e91d"
+    },
+    "tilt": {
+      "source": "0xbigboss/claude-code",
+      "sourceType": "github",
+      "computedHash": "719d9ac4a0fc9f8cf644deb205bd13426d3fe5ce00b31e6ec65692571598d575"
+    },
+    "tiltup": {
+      "source": "0xbigboss/claude-code",
+      "sourceType": "github",
+      "computedHash": "0af66eeb27cc56bfb522787d49b6d2b02223ab16e1fd0d9945ec48929628a532"
+    }
+  }
+}
