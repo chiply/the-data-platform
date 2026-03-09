@@ -1,0 +1,41 @@
+name: PR Title Lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  pr-title-lint:
+    name: Validate PR Title (Conventional Commits)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title follows Conventional Commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Checking PR title: '$PR_TITLE'"
+          echo ""
+
+          # Conventional Commits regex
+          # Format: type(optional-scope)?optional-bang: description
+          pattern='^(feat|fix|chore|docs|refactor|test|ci|style|perf|build|revert)(\(.+\))?!?: .+'
+
+          if echo "$PR_TITLE" | grep -qE "$pattern"; then
+            echo "PR title follows Conventional Commits spec."
+          else
+            echo "ERROR: PR title does not follow the Conventional Commits spec."
+            echo ""
+            echo "Expected format:"
+            echo "  type: description"
+            echo "  type(scope): description"
+            echo "  type!: description          (breaking change)"
+            echo "  type(scope)!: description   (breaking change)"
+            echo ""
+            echo "Allowed types: feat, fix, chore, docs, refactor, test, ci, style, perf, build, revert"
+            echo ""
+            echo "Examples:"
+            echo "  feat: add user authentication"
+            echo "  fix(feed-reader): handle empty RSS feeds"
+            echo "  chore!: drop support for Node 14"
+            exit 1
+          fi
