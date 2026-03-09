@@ -1,0 +1,433 @@
+#+TITLE: 003 - Kubernetes Local Development & Infrastructure Parity
+#+AUTHOR: Charlie Holland
+#+STATUS: Active
+#+CATEGORY: infra
+#+CREATED: [2026-03-09]
+#+LAST_MODIFIED: [2026-03-09]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Establish Kubernetes as the compute platform for The Data Platform by creating a
+Pulumi-based infrastructure layer that provisions clusters for both local
+development and production environments. The same infrastructure code (with
+environment-specific configuration) manages a local k3d cluster and a cloud-managed
+cluster, providing development/production parity from day one.
+
+* Motivation
+
+The architecture (=ARCHITECTURE.md=) mandates Kubernetes for all service deployment
+and "local testing is first-class" as a core principle. The =monorepo/infra/=
+directory exists as a placeholder with no Pulumi code, and no containerization or
+cluster provisioning exists yet. Before any services can be built and deployed, we
+need:
+
+1. A way to spin up a local K8s cluster quickly for development and testing
+2. Infrastructure code that works for both local and production clusters
+3. A platform layer that bootstraps core services (ingress, observability) consistently
+4. A foundation that supports future Argo CD GitOps adoption without a rewrite
+
+Without this, every subsequent design doc (services, workflows, pipelines) has no
+deployment target.
+
+* Design
+
+The infrastructure follows a *three-layer architecture* where each layer has a
+different lifecycle, blast radius, and permission scope. Layers communicate through
+a single interface: the kubeconfig.
+
+#+begin_src
+┌──────────────────────────────────────┐
+│        Application Layer             │  Same Pulumi code, config-driven
+│   (ServiceDeployment components)     │  differences (replicas, resources,
+│                                      │  image URLs)
+├──────────────────────────────────────┤
+│        Platform Layer                │  Same Pulumi code, minimal branching
+│   (ingress, cert-manager, monitoring,│  (service type, TLS issuer)
+│    sealed-secrets, etc.)             │
+├──────────────────────────────────────┤
+│        Cluster Layer                 │  Different providers per environment
+│   k3d / kind  │  EKS / GKE / AKS    │  (this is the abstraction seam)
+└──────────────────────────────────────┘
+#+end_src
+
+** Layer 1: Cluster Provisioning
+
+Creates the Kubernetes cluster itself. This is the *only* layer where local and
+production diverge significantly. The output is a kubeconfig — everything above
+consumes only that.
+
+- *Local:* k3d (k3s in Docker) creates a multi-node cluster in ~20-30 seconds
+- *Production:* k3s on Linode 2GB ($12/mo) via =@pulumi/linode= + Command provider
+
+Both environments run k3s, maximizing parity. Pulumi stacks differentiate them:
+
+#+begin_src yaml
+# Pulumi.local.yaml
+config:
+  cluster:clusterType: k3d
+  cluster:clusterName: tdp-local
+
+# Pulumi.production.yaml
+config:
+  cluster:clusterType: linode-k3s
+  cluster:clusterName: tdp-production
+#+end_src
+
+** Layer 2: Platform Bootstrap
+
+Installs core services onto *any* cluster, regardless of how it was provisioned.
+Same Pulumi code, with environment-specific values (e.g., service type, resource
+limits, retention periods).
+
+Platform services:
+- Ingress controller (Traefik) — bundled with k3s/k3d, same config everywhere
+- Cert-manager — self-signed locally, Let's Encrypt in production
+- Monitoring (Prometheus + Grafana) — lighter footprint locally
+- Sealed Secrets — secret management
+- Argo CD placeholder — installed in Layer 2 when ready for GitOps
+
+** Layer 3: Application Deployment
+
+Per-service deployments using shared =ComponentResource= abstractions. Each service
+gets a =ServiceDeployment= component that encapsulates Deployment + Service +
+Ingress with environment-appropriate defaults.
+
+This layer is where Argo CD eventually takes over (Pulumi bootstraps Argo CD in
+Layer 2, then Argo CD manages Layer 3).
+
+** Directory Structure
+
+#+begin_src
+monorepo/infra/
+├── cluster/                    # Layer 1: Cluster provisioning
+│   ├── Pulumi.yaml
+│   ├── Pulumi.local.yaml
+│   ├── index.ts                # Dispatches by clusterType config
+│   ├── providers/
+│   │   ├── k3d.ts              # k3d cluster via Command provider
+│   │   └── linode-k3s.ts        # k3s on Linode via @pulumi/linode + Command
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── platform/                   # Layer 2: Cluster bootstrapping
+│   ├── Pulumi.yaml
+│   ├── Pulumi.local.yaml
+│   ├── index.ts
+│   ├── charts/
+│   │   ├── cert-manager.ts     # TLS certificates
+│   │   └── monitoring.ts       # Prometheus + Grafana
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── components/                 # Shared Pulumi ComponentResources
+│   ├── service-deployment.ts   # Reusable Deployment+Service+Ingress
+│   ├── index.ts
+│   ├── package.json
+│   └── tsconfig.json
+│
+└── scripts/
+    ├── local-up.sh             # pulumi up for cluster + platform (local)
+    └── local-down.sh           # pulumi destroy for local stack
+#+end_src
+
+** Local Kubernetes Tool: k3d
+
+k3d (k3s in Docker) is the primary local cluster tool.
+
+*Why k3d over alternatives:*
+
+| Criterion              | k3d           | kind              | minikube          | Docker Desktop K8s |
+|------------------------+---------------+-------------------+-------------------+--------------------|
+| Cluster create time    | ~20-30s       | ~90s              | ~120-180s         | N/A (persistent)   |
+| RAM usage (idle)       | ~512MB        | ~800MB            | ~1.5GB            | ~1.5GB             |
+| Multi-node             | Yes           | Yes               | Experimental      | No                 |
+| Built-in ingress       | Traefik       | Manual install     | Addon             | Manual install     |
+| Built-in LoadBalancer  | Klipper       | Needs MetalLB     | =minikube tunnel= | Docker networking  |
+| Local registry         | Built-in      | =kind load=       | =docker-env=      | Shared daemon      |
+| CI-friendly            | Excellent     | Excellent         | Moderate          | Not viable         |
+| K8s certified          | Yes (CNCF)    | Yes (conformance) | Yes               | Yes                |
+
+k3d advantages for this project:
+- *Fastest iteration:* 20-30 second cluster creation enables throwaway clusters
+- *Built-in registry:* =k3d registry create= avoids image push/pull overhead
+- *Batteries included:* Traefik ingress and Klipper LB work out of the box
+- *CI-friendly:* Can run in GitHub Actions without special configuration
+- *Lightweight:* ~512MB RAM leaves headroom for actual workloads
+
+k3d is a CNCF-certified Kubernetes distribution. While it bundles k3s (which uses
+SQLite instead of etcd and Flannel CNI instead of Calico), these differences are
+comparable in magnitude to the deviations in managed cloud offerings (EKS, GKE).
+
+** Pulumi Language Choice: TypeScript
+
+TypeScript aligns with:
+- First-class Pulumi support (most examples, best provider coverage)
+- Strong typing for infrastructure configuration
+- =ARCHITECTURE.md= preference for general-purpose languages over DSLs
+- Shared tooling with potential frontend/SDK work
+
+** What Stays The Same Across Environments
+
+- Kubernetes resource definitions (Deployments, Services, ConfigMaps)
+- Helm chart installations and versions
+- RBAC policies and NetworkPolicies
+- Application configuration structure
+- Labeling and annotation conventions
+
+** What Must Differ
+
+| Concern                 | Local                           | Production                        |
+|-------------------------+---------------------------------+-----------------------------------|
+| Cluster provisioning    | k3d CLI                         | EKS/GKE API                      |
+| Ingress                 | Traefik (bundled with k3d)      | Traefik (bundled with k3s)        |
+| TLS                     | Self-signed / none              | Let's Encrypt                     |
+| DNS                     | =*.localhost=                   | Real domains                      |
+| Container registry      | =k3d-registry:5111=            | ECR/GCR/ACR                       |
+| Resource requests       | Minimal (100m CPU, 128Mi)       | Production-sized                  |
+| Replica count           | 1                               | 3+                                |
+| PV provisioner          | local-path                      | EBS/PD CSI driver                 |
+| Monitoring retention    | 6h                              | 30d+                              |
+
+** Argo CD Readiness
+
+This design prepares for Argo CD GitOps without requiring it now:
+
+1. *Consistent labels:* All resources use =app.kubernetes.io/*= labels via the
+   =ServiceDeployment= component
+2. *Layered architecture:* Argo CD installs as a platform service (Layer 2), then
+   manages application deployments (Layer 3)
+3. *Declarative manifests:* Pulumi can export rendered YAML for Argo CD consumption
+4. *Migration path:*
+   - Phase 1 (now): Pulumi manages all three layers
+   - Phase 2: Pulumi L1+L2, Argo CD manages L3 (applications)
+   - Phase 3: Pulumi L1 only, Argo CD manages L2+L3
+
+* Decision
+
+Three-layer Pulumi infrastructure (cluster / platform / application) with k3s as the
+Kubernetes distribution in both environments:
+- *Local:* k3d (k3s in Docker) for fast, throwaway clusters
+- *Production:* k3s on Linode 2GB ($12/mo) for architectural consistency
+- *Ingress:* Traefik (bundled with k3s) everywhere — zero extra setup
+- *State:* Pulumi Cloud (free tier) for managed state and secrets
+- *Build:* Bazel for code/tests, Pulumi for infra, shell scripts to orchestrate
+- *Images:* Dockerfiles (outside Bazel) for Tilt hot-reload compatibility
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+Implementation tasks scoped to local cluster setup and the infrastructure
+foundation.
+
+** TODO [TDP-003-00] Set up accounts and install prerequisites       :p0:human:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Human-only task — the agent cannot do these for you.
+
+*Accounts:*
+- Create a [[https://app.pulumi.com/signup][Pulumi Cloud]] account (free tier) and run =pulumi login=
+- Create a [[https://www.linode.com/][Linode/Akamai]] account and generate an API token
+  (=Account → API Tokens → Create a Personal Access Token=)
+- Store the Linode token as a Pulumi secret: =pulumi config set --secret linode:token <token>=
+
+*Local tools (install if not already present):*
+- [[https://docs.docker.com/get-docker/][Docker]] (required for k3d)
+- [[https://k3d.io/#installation][k3d]] (=brew install k3d= or =curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash=)
+- [[https://www.pulumi.com/docs/install/][Pulumi CLI]] (=brew install pulumi= or =curl -fsSL https://get.pulumi.com | sh=)
+- [[https://nodejs.org/][Node.js]] (for TypeScript Pulumi projects)
+- [[https://kubernetes.io/docs/tasks/tools/][kubectl]] (=brew install kubectl=)
+
+These installs should be codified in a setup script (e.g., =~/setup.sh= or a
+dotfiles bootstrap) so new developers can onboard quickly and the same installs
+can be reused in CI workflows.
+
+** TODO [TDP-003-01] Initialize Pulumi cluster project                  :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/infra/cluster/= with:
+- =Pulumi.yaml= project definition (TypeScript, =tdp-cluster= project name)
+- =package.json= with =@pulumi/pulumi= and =@pulumi/command= dependencies
+- =tsconfig.json=
+- =Pulumi.local.yaml= stack configuration
+- =index.ts= entrypoint that dispatches by =clusterType= config value
+
+** TODO [TDP-003-02] Implement k3d cluster provider                     :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/infra/cluster/providers/k3d.ts=:
+- Use =@pulumi/command= to create/destroy k3d clusters
+- Create a local registry (=k3d registry create=)
+- Configure port mappings (80, 443 for ingress)
+- Support configurable worker node count (default: 2)
+- Export kubeconfig as a Pulumi output
+
+** TODO [TDP-003-03] Initialize Pulumi platform project                 :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/infra/platform/= with:
+- =Pulumi.yaml= project definition
+- =package.json= with =@pulumi/pulumi=, =@pulumi/kubernetes= dependencies
+- Stack reference to cluster project for kubeconfig
+- =index.ts= entrypoint that installs platform charts
+
+** TODO [TDP-003-04] Verify Traefik ingress and configure platform layer :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Traefik is bundled with k3s/k3d — no separate install needed. This task:
+- Verify Traefik is running and accepting traffic on the local k3d cluster
+- Create =monorepo/infra/platform/index.ts= to install additional platform charts
+  (cert-manager, monitoring) via stack reference to the cluster layer
+- Document how to define Ingress resources that work with Traefik
+
+** TODO [TDP-003-05] Create ServiceDeployment component resource        :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/infra/components/service-deployment.ts=:
+- Encapsulate Deployment + Service + optional Ingress
+- Accept environment-driven parameters (replicas, resources, image, ingress host)
+- Apply consistent =app.kubernetes.io/*= labels
+- Export as a reusable package for Layer 3 projects
+
+** TODO [TDP-003-06] Create local-up and local-down scripts             :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =monorepo/infra/scripts/=:
+- =local-up.sh=: Run =pulumi up= for cluster (local stack), then platform (local stack)
+- =local-down.sh=: Run =pulumi destroy= for platform, then cluster
+- Validate prerequisites (docker, k3d, pulumi, node/npm)
+- Print cluster access info on success (kubeconfig path, registry URL)
+
+** TODO [TDP-003-07] Add smoke test for local cluster                   :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create a minimal verification:
+- Deploy a hello-world pod using the =ServiceDeployment= component
+- Verify it's reachable via ingress on localhost
+- Can run as part of CI or as a manual =scripts/smoke-test.sh=
+
+** TODO [TDP-003-08] Implement Linode k3s cluster provider              :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/infra/cluster/providers/linode-k3s.ts=:
+- Use =@pulumi/linode= to provision a Linode 2GB instance
+- Use =@pulumi/command= remote provisioner to install k3s via =curl -sfL https://get.k3s.io | sh -=
+- Configure firewall rules (allow 80, 443, 6443 for K8s API)
+- Export kubeconfig as a Pulumi output
+- Add =Pulumi.production.yaml= stack configuration
+
+** TODO [TDP-003-09] Create base Dockerfile and example service image   :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create initial Dockerfile scaffolding:
+- Base Dockerfile for Python services (aligns with sample feed reader service)
+- Example Dockerfile in =monorepo/services/= or =monorepo/infra/examples/=
+- Verify the image builds and loads into k3d registry (=k3d image import=)
+- Document the image build + push workflow for local development
+
+** TODO [TDP-003-10] Document local development workflow                :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update =monorepo/infra/README.md= with:
+- Prerequisites (Docker, k3d, Pulumi, Node.js)
+- Quick start (=./scripts/local-up.sh=)
+- How to deploy a service to the local cluster
+- How to access services (ingress, port-forwarding)
+- Teardown (=./scripts/local-down.sh=)
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Which cloud provider for production Kubernetes?
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+k3s on Linode 2GB ($12/mo). This is architecturally consistent with the local k3d
+setup (same k3s distribution, same Traefik ingress, same containerd runtime). Pulumi
+provisions the Linode instance via =@pulumi/linode= and installs k3s via the Command
+provider — same pattern as the local k3d cluster provider.
+
+Single-node k3s runs the control plane (API server, scheduler, controller manager,
+SQLite datastore) and worker on the same machine. This is appropriate for dev/staging.
+For production HA, additional nodes can be added to the k3s cluster, or migration to
+LKE (managed control plane) is straightforward.
+
+Cost comparison considered: Hetzner (~$22/mo, EU-only), DigitalOcean (~$87/mo),
+Vultr (~$82/mo), AWS EKS (~$180/mo). Linode at $12/mo (single node, no NodeBalancer)
+is the best balance of cost, Pulumi support, and architectural consistency.
+
+** DECIDED Should we disable k3d's bundled Traefik in favor of NGINX ingress?
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Traefik everywhere. Both k3d (local) and k3s (production on Linode) bundle Traefik
+by default. Using the bundled ingress controller means zero extra setup, full
+local/production parity, and identical ingress annotations across environments.
+Traefik supports both standard Kubernetes Ingress resources and its own IngressRoute
+CRDs.
+
+** DECIDED Pulumi state backend for local development?
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Pulumi Cloud (free tier). Provides managed state storage, secrets encryption, and
+drift detection out of the box. Free for individual use. If the project grows to a
+team, Pulumi Cloud scales with collaboration features. Avoids the risk of losing
+local state files.
+
+** DECIDED Should Bazel manage Pulumi operations?
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Pulumi alongside Bazel. Bazel builds code, runs tests, and (eventually) builds
+container images. Pulumi handles infrastructure provisioning and deployment. Shell
+scripts in =monorepo/infra/scripts/= orchestrate the sequence. This is simpler,
+matches industry practice, and avoids fighting Bazel's hermetic/stateless model
+with Pulumi's inherently stateful operations.
+
+** DECIDED How should container images be built?
+:PROPERTIES:
+:DECIDED: [2026-03-09]
+:END:
+
+Dockerfiles outside Bazel (or wrapped via genrule). This provides the best
+compatibility with Tilt for hot-reloading during development — Tilt's
+=docker_build()= natively understands Dockerfiles and leverages Docker layer
+caching. When Tilt's =live_update= can't handle a change (e.g., new dependency),
+Docker rebuilds from the cached layer just before the change, keeping the
+feedback loop fast.
+
+Bazel rules_oci was considered for hermetic/reproducible builds but has weaker
+Tilt integration (requires =custom_build()=, loses Docker layer caching). A future
+design doc for Tilt will address the full development inner-loop, and may revisit
+using Bazel rules_oci for CI/production builds alongside Dockerfiles for dev.

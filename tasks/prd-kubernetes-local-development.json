@@ -1,0 +1,198 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/kubernetes-local-development",
+  "description": "Establish Kubernetes as the compute platform for The Data Platform by creating a Pulumi-based infrastructure layer that provisions clusters for both local development (k3d) and production (k3s on Linode). Three-layer architecture: cluster provisioning, platform bootstrap, and application deployment.",
+  "sourceDesignDoc": "docs/design/003-kubernetes-local-development.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-003-01",
+      "title": "Initialize Pulumi cluster project",
+      "description": "As a developer, I want a Pulumi project for cluster provisioning so that I can create Kubernetes clusters via infrastructure as code.",
+      "acceptanceCriteria": [
+        "monorepo/infra/cluster/Pulumi.yaml exists with project name tdp-cluster and runtime nodejs",
+        "monorepo/infra/cluster/package.json exists with @pulumi/pulumi and @pulumi/command dependencies",
+        "monorepo/infra/cluster/tsconfig.json exists with strict TypeScript config",
+        "monorepo/infra/cluster/Pulumi.local.yaml exists with clusterType: k3d and clusterName: tdp-local",
+        "monorepo/infra/cluster/index.ts exists and dispatches to provider modules based on clusterType config value",
+        "npm install succeeds in the cluster directory",
+        "Typecheck passes (npx tsc --noEmit)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: M. This is the foundation — all other infra tasks depend on this."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-003-02",
+      "title": "Implement k3d cluster provider",
+      "description": "As a developer, I want a k3d cluster provider so that I can spin up a local Kubernetes cluster with a container registry for development.",
+      "acceptanceCriteria": [
+        "monorepo/infra/cluster/providers/k3d.ts exists and exports a function or class that creates a k3d cluster",
+        "Uses @pulumi/command local.Command to run k3d CLI commands",
+        "Creates a local registry via k3d registry create",
+        "Configures port mappings for ports 80 and 443 (for Traefik ingress)",
+        "Supports configurable worker node count via Pulumi config (default: 2)",
+        "Exports kubeconfig as a Pulumi output",
+        "Includes destroy/cleanup commands for the cluster and registry",
+        "Typecheck passes (npx tsc --noEmit)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: M. Depends on US-001."
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-003-03",
+      "title": "Initialize Pulumi platform project",
+      "description": "As a developer, I want a Pulumi project for platform bootstrapping so that core services can be installed on any cluster via a stack reference to the cluster layer.",
+      "acceptanceCriteria": [
+        "monorepo/infra/platform/Pulumi.yaml exists with project name tdp-platform and runtime nodejs",
+        "monorepo/infra/platform/package.json exists with @pulumi/pulumi and @pulumi/kubernetes dependencies",
+        "monorepo/infra/platform/tsconfig.json exists with strict TypeScript config",
+        "monorepo/infra/platform/Pulumi.local.yaml exists with stack config",
+        "monorepo/infra/platform/index.ts exists and uses a StackReference to read kubeconfig from the cluster project",
+        "Creates a k8s.Provider using the referenced kubeconfig",
+        "npm install succeeds in the platform directory",
+        "Typecheck passes (npx tsc --noEmit)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: M. Depends on US-001."
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-003-04",
+      "title": "Verify Traefik ingress and configure platform layer",
+      "description": "As a developer, I want the platform layer to verify Traefik is running and install additional platform charts (cert-manager, monitoring) so that the cluster has core services available.",
+      "acceptanceCriteria": [
+        "Platform index.ts includes a check or note that Traefik is bundled with k3s/k3d and does not install a separate ingress controller",
+        "monorepo/infra/platform/charts/cert-manager.ts exists and installs cert-manager via Helm chart with installCRDs: true",
+        "monorepo/infra/platform/charts/monitoring.ts exists and installs kube-prometheus-stack via Helm chart with environment-appropriate resource limits",
+        "Platform index.ts imports and uses the chart modules",
+        "Documentation exists (comments or README) on how to define Ingress resources that work with Traefik",
+        "Typecheck passes (npx tsc --noEmit)"
+      ],
+      "priority": 4,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: S. Depends on US-002, US-003."
+    },
+    {
+      "id": "US-005",
+      "sourceTaskId": "TDP-003-05",
+      "title": "Create ServiceDeployment component resource",
+      "description": "As a developer, I want a reusable Pulumi ComponentResource that encapsulates a Kubernetes Deployment + Service + optional Ingress so that application deployments are consistent across services.",
+      "acceptanceCriteria": [
+        "monorepo/infra/components/package.json exists with @pulumi/pulumi and @pulumi/kubernetes dependencies",
+        "monorepo/infra/components/tsconfig.json exists",
+        "monorepo/infra/components/service-deployment.ts exports a ServiceDeployment class extending pulumi.ComponentResource",
+        "ServiceDeployment accepts parameters: image, port, replicas, env, resources, ingress (host, tls)",
+        "Applies consistent app.kubernetes.io/* labels (name, part-of: the-data-platform, managed-by: pulumi)",
+        "Creates a Deployment, Service, and optionally an Ingress resource",
+        "monorepo/infra/components/index.ts re-exports the component",
+        "Typecheck passes (npx tsc --noEmit)"
+      ],
+      "priority": 5,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: M. Depends on US-001."
+    },
+    {
+      "id": "US-006",
+      "sourceTaskId": "TDP-003-06",
+      "title": "Create local-up and local-down scripts",
+      "description": "As a developer, I want shell scripts that spin up and tear down the full local Kubernetes environment so that I can get started with a single command.",
+      "acceptanceCriteria": [
+        "monorepo/infra/scripts/local-up.sh exists and is executable",
+        "local-up.sh validates prerequisites (docker, k3d, pulumi, node/npm) and exits with a helpful error if any are missing",
+        "local-up.sh runs pulumi up for the cluster project (local stack), then the platform project (local stack)",
+        "local-up.sh prints cluster access info on success (kubeconfig path, registry URL, how to set KUBECONFIG)",
+        "monorepo/infra/scripts/local-down.sh exists and is executable",
+        "local-down.sh runs pulumi destroy for platform (local stack), then cluster (local stack)",
+        "Both scripts use set -euo pipefail for safety"
+      ],
+      "priority": 6,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: S. Depends on US-001, US-002, US-003."
+    },
+    {
+      "id": "US-007",
+      "sourceTaskId": "TDP-003-07",
+      "title": "Add smoke test for local cluster",
+      "description": "As a developer, I want a smoke test that deploys a hello-world pod and verifies it's reachable via ingress so that I can confirm the local cluster is working end-to-end.",
+      "acceptanceCriteria": [
+        "A smoke test script or Pulumi project exists that deploys a minimal container using the ServiceDeployment component",
+        "The deployment is accessible via Traefik ingress on localhost",
+        "The test verifies HTTP connectivity to the deployed service",
+        "The test cleans up after itself (removes the test deployment)",
+        "Can be run manually via a script (e.g., monorepo/infra/scripts/smoke-test.sh)"
+      ],
+      "priority": 7,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Effort: S. Depends on US-005, US-006. Human review: end-to-end verification checkpoint."
+    },
+    {
+      "id": "US-008",
+      "sourceTaskId": "TDP-003-08",
+      "title": "Implement Linode k3s cluster provider",
+      "description": "As a developer, I want a Linode k3s cluster provider so that I can provision a production Kubernetes cluster on Linode using the same Pulumi infrastructure code.",
+      "acceptanceCriteria": [
+        "monorepo/infra/cluster/providers/linode-k3s.ts exists and exports a function or class that provisions a Linode instance with k3s",
+        "Uses @pulumi/linode to create a Linode 2GB instance",
+        "Uses @pulumi/command remote provisioner to install k3s via curl -sfL https://get.k3s.io | sh -",
+        "Configures Linode firewall rules to allow ports 80, 443, and 6443 (K8s API)",
+        "Exports kubeconfig as a Pulumi output",
+        "monorepo/infra/cluster/Pulumi.production.yaml exists with clusterType: linode-k3s config",
+        "package.json includes @pulumi/linode dependency",
+        "index.ts dispatches to linode-k3s provider when clusterType is linode-k3s",
+        "Typecheck passes (npx tsc --noEmit)"
+      ],
+      "priority": 8,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Effort: M. Depends on US-001. Human review: production infrastructure requires verification before use."
+    },
+    {
+      "id": "US-009",
+      "sourceTaskId": "TDP-003-09",
+      "title": "Create base Dockerfile and example service image",
+      "description": "As a developer, I want a base Dockerfile for Python services so that I can build container images and load them into the local k3d registry.",
+      "acceptanceCriteria": [
+        "A base Dockerfile for Python services exists (e.g., monorepo/services/Dockerfile.base or similar)",
+        "An example Dockerfile exists demonstrating how to build a service image",
+        "The example image builds successfully with docker build",
+        "The image can be loaded into the k3d registry (via k3d image import or pushing to the k3d registry)",
+        "A brief README or comments document the image build + push workflow for local development"
+      ],
+      "priority": 9,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: S. Depends on US-002 for k3d registry testing."
+    },
+    {
+      "id": "US-010",
+      "sourceTaskId": "TDP-003-10",
+      "title": "Document local development workflow",
+      "description": "As a developer, I want clear documentation on how to use the local Kubernetes environment so that I can onboard quickly.",
+      "acceptanceCriteria": [
+        "monorepo/infra/README.md is updated with comprehensive local development docs",
+        "Documents prerequisites (Docker, k3d, Pulumi, Node.js, kubectl)",
+        "Documents quick start workflow (./scripts/local-up.sh)",
+        "Documents how to deploy a service to the local cluster",
+        "Documents how to access services (ingress URLs, port-forwarding)",
+        "Documents teardown (./scripts/local-down.sh)",
+        "All referenced scripts and paths are accurate"
+      ],
+      "priority": 10,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Effort: S. Final task — human review to verify docs are accurate and complete."
+    }
+  ]
+}

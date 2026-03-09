@@ -44,6 +44,7 @@ this table to determine valid categories.
 | 000 | [[file:000-template.org][Template]]           | N/A    |
 | 001 | [[file:001-monorepo-bootstrap.org][Monorepo Bootstrap]] | Complete |
 | 002 | [[file:002-release-management.org][Release Management]] | Complete |
+| 003 | [[file:003-kubernetes-local-development.org][K8s Local Dev & Infra Parity]] | Active |
 
 * Elisp Setup
 :PROPERTIES:
