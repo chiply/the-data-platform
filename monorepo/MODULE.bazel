@@ -6,4 +6,4 @@ module(
 )
 
 # Python rules
-bazel_dep(name = "rules_python", version = "1.1.0")
+bazel_dep(name = "rules_python", version = "1.9.0")

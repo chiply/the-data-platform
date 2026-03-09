@@ -40,7 +40,7 @@ CI wrapper scripts (once created) live in `monorepo/scripts/`:
 ```bash
 ./scripts/build.sh           # wraps bazel build
 ./scripts/test.sh             # wraps bazel test
-./scripts/render-diagrams.sh  # renders Mermaid diagrams
+./scripts/render-diagrams.sh  # renders D2 diagrams
 ./scripts/affected.sh         # computes affected targets from git diff
 ```
 
