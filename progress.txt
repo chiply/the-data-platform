@@ -37,3 +37,8 @@ PRD: tasks/prd-kubernetes-local-development.json
 - Files changed: monorepo/infra/components/{package.json, package-lock.json, tsconfig.json, service-deployment.ts, index.ts}
 - Learnings: ComponentResource type strings follow `tdp:components:<ClassName>` convention. pulumi.Input<T> wrapping needed for args from other outputs.
 ---
+
+## US-006 - Create local-up and local-down scripts
+- What was implemented: local-up.sh and local-down.sh scripts with prerequisite validation, pulumi up/destroy sequencing, and cluster access info output.
+- Files changed: monorepo/infra/scripts/{local-up.sh, local-down.sh}
+---

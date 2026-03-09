@@ -116,7 +116,7 @@
         "Both scripts use set -euo pipefail for safety"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Depends on US-001, US-002, US-003."
     },
