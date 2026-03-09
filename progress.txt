@@ -16,3 +16,9 @@ PRD: tasks/prd-monorepo-bootstrap.json
 - Files changed: monorepo/MODULE.bazel, monorepo/.bazelversion, monorepo/.bazelrc, monorepo/BUILD.bazel
 - Learnings: aspect_rules_js 2.1.2 brings rules_nodejs transitively; rules_python 1.1.0 works with Bazel 7.6.1
 ---
+
+## US-002 - Scaffold monorepo directory structure
+- What was implemented: All 11 directories from ARCHITECTURE.md created with BUILD.bazel and README.md
+- Files changed: 22 files (BUILD.bazel + README.md for each of: services, libs, schemas, sdks, workflows, pipelines, infra, deploy, tools, scripts, third_party)
+- Learnings: Empty/comment-only BUILD.bazel files work fine; Bazel 7.6.1 handles 12 packages with no issues
+---

@@ -33,9 +33,9 @@
         "bazel build //... still succeeds"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
-      "notes": "Effort: 1:00. Priority: p0. Depends on US-001."
+      "notes": "Effort: 1:00. Priority: p0. Depends on US-001. COMPLETED: All 11 directories scaffolded with BUILD.bazel and README.md."
     },
     {
       "id": "US-003",
