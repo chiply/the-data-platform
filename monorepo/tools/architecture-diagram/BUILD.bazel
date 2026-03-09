@@ -1,0 +1,19 @@
+# Render C4 Context diagram to SVG using D2.
+# Usage: bazel build //tools/architecture-diagram:c4_context_svg
+genrule(
+    name = "c4_context_svg",
+    srcs = ["diagrams/c4-context.d2"],
+    outs = ["c4-context.svg"],
+    cmd = "d2 --layout=elk $(location diagrams/c4-context.d2) $@",
+    visibility = ["//visibility:public"],
+)
+
+# Render C4 Container diagram to SVG using D2.
+# Usage: bazel build //tools/architecture-diagram:c4_container_svg
+genrule(
+    name = "c4_container_svg",
+    srcs = ["diagrams/c4-container.d2"],
+    outs = ["c4-container.svg"],
+    cmd = "d2 --layout=elk $(location diagrams/c4-container.d2) $@",
+    visibility = ["//visibility:public"],
+)

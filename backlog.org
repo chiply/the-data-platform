@@ -8,6 +8,8 @@ Active tasks checked out from design docs.
 ** Active
 # Queue tasks here with /task-queue or M-x backlog/task-queue
 
+
+
 ** Blocked
 # Tasks waiting on external dependency
 

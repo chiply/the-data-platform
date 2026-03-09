@@ -1,0 +1,160 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/monorepo-bootstrap",
+  "description": "Initialize the Bazel monorepo with bzlmod, scaffold the directory structure defined in ARCHITECTURE.md, and create the first sub-repo: a Mermaid C4 diagram tool for rendering the platform's architecture diagrams.",
+  "sourceDesignDoc": "docs/design/001-monorepo-bootstrap.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-001-01",
+      "title": "Initialize MODULE.bazel and Bazel configuration",
+      "description": "As a developer, I want the Bazel build system initialized with bzlmod so that the monorepo has a working build foundation. Create MODULE.bazel with module name and initial bazel_dep entries (rules_python, rules_nodejs). Create .bazelrc with common settings. Create .bazelversion pinning Bazel 7 LTS. Create root BUILD.bazel.",
+      "acceptanceCriteria": [
+        "MODULE.bazel exists with module name and bazel_dep entries for rules_python and rules_nodejs",
+        ".bazelrc exists with common build settings",
+        ".bazelversion exists pinning Bazel 7 LTS",
+        "Root BUILD.bazel exists",
+        "bazel build //... succeeds with no errors"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 4:00. Priority: p0. Foundation task — everything else depends on this. COMPLETED: MODULE.bazel with rules_python 1.1.0 and aspect_rules_js 2.1.2, .bazelrc, .bazelversion 7.6.1, root BUILD.bazel."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-001-02",
+      "title": "Scaffold monorepo directory structure",
+      "description": "As a developer, I want the standard monorepo directory structure in place so that services, libraries, and tools have a defined home. Create all directories defined in ARCHITECTURE.md (services, libs, schemas, sdks, workflows, pipelines, infra, deploy, tools, scripts, third_party). Each gets an empty BUILD.bazel and a brief README.md.",
+      "acceptanceCriteria": [
+        "All directories from ARCHITECTURE.md exist under monorepo/: services, libs, schemas, sdks, workflows, pipelines, infra, deploy, tools, scripts, third_party",
+        "Each directory contains a BUILD.bazel file",
+        "Each directory contains a README.md explaining its purpose",
+        "bazel build //... still succeeds"
+      ],
+      "priority": 2,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 1:00. Priority: p0. Depends on US-001. COMPLETED: All 11 directories scaffolded with BUILD.bazel and README.md."
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-001-03",
+      "title": "Set up architecture-diagram tool with Mermaid CLI",
+      "description": "As a developer, I want a Mermaid-based diagram rendering tool so that architecture diagrams can be generated from source files via Bazel. Create tools/architecture-diagram/ with package.json (mermaid-cli, elk dependency), mermaidrc.json (ELK layout, theme config), BUILD.bazel with render targets, and README.md.",
+      "acceptanceCriteria": [
+        "tools/architecture-diagram/package.json exists with @mermaid-js/mermaid-cli and ELK dependency",
+        "tools/architecture-diagram/mermaidrc.json configures ELK layout engine and consistent theme",
+        "tools/architecture-diagram/BUILD.bazel defines render targets",
+        "tools/architecture-diagram/README.md documents usage",
+        "bazel build //tools/architecture-diagram/... succeeds and produces SVG/PNG output"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 4:00. Priority: p0. Depends on US-002. COMPLETED: Full Mermaid pipeline with rules_js, ELK layout, sample diagram renders to SVG via bazel build."
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-001-06",
+      "title": "Create CI wrapper scripts",
+      "description": "As a developer, I want convenience scripts for common CI operations so that builds, tests, and diagram rendering can be run with simple commands. Create scripts/build.sh, scripts/test.sh, and scripts/render-diagrams.sh. Each wraps the corresponding Bazel command. All must be runnable locally. Scripts should accept an optional Bazel target pattern for scoped execution.",
+      "acceptanceCriteria": [
+        "scripts/build.sh wraps bazel build and accepts optional target pattern",
+        "scripts/test.sh wraps bazel test and accepts optional target pattern",
+        "scripts/render-diagrams.sh wraps the diagram Bazel target",
+        "All scripts are executable (chmod +x)",
+        "All scripts work locally with no special environment beyond Bazel"
+      ],
+      "priority": 4,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 1:00. Priority: p1. Depends on US-002. COMPLETED: build.sh, test.sh, render-diagrams.sh created."
+    },
+    {
+      "id": "US-005",
+      "sourceTaskId": "TDP-001-08",
+      "title": "Implement affected-targets detection script",
+      "description": "As a developer, I want a script that computes affected Bazel targets from the git diff so that CI only builds and tests what changed. Create scripts/affected.sh using bazel query rdeps(//..., set(...)) to walk the dependency graph. Output should be consumable by build.sh and test.sh. Must work locally (diffing against main) and in CI (diffing against the PR base).",
+      "acceptanceCriteria": [
+        "scripts/affected.sh exists and is executable",
+        "Script computes affected targets from git diff against base branch",
+        "Uses bazel query rdeps(//..., set(...)) for dependency graph traversal",
+        "Output is consumable by build.sh and test.sh",
+        "Works locally (diffing against main) and in CI (diffing against PR base)",
+        "Follows scoping rules from the design doc (e.g., scripts/ changes trigger full CI run)"
+      ],
+      "priority": 5,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 4:00. Priority: p0. Depends on US-004. COMPLETED: affected.sh with scoping rules, rdeps query, CI_BASE_BRANCH support."
+    },
+    {
+      "id": "US-006",
+      "sourceTaskId": "TDP-001-04",
+      "title": "Create initial C4 Context diagram",
+      "description": "As a developer, I want a C4 Context diagram showing the platform at the highest level so that stakeholders can understand the system boundaries and external dependencies. Write diagrams/c4-context.mmd showing the platform, its users, and external systems (RSS feed sources, cloud providers). Use Mermaid C4 syntax with ELK layout.",
+      "acceptanceCriteria": [
+        "tools/architecture-diagram/diagrams/c4-context.mmd exists with valid Mermaid C4 syntax",
+        "Diagram shows the platform, users, and external systems (RSS sources, cloud providers)",
+        "Diagram renders successfully via the Bazel target producing SVG/PNG"
+      ],
+      "priority": 6,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 2:00. Priority: p1. Depends on US-003. COMPLETED: c4-context.mmd with platform, users, RSS sources, cloud provider."
+    },
+    {
+      "id": "US-007",
+      "sourceTaskId": "TDP-001-05",
+      "title": "Create initial C4 Container diagram",
+      "description": "As a developer, I want a C4 Container diagram zooming into the platform internals so that the architecture is documented at the container level. Write diagrams/c4-container.mmd showing: FastAPI services, Temporal orchestration, Dagster pipelines, schema registry, intelligent broker, search, k8s compute, Pulumi infra. Use Mermaid C4 syntax with ELK layout.",
+      "acceptanceCriteria": [
+        "tools/architecture-diagram/diagrams/c4-container.mmd exists with valid Mermaid C4 syntax",
+        "Diagram shows FastAPI services, Temporal, Dagster, schema registry, intelligent broker, search, k8s, Pulumi",
+        "Diagram renders successfully via the Bazel target producing SVG/PNG"
+      ],
+      "priority": 7,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 4:00. Priority: p1. Depends on US-003. COMPLETED: c4-container.mmd with all platform internals, renders to SVG."
+    },
+    {
+      "id": "US-009",
+      "sourceTaskId": "TDP-001-09",
+      "title": "Migrate diagram tool from Mermaid to D2",
+      "description": "As a developer, I want to replace Mermaid with D2 for architecture diagrams so that diagrams have better auto-layout, proper arrow routing, and first-class C4 support. Remove the Mermaid npm dependencies from MODULE.bazel, rewrite .mmd diagram files as .d2 files, update BUILD.bazel to use a D2 genrule, and update render-diagrams.sh.",
+      "acceptanceCriteria": [
+        "D2 CLI is available (installed via brew or toolchain)",
+        "tools/architecture-diagram/diagrams/c4-context.d2 exists with valid D2 syntax",
+        "tools/architecture-diagram/diagrams/c4-container.d2 exists with valid D2 syntax",
+        "BUILD.bazel uses D2 genrule targets instead of Mermaid/mmdc",
+        "Mermaid npm dependencies removed from MODULE.bazel (npm_translate_lock, package.json, pnpm-lock.yaml)",
+        "bazel build //tools/architecture-diagram/... produces SVG output",
+        "render-diagrams.sh updated to work with new targets",
+        "Rendered diagrams have clean layout with no overlapping arrows"
+      ],
+      "priority": 8,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: 4:00. Priority: p0. COMPLETED: Full migration — D2 genrules, Mermaid/npm removed, diagrams rewritten, ~300ms builds."
+    },
+    {
+      "id": "US-008",
+      "sourceTaskId": "TDP-001-07",
+      "title": "Validate end-to-end: build, test, render",
+      "description": "As a developer, I want to validate the entire monorepo foundation works end-to-end before building on it. Run the full cycle locally: bazel build //..., bazel test //..., and diagram rendering. Fix any issues discovered.",
+      "acceptanceCriteria": [
+        "bazel build //... succeeds with no errors",
+        "bazel test //... succeeds with no errors",
+        "Diagram rendering produces valid SVG/PNG for both C4 diagrams",
+        "scripts/build.sh, scripts/test.sh, and scripts/render-diagrams.sh all work correctly",
+        "scripts/affected.sh correctly identifies affected targets"
+      ],
+      "priority": 9,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Effort: 2:00. Priority: p0. Final validation — depends on all other tasks. Natural human review checkpoint."
+    }
+  ]
+}

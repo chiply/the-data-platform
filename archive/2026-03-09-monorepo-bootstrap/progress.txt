@@ -1,0 +1,77 @@
+# Ralph Progress Log
+Started: 2026-03-09
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-monorepo-bootstrap.json
+
+## Codebase Patterns
+- bazelisk is used (installed via brew); .bazelversion controls Bazel version
+- aspect_rules_js 2.1.2 transitively brings in rules_nodejs 6.3.0 — no separate rules_nodejs dep needed
+- rules_python 1.1.0 and aspect_rules_js 2.1.2 resolve cleanly with Bazel 7.6.1
+- All monorepo files live under monorepo/ relative to repo root
+- bazel build //... succeeds with 0 targets for empty BUILD files (expected)
+---
+
+## US-001 - Initialize MODULE.bazel and Bazel configuration
+- What was implemented: Complete Bazel build foundation with bzlmod
+- Files changed: monorepo/MODULE.bazel, monorepo/.bazelversion, monorepo/.bazelrc, monorepo/BUILD.bazel
+- Learnings: aspect_rules_js 2.1.2 brings rules_nodejs transitively; rules_python 1.1.0 works with Bazel 7.6.1
+---
+
+## US-002 - Scaffold monorepo directory structure
+- What was implemented: All 11 directories from ARCHITECTURE.md created with BUILD.bazel and README.md
+- Files changed: 22 files (BUILD.bazel + README.md for each of: services, libs, schemas, sdks, workflows, pipelines, infra, deploy, tools, scripts, third_party)
+- Learnings: Empty/comment-only BUILD.bazel files work fine; Bazel 7.6.1 handles 12 packages with no issues
+---
+
+## US-003 - Set up architecture-diagram tool with Mermaid CLI
+- What was implemented: Full Mermaid rendering pipeline with aspect_rules_js, ELK layout, sample diagram
+- Files changed: MODULE.bazel (npm extension), .bazelignore, tools/architecture-diagram/{BUILD.bazel,package.json,pnpm-lock.yaml,mermaidrc.json,diagrams/sample.mmd,README.md}
+- Learnings:
+  - aspect_rules_js 2.1.2 with pnpm v9 requires pnpm.onlyBuiltDependencies in package.json
+  - bins config in npm_translate_lock uses string list with = separator: ["mmdc=./src/cli.js"]
+  - Generated bzl files are namespaced under root_package path: @npm//tools/architecture-diagram:@mermaid-js/mermaid-cli/package_json.bzl
+  - Puppeteer needs execution_requirements = {"no-sandbox": "1"} for Chrome outside sandbox
+  - diagrams/ should NOT have its own BUILD.bazel to avoid subpackage boundary issues with copy_to_bin
+  - Args paths in js_run_binary are relative to execroot — use full package-relative paths
+---
+
+## US-004 - Create CI wrapper scripts
+- What was implemented: build.sh, test.sh, render-diagrams.sh in monorepo/scripts/
+- Files changed: monorepo/scripts/{build.sh,test.sh,render-diagrams.sh}
+- Learnings: bazel test //... returns exit code 4 when no test targets exist (expected, not failure); diagram target is //tools/architecture-diagram:sample_svg
+---
+
+## US-005 - Implement affected-targets detection script
+- What was implemented: affected.sh with git diff, scoping rules, rdeps query, CI_BASE_BRANCH support
+- Files changed: monorepo/scripts/affected.sh (103 lines)
+- Learnings: macOS lacks GNU realpath --relative-to; use pwd -P and string stripping instead
+---
+
+## US-006 - Create initial C4 Context diagram
+- What was implemented: c4-context.mmd with platform, users, RSS sources, cloud provider; c4_context_svg Bazel target
+- Files changed: monorepo/tools/architecture-diagram/diagrams/c4-context.mmd, BUILD.bazel updated
+- Learnings: C4Context syntax doesn't use frontmatter; BUILD target pattern is straightforward duplication; builds in ~7s
+---
+
+## US-007 - Create initial C4 Container diagram
+- What was implemented: c4-container.mmd with Feed Reader, Schema Registry, Broker, Search, Temporal, Dagster, K8s, Pulumi
+- Files changed: monorepo/tools/architecture-diagram/diagrams/c4-container.mmd, BUILD.bazel updated
+- Learnings: C4Container uses System_Boundary + Container(); builds in ~3s when cache warm
+---
+
+## US-009 - Migrate diagram tool from Mermaid to D2
+- What was implemented: Full Mermaid→D2 migration. D2 genrules replace js_run_binary/Puppeteer. npm deps removed from MODULE.bazel.
+- Files changed: MODULE.bazel, BUILD.bazel, new .d2 files, deleted .mmd/package.json/pnpm-lock.yaml/mermaidrc.json/.bazelignore
+- Learnings:
+  - D2 genrules are dramatically simpler — no Puppeteer, Chrome, npm, sandbox workarounds
+  - D2 ELK layout works out of box with --layout=elk flag
+  - Build time ~300ms per diagram vs seconds with Mermaid/Puppeteer
+  - MODULE.bazel.lock auto-regenerates when deps change; commit alongside MODULE.bazel
+  - aspect_rules_js no longer needed after removing Mermaid
+---
+
+## US-008 - Validate end-to-end: build, test, render (post-D2 migration)
+- What was implemented: All 8 validation checks passed. No fixes needed.
+- Files changed: none
+- Learnings: D2 genrules compile cleanly, disk cache hits make rebuilds fast
+---

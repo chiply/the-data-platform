@@ -1,0 +1,14 @@
+# Enable bzlmod (default in Bazel 7, but explicit for clarity)
+common --enable_bzlmod
+
+# Test output: only show errors by default
+test --test_output=errors
+
+# Build with verbose failures for easier debugging
+build --verbose_failures
+
+# Use a shared disk cache for faster rebuilds
+build --disk_cache=${HOME}/.cache/bazel-disk
+
+# Platform: enable modern toolchain resolution
+build --incompatible_enable_cc_toolchain_resolution

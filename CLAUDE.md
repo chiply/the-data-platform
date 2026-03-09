@@ -20,6 +20,30 @@ service design, scope, and how it exercises each platform subsystem is documente
 - Understanding what the platform needs to support end-to-end
 - Building example services, workflows, pipelines, or schemas
 
+## Build & Test Commands
+
+The monorepo uses Bazel (bzlmod). Run these from the `monorepo/` directory:
+
+```bash
+# Build all targets
+bazel build //...
+
+# Run all tests
+bazel test //...
+
+# Render architecture diagrams
+bazel build //tools/architecture-diagram/...
+```
+
+CI wrapper scripts (once created) live in `monorepo/scripts/`:
+
+```bash
+./scripts/build.sh           # wraps bazel build
+./scripts/test.sh             # wraps bazel test
+./scripts/render-diagrams.sh  # renders D2 diagrams
+./scripts/affected.sh         # computes affected targets from git diff
+```
+
 ## Design Doc Workflow
 
 This project uses design docs for task management. Design docs live in `docs/design/`.

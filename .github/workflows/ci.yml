@@ -1,0 +1,238 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  bazel-build:
+    name: Bazel Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bazelisk
+        run: |
+          sudo curl -L -o /usr/local/bin/bazel \
+            https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+          sudo chmod +x /usr/local/bin/bazel
+
+      - name: Install D2
+        run: |
+          curl -fsSL https://d2lang.com/install.sh | sh -s --
+
+      - name: Verify Bazel version
+        run: bazel version
+
+      - name: Verify MODULE.bazel is valid
+        run: bazel mod graph
+
+      - name: Build all targets
+        run: bazel build //...
+
+      - name: Verify BUILD.bazel files exist in all packages
+        run: |
+          expected_dirs="services libs schemas sdks workflows pipelines infra deploy tools scripts third_party"
+          for dir in $expected_dirs; do
+            if [ ! -f "${dir}/BUILD.bazel" ]; then
+              echo "FAIL: ${dir}/BUILD.bazel missing"
+              exit 1
+            fi
+            echo "OK: ${dir}/BUILD.bazel exists"
+          done
+
+      - name: Test all targets
+        run: |
+          set +e
+          bazel test //...
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ] || [ "$status" -eq 4 ]; then
+            echo "Tests passed (exit code $status)"
+            exit 0
+          else
+            exit "$status"
+          fi
+
+  diagrams:
+    name: Diagram Rendering
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bazelisk
+        run: |
+          sudo curl -L -o /usr/local/bin/bazel \
+            https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+          sudo chmod +x /usr/local/bin/bazel
+
+      - name: Install D2
+        run: |
+          curl -fsSL https://d2lang.com/install.sh | sh -s --
+
+      - name: Verify D2 is available
+        run: d2 --version
+
+      - name: Verify diagram source files exist
+        run: |
+          for f in diagrams/c4-context.d2 diagrams/c4-container.d2; do
+            file="tools/architecture-diagram/${f}"
+            if [ ! -f "$file" ]; then
+              echo "FAIL: $file missing"
+              exit 1
+            fi
+            echo "OK: $file exists"
+          done
+
+      - name: Build C4 Context diagram
+        run: bazel build //tools/architecture-diagram:c4_context_svg
+
+      - name: Build C4 Container diagram
+        run: bazel build //tools/architecture-diagram:c4_container_svg
+
+      - name: Validate SVG output is well-formed
+        run: |
+          for svg in bazel-bin/tools/architecture-diagram/c4-context.svg \
+                     bazel-bin/tools/architecture-diagram/c4-container.svg; do
+            if [ ! -f "$svg" ]; then
+              echo "FAIL: $svg not produced"
+              exit 1
+            fi
+            if ! head -5 "$svg" | grep -q '<svg'; then
+              echo "FAIL: $svg is not valid SVG"
+              exit 1
+            fi
+            echo "OK: $svg is valid SVG ($(wc -c < "$svg") bytes)"
+          done
+
+  ci-scripts:
+    name: CI Scripts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bazelisk
+        run: |
+          sudo curl -L -o /usr/local/bin/bazel \
+            https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+          sudo chmod +x /usr/local/bin/bazel
+
+      - name: Install D2
+        run: |
+          curl -fsSL https://d2lang.com/install.sh | sh -s --
+
+      - name: Verify scripts are executable
+        run: |
+          for script in scripts/build.sh scripts/test.sh scripts/render-diagrams.sh scripts/affected.sh; do
+            if [ ! -x "$script" ]; then
+              echo "FAIL: $script is not executable"
+              exit 1
+            fi
+            echo "OK: $script is executable"
+          done
+
+      - name: Run build.sh
+        run: ./scripts/build.sh
+
+      - name: Run test.sh
+        run: ./scripts/test.sh
+
+      - name: Run render-diagrams.sh
+        run: ./scripts/render-diagrams.sh
+
+      - name: Run affected.sh
+        env:
+          CI_BASE_BRANCH: main
+        run: |
+          set +e
+          output=$(./scripts/affected.sh 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          # affected.sh should exit 0 even with no changes
+          if [ "$status" -ne 0 ]; then
+            echo "FAIL: affected.sh exited with $status"
+            exit 1
+          fi
+          echo "OK: affected.sh completed successfully"
+
+  monorepo-structure:
+    name: Monorepo Structure Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify monorepo directory structure matches ARCHITECTURE.md
+        run: |
+          expected_dirs="services libs schemas sdks workflows pipelines infra deploy tools scripts third_party"
+          all_ok=true
+          for dir in $expected_dirs; do
+            if [ ! -d "monorepo/${dir}" ]; then
+              echo "FAIL: monorepo/${dir}/ directory missing"
+              all_ok=false
+            elif [ ! -f "monorepo/${dir}/BUILD.bazel" ]; then
+              echo "FAIL: monorepo/${dir}/BUILD.bazel missing"
+              all_ok=false
+            elif [ ! -f "monorepo/${dir}/README.md" ]; then
+              echo "FAIL: monorepo/${dir}/README.md missing"
+              all_ok=false
+            else
+              echo "OK: monorepo/${dir}/ (BUILD.bazel + README.md)"
+            fi
+          done
+          if [ "$all_ok" = false ]; then
+            exit 1
+          fi
+
+      - name: Verify Bazel configuration files
+        run: |
+          for f in MODULE.bazel BUILD.bazel .bazelrc .bazelversion; do
+            if [ ! -f "monorepo/${f}" ]; then
+              echo "FAIL: monorepo/${f} missing"
+              exit 1
+            fi
+            echo "OK: monorepo/${f} exists"
+          done
+
+      - name: Verify .bazelversion pins Bazel 7.x
+        run: |
+          version=$(cat monorepo/.bazelversion)
+          if ! echo "$version" | grep -qE '^7\.'; then
+            echo "FAIL: .bazelversion is '$version', expected 7.x"
+            exit 1
+          fi
+          echo "OK: .bazelversion pins $version"
+
+      - name: Verify MODULE.bazel uses bzlmod
+        run: |
+          if ! grep -q 'module(' monorepo/MODULE.bazel; then
+            echo "FAIL: MODULE.bazel missing module() declaration"
+            exit 1
+          fi
+          if ! grep -q 'rules_python' monorepo/MODULE.bazel; then
+            echo "FAIL: MODULE.bazel missing rules_python dependency"
+            exit 1
+          fi
+          echo "OK: MODULE.bazel has module() and rules_python"
+
+      - name: Verify diagram tool setup
+        run: |
+          base="monorepo/tools/architecture-diagram"
+          for f in BUILD.bazel README.md diagrams/c4-context.d2 diagrams/c4-container.d2; do
+            if [ ! -f "${base}/${f}" ]; then
+              echo "FAIL: ${base}/${f} missing"
+              exit 1
+            fi
+            echo "OK: ${base}/${f} exists"
+          done
