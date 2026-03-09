@@ -52,3 +52,9 @@ PRD: tasks/prd-monorepo-bootstrap.json
 - Files changed: monorepo/tools/architecture-diagram/diagrams/c4-context.mmd, BUILD.bazel updated
 - Learnings: C4Context syntax doesn't use frontmatter; BUILD target pattern is straightforward duplication; builds in ~7s
 ---
+
+## US-007 - Create initial C4 Container diagram
+- What was implemented: c4-container.mmd with Feed Reader, Schema Registry, Broker, Search, Temporal, Dagster, K8s, Pulumi
+- Files changed: monorepo/tools/architecture-diagram/diagrams/c4-container.mmd, BUILD.bazel updated
+- Learnings: C4Container uses System_Boundary + Container(); builds in ~3s when cache warm
+---
