@@ -1,0 +1,2 @@
+# Base Python dependencies shared across all platform services.
+# Service-specific dependencies go in each service's own requirements.txt.
