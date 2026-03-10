@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/chiply/the-data-platform/compare/platform-v0.1.2...platform-v0.1.3) (2026-03-10)
+
+
+### Features
+
+* **infra:** Add dev environment on Linode with multi-env config ([#8](https://github.com/chiply/the-data-platform/issues/8)) ([bfdd7e9](https://github.com/chiply/the-data-platform/commit/bfdd7e9ab39d6b0794756870aeca728bba3a448c))
+
 ## [0.1.2](https://github.com/chiply/the-data-platform/compare/platform-v0.1.1...platform-v0.1.2) (2026-03-10)
 
 
