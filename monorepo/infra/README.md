@@ -55,14 +55,12 @@ monorepo/infra/scripts/local-up.sh
 monorepo/infra/scripts/smoke-test.sh            # defaults to local
 monorepo/infra/scripts/local-down.sh
 
-# Dev environment (requires LINODE_TOKEN)
-export LINODE_TOKEN="..."
+# Dev environment (secrets provided by Pulumi ESC)
 monorepo/infra/scripts/dev-up.sh
 monorepo/infra/scripts/smoke-test.sh dev
 monorepo/infra/scripts/dev-down.sh
 
-# Production environment (requires LINODE_TOKEN)
-export LINODE_TOKEN="..."
+# Production environment (secrets provided by Pulumi ESC)
 monorepo/infra/scripts/production-up.sh
 monorepo/infra/scripts/smoke-test.sh production
 monorepo/infra/scripts/production-down.sh
@@ -109,7 +107,48 @@ Each Pulumi project has a `Pulumi.<env>.yaml` file per environment with stack-sp
 - `prometheusRetention` — metrics retention period (default: `"6h"`)
 - `prometheusScrapeInterval` — scrape interval (default: `"30s"`)
 - `prometheusStorageSize` — PV size for Prometheus (omit for emptyDir)
-- `grafanaAdminPassword` — Pulumi secret (omit for default `"admin"` in local)
+- `grafanaAdminPassword` — provided by ESC (omit for default `"admin"` in local)
+
+### Secrets Management (Pulumi ESC)
+
+Infrastructure secrets are managed via [Pulumi ESC](https://www.pulumi.com/docs/esc/) environments, not `.env` files or inline encrypted values. Each remote environment (dev, production) imports its ESC environment in `Pulumi.<env>.yaml`:
+
+```yaml
+environment:
+  - tdp/dev      # or tdp/production
+```
+
+This provides secrets (`linode:token`, `linodeRootPassword`, `grafanaAdminPassword`) directly to the Pulumi stack at deployment time. No `.env` file or manual `pulumi config set --secret` is needed.
+
+**Current ESC environments:**
+
+| Environment | ESC path | Secrets |
+|-------------|----------|---------|
+| `tdp/dev` | `chiply-org/tdp/dev` | `linode:token`, `linodeRootPassword`, `grafanaAdminPassword` |
+| `tdp/production` | `chiply-org/tdp/production` | `linode:token`, `linodeRootPassword`, `grafanaAdminPassword` |
+
+Local does not use ESC — it has no secrets.
+
+**Common operations:**
+
+```bash
+# View an environment's secrets
+pulumi env open chiply-org/tdp/dev
+
+# Add or update a secret
+pulumi env set chiply-org/tdp/dev --secret pulumiConfig.<namespace>:<key> <value>
+
+# Add an environment variable (for scripts/CLI tools)
+pulumi env set chiply-org/tdp/dev --secret environmentVariables.MY_VAR <value>
+
+# Run a command with ESC environment variables injected
+pulumi env run chiply-org/tdp/dev -- <command>
+```
+
+**Adding a new secret:**
+1. Add it to the ESC environment: `pulumi env set chiply-org/tdp/<env> --secret pulumiConfig.<key> <value>`
+2. Reference it in Pulumi code via `config.requireSecret("<key>")` — no script changes needed
+3. Team members get the secret automatically on next `pulumi up`
 
 ### Adding Platform Charts (Contributor Guide)
 

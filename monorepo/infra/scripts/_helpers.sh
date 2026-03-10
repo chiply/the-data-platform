@@ -33,16 +33,6 @@ validate_prerequisites() {
 }
 
 # ---------------------------------------------------------------------------
-# Environment variable checks
-# ---------------------------------------------------------------------------
-require_linode_token() {
-  if [[ -z "${LINODE_TOKEN:-}" ]]; then
-    echo "ERROR: LINODE_TOKEN is not set. Add it to .env and run: source .env && export LINODE_TOKEN" >&2
-    exit 1
-  fi
-}
-
-# ---------------------------------------------------------------------------
 # Stack initialization
 # ---------------------------------------------------------------------------
 init_stack_if_missing() {
@@ -51,31 +41,6 @@ init_stack_if_missing() {
   if ! pulumi stack ls --json 2>/dev/null | grep -q "\"name\": \"${stack}\""; then
     echo "==> Initializing stack ${stack}..."
     pulumi stack init "${stack}"
-  fi
-  popd >/dev/null
-}
-
-# ---------------------------------------------------------------------------
-# Secret / config helpers
-# ---------------------------------------------------------------------------
-configure_secret_if_missing() {
-  local dir="$1" stack="$2" key="$3" env_var="$4" generate="$5"
-  pushd "${dir}" >/dev/null
-  if ! pulumi config get "${key}" --stack "${stack}" &>/dev/null; then
-    local value="${!env_var:-}"
-    if [[ -z "${value}" && "${generate}" == "true" ]]; then
-      value=$(openssl rand -base64 24)
-      echo "==> Generated ${key} (not in env, auto-generated)"
-    fi
-    if [[ -z "${value}" ]]; then
-      echo "ERROR: ${key} is not configured and ${env_var} is not set." >&2
-      echo "  Either set ${env_var} in .env or run:" >&2
-      echo "  pulumi config set --secret --stack ${stack} ${key} <value>" >&2
-      popd >/dev/null
-      exit 1
-    fi
-    echo "==> Setting ${key} from ${env_var}..."
-    pulumi config set --secret --stack "${stack}" "${key}" "${value}"
   fi
   popd >/dev/null
 }

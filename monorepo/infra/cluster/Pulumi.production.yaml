@@ -1,7 +1,5 @@
+environment:
+  - tdp/production
 config:
   tdp-cluster:clusterType: linode-k3s
   tdp-cluster:clusterName: tdp-production
-  linode:token:
-    secure: AAABAJMkUQwOYaWdyhRbh5h2giEvSB9/RCbUQkYEGxcS7QE3vQe61Kz99oMa46o1D+Mhi6eHjwZneTMKn5o9sdzZHVG3v3ZlbC7odgMpxdgjAWqY8epRNKYYtv+D5Lgs
-  tdp-cluster:linodeRootPassword:
-    secure: AAABAMRW3sukckMZL3N/oVlkVgJnsuizQtfaHHVV48ncvQKtHHmodffdogrbwiZcgxyL8dI35VjHFa4D7RGNYA==

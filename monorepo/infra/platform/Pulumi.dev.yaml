@@ -1,3 +1,5 @@
+environment:
+  - tdp/dev
 config:
   tdp-platform:clusterStackRef: chiply-org/tdp-cluster/dev
   tdp-platform:resourceTier: standard

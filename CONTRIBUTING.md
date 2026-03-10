@@ -203,9 +203,12 @@ real data.
 ### Quick start
 
 ```bash
-source .env && export PULUMI_ACCESS_TOKEN LINODE_TOKEN
+source .env && export PULUMI_ACCESS_TOKEN
 ./monorepo/infra/scripts/dev-up.sh
 ```
+
+Secrets (Linode token, root password, Grafana password) are provided automatically by
+the Pulumi ESC environment `tdp/dev`. No `.env` entries needed beyond `PULUMI_ACCESS_TOKEN`.
 
 ### Tear down
 
@@ -242,43 +245,22 @@ Sign up at [Linode/Akamai Cloud](https://login.linode.com/signup). Generate a pe
 access token at **My Profile > API Tokens** with Read/Write access for Linodes, Firewalls,
 and StackScripts.
 
-### 2. Store credentials
+### 2. Verify access to secrets
 
-Add these to your `.env` file (see `.env.example` for the full template):
+Production secrets (Linode token, root password, Grafana password) are managed via
+Pulumi ESC. Ask a team member for access to the `chiply-org` Pulumi organization.
 
-```bash
-# .env (gitignored)
-LINODE_TOKEN=<your-linode-api-token>
-LINODE_ROOT_PASSWORD=<strong-password>          # openssl rand -base64 24
-GRAFANA_ADMIN_PASSWORD=<strong-password>        # openssl rand -base64 24
-```
-
-Then configure the Pulumi production stack:
+Verify you can access the production environment:
 
 ```bash
-source .env && export PULUMI_ACCESS_TOKEN
-
-cd monorepo/infra/cluster
-pulumi stack select production  # or: pulumi stack init production
-
-# Store Linode API token (encrypted in Pulumi state)
-pulumi config set --secret --stack production linode:token "$LINODE_TOKEN"
-
-# Store root password for the k3s instance (encrypted)
-pulumi config set --secret --stack production tdp-cluster:linodeRootPassword "$LINODE_ROOT_PASSWORD"
+pulumi env open chiply-org/tdp/production
 ```
 
-### 3. Configure the platform stack
+If you need to add or rotate a secret, see the
+[Secrets Management](monorepo/infra/README.md#secrets-management-pulumi-esc) section
+in the infra README.
 
-```bash
-cd monorepo/infra/platform
-pulumi stack init production
-pulumi config set --stack production tdp-platform:clusterStackRef "<your-org>/tdp-cluster/production"
-pulumi config set --stack production tdp-platform:environment production
-pulumi config set --secret --stack production tdp-platform:grafanaAdminPassword "$GRAFANA_ADMIN_PASSWORD"
-```
-
-### 4. Deploy everything
+### 3. Deploy everything
 
 ```bash
 ./monorepo/infra/scripts/production-up.sh
@@ -290,7 +272,7 @@ This single command:
 3. Installs **cert-manager** and the **Prometheus/Grafana monitoring stack**
 4. Exports the kubeconfig to `~/.kube/tdp-production.yaml`
 
-### 5. Access the production cluster
+### 4. Access the production cluster
 
 ```bash
 # Verify nodes
@@ -304,7 +286,7 @@ kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n monitoring svc/
 # Then open: http://localhost:3001 — login: admin / $GRAFANA_ADMIN_PASSWORD
 ```
 
-### 6. Tear down production
+### 5. Tear down production
 
 ```bash
 ./monorepo/infra/scripts/production-down.sh

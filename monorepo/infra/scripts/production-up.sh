@@ -18,37 +18,27 @@ check_cmd kubectl
 validate_prerequisites
 
 # ---------------------------------------------------------------------------
-# Ensure required env vars are set
-# ---------------------------------------------------------------------------
-require_linode_token
-
-# ---------------------------------------------------------------------------
 # Initialize stacks if needed
 # ---------------------------------------------------------------------------
 init_stack_if_missing "${CLUSTER_DIR}" "${STACK_NAME}"
 init_stack_if_missing "${PLATFORM_DIR}" "${STACK_NAME}"
 
 # ---------------------------------------------------------------------------
-# Configure secrets if not already set
+# Configure non-secret config if not already set
 # ---------------------------------------------------------------------------
-# Cluster secrets
-configure_secret_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "linode:token" "LINODE_TOKEN" "false"
-configure_secret_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "tdp-cluster:linodeRootPassword" "LINODE_ROOT_PASSWORD" "true"
-
-# Cluster config (non-secret)
 configure_config_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "tdp-cluster:clusterType" "linode-k3s"
 configure_config_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "tdp-cluster:clusterName" "tdp-production"
 
-# Platform config
 pushd "${PLATFORM_DIR}" >/dev/null
 ORG_NAME=$(pulumi whoami 2>/dev/null || echo "organization")
 popd >/dev/null
 configure_config_if_missing "${PLATFORM_DIR}" "${STACK_NAME}" "tdp-platform:clusterStackRef" "${ORG_NAME}/tdp-cluster/${STACK_NAME}"
 
-configure_secret_if_missing "${PLATFORM_DIR}" "${STACK_NAME}" "tdp-platform:grafanaAdminPassword" "GRAFANA_ADMIN_PASSWORD" "true"
-
 # ---------------------------------------------------------------------------
 # Bring up the production environment
+# Secrets (linode:token, linodeRootPassword, grafanaAdminPassword) are
+# provided by the Pulumi ESC environment "tdp/production" imported in
+# Pulumi.production.yaml.
 # ---------------------------------------------------------------------------
 deploy_stack "${CLUSTER_DIR}" "cluster infrastructure (tdp-cluster / ${STACK_NAME})" "${STACK_NAME}"
 
