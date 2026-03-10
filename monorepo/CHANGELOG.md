@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/chiply/the-data-platform/compare/platform-v0.1.1...platform-v0.1.2) (2026-03-10)
+
+
+### Features
+
+* **infra:** Kubernetes local development infrastructure ([#6](https://github.com/chiply/the-data-platform/issues/6)) ([f3d5f42](https://github.com/chiply/the-data-platform/commit/f3d5f42cfea7558e3ab9b0b49f54c5f0d48f4a63))
+
 ## [0.1.1](https://github.com/chiply/the-data-platform/compare/platform-v0.1.0...platform-v0.1.1) (2026-03-09)
 
 
