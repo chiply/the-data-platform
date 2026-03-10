@@ -16,27 +16,29 @@ export type LinodeK3sClusterResult = K3dClusterResult;
 
 export function createLinodeK3sCluster(): LinodeK3sClusterResult {
   const config = new pulumi.Config();
-  const clusterName = config.get("clusterName") || "tdp-production";
+  const clusterName = config.require("clusterName");
+  const environment = config.get("environment") || clusterName.replace(/^tdp-/, "");
   const region = config.get("linodeRegion") || "us-east";
   const instanceType = config.get("linodeInstanceType") || "g6-standard-2"; // Linode 4GB/2CPU
   const image = config.get("linodeImage") || "linode/ubuntu22.04";
   const rootPassword = config.requireSecret("linodeRootPassword");
+  const firewallAllowedIPs = config.getObject<string[]>("firewallAllowedIPs") || ["0.0.0.0/0"];
 
   // ── Firewall ──────────────────────────────────────────────────────────
   // Allow inbound traffic on ports required by the cluster:
-  //   80  – HTTP ingress
-  //  443  – HTTPS ingress
-  // 6443  – Kubernetes API server
+  //   22  – SSH (restricted to allowed IPs)
+  //   80  – HTTP ingress (open)
+  //  443  – HTTPS ingress (open)
+  // 6443  – Kubernetes API server (restricted to allowed IPs)
   const firewall = new linode.Firewall("k3s-firewall", {
     label: `${clusterName}-fw`,
     inbounds: [
       {
-        // TODO: restrict to known IPs (CI/CD, VPN) before production use
         label: "allow-ssh",
         action: "ACCEPT",
         protocol: "TCP",
         ports: "22",
-        ipv4s: ["0.0.0.0/0"],
+        ipv4s: firewallAllowedIPs,
         ipv6s: ["::/0"],
       },
       {
@@ -56,12 +58,11 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
         ipv6s: ["::/0"],
       },
       {
-        // TODO: restrict to known IPs (CI/CD, VPN) before production use
         label: "allow-k8s-api",
         action: "ACCEPT",
         protocol: "TCP",
         ports: "6443",
-        ipv4s: ["0.0.0.0/0"],
+        ipv4s: firewallAllowedIPs,
         ipv6s: ["::/0"],
       },
     ],
@@ -80,7 +81,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
       rootPass: rootPassword,
       authorizedUsers: [],
       firewallId: firewall.id.apply((id) => Number(id)),
-      tags: ["k3s", "tdp"],
+      tags: ["k3s", "tdp", environment],
     },
   );
 
