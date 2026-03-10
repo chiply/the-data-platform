@@ -33,12 +33,17 @@ source .env && export PULUMI_ACCESS_TOKEN
 Install all required tools with Homebrew (macOS):
 
 ```bash
-brew install docker k3d pulumi kubectl derailed/k9s/k9s node
+brew install --cask docker   # Docker Desktop (includes daemon)
+brew install k3d pulumi kubectl derailed/k9s/k9s node
 ```
+
+> **Note:** `brew install docker` only installs the CLI, not the Docker daemon.
+> Use `brew install --cask docker` for Docker Desktop, or download from
+> https://docs.docker.com/get-docker/.
 
 | Tool | Purpose | Verify |
 |------|---------|--------|
-| [Docker](https://docs.docker.com/get-docker/) | Container runtime — must be running | `docker info` |
+| [Docker Desktop](https://docs.docker.com/get-docker/) | Container runtime — must be running | `docker info` |
 | [k3d](https://k3d.io/) | Runs lightweight k3s clusters in Docker | `k3d version` |
 | [Pulumi](https://www.pulumi.com/docs/install/) | Infrastructure-as-code engine | `pulumi version` |
 | [Node.js](https://nodejs.org/) | Runs Pulumi TypeScript programs | `node --version` (v18+) |

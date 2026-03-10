@@ -31,6 +31,14 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
     label: `${clusterName}-fw`,
     inbounds: [
       {
+        label: "allow-ssh",
+        action: "ACCEPT",
+        protocol: "TCP",
+        ports: "22",
+        ipv4s: ["0.0.0.0/0"],
+        ipv6s: ["::/0"],
+      },
+      {
         label: "allow-http",
         action: "ACCEPT",
         protocol: "TCP",
@@ -47,6 +55,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
         ipv6s: ["::/0"],
       },
       {
+        // TODO: restrict to known IPs (CI/CD, VPN) before production use
         label: "allow-k8s-api",
         action: "ACCEPT",
         protocol: "TCP",

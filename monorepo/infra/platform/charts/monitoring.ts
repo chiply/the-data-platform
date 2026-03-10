@@ -47,7 +47,7 @@ export function installMonitoring(args: MonitoringArgs): k8s.helm.v3.Release {
                   requests: { cpu: "500m", memory: "1Gi" },
                   limits: { cpu: "1000m", memory: "2Gi" },
                 },
-            // Shorter scrape interval locally for faster feedback
+            // Longer scrape interval locally (30s) to reduce resource usage
             scrapeInterval: isLocal ? "30s" : "15s",
             // Disable persistent storage locally to save resources
             storageSpec: isLocal

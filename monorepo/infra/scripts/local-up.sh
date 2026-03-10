@@ -47,28 +47,30 @@ fi
 # ---------------------------------------------------------------------------
 echo "==> Deploying cluster infrastructure (tdp-cluster / ${STACK_NAME})..."
 pushd "${CLUSTER_DIR}" >/dev/null
+npm install --silent
 pulumi up --stack "${STACK_NAME}" --yes
 popd >/dev/null
 
 echo ""
 echo "==> Deploying platform infrastructure (tdp-platform / ${STACK_NAME})..."
 pushd "${PLATFORM_DIR}" >/dev/null
+npm install --silent
 pulumi up --stack "${STACK_NAME}" --yes
 popd >/dev/null
 
 # ---------------------------------------------------------------------------
 # Print cluster access info
 # ---------------------------------------------------------------------------
-KUBECONFIG_PATH="${HOME}/.k3d/kubeconfig-tdp-local.yaml"
-REGISTRY_URL="localhost:5050"
+CLUSTER_NAME=$(cd "${CLUSTER_DIR}" && pulumi stack output clusterName --stack "${STACK_NAME}" 2>/dev/null || echo "tdp-local")
+REGISTRY_URL=$(cd "${CLUSTER_DIR}" && pulumi stack output registryUrl --stack "${STACK_NAME}" 2>/dev/null || echo "k3d-tdp-local-registry:5111")
 
 echo ""
 echo "========================================"
 echo "  Local environment is ready!"
 echo "========================================"
 echo ""
-echo "Cluster access:"
-echo "  export KUBECONFIG=\"${KUBECONFIG_PATH}\""
+echo "Cluster access (k3d sets kubeconfig automatically):"
+echo "  kubectl config use-context k3d-${CLUSTER_NAME}"
 echo ""
 echo "Local container registry:"
 echo "  ${REGISTRY_URL}"
