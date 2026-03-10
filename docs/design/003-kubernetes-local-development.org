@@ -1,6 +1,6 @@
 #+TITLE: 003 - Kubernetes Local Development & Infrastructure Parity
 #+AUTHOR: Charlie Holland
-#+STATUS: Active
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-09]
 #+LAST_MODIFIED: [2026-03-10]
@@ -222,13 +222,12 @@ Kubernetes distribution in both environments:
 Implementation tasks scoped to local cluster setup and the infrastructure
 foundation.
 
-** WIP [TDP-003-00] Set up accounts and install prerequisites       :p0:human:
+** DONE [TDP-003-00] Set up accounts and install prerequisites       :p0:human:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: human
+:COMPLETED_AT: [2026-03-10]
 :END:
-
-Partial completion [2026-03-10]: Pulumi Cloud account created, local tools installed
-(Docker, k3d, Pulumi, Node.js, kubectl, k9s). Remaining: Linode account + API token.
 
 Human-only task — the agent cannot do these for you.
 
@@ -342,13 +341,12 @@ Create a minimal verification:
 - Verify it's reachable via ingress on localhost
 - Can run as part of CI or as a manual =scripts/smoke-test.sh=
 
-** WIP [TDP-003-08] Implement Linode k3s cluster provider              :p2:
+** DONE [TDP-003-08] Implement Linode k3s cluster provider              :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
-
-Code complete [2026-03-10] via Ralph — typechecks pass. Needs Linode account +
-API token to verify end-to-end. Blocked on TDP-003-00 Linode setup.
 
 Create =monorepo/infra/cluster/providers/linode-k3s.ts=:
 - Use =@pulumi/linode= to provision a Linode 2GB instance
