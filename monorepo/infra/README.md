@@ -29,7 +29,7 @@ infra/
 | Deploy frequency | On-demand | Every push to `main` | Manual / release-gated |
 | Data | Local / synthetic | Synthetic / seed data | Real data |
 | Disposability | Fully disposable | Fully disposable, no backups | Persistent, backed up |
-| Cost | Free | ~$25/mo | ~$24/mo |
+| Cost | Free | ~$24/mo (Linode 4GB) | ~$24/mo (Linode 4GB) |
 
 **Dev is fully disposable.** Running `dev-down.sh` destroys the Linode instance and all data, including monitoring history. The cluster can be recreated from scratch at any time via `dev-up.sh`.
 

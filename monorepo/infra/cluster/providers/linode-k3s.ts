@@ -23,6 +23,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
   const image = config.get("linodeImage") || "linode/ubuntu22.04";
   const rootPassword = config.requireSecret("linodeRootPassword");
   const firewallAllowedIPs = config.getObject<string[]>("firewallAllowedIPs") || ["0.0.0.0/0"];
+  const firewallAllowedIPv6s = config.getObject<string[]>("firewallAllowedIPv6s") || ["::/0"];
 
   // ── Firewall ──────────────────────────────────────────────────────────
   // Allow inbound traffic on ports required by the cluster:
@@ -39,7 +40,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
         protocol: "TCP",
         ports: "22",
         ipv4s: firewallAllowedIPs,
-        ipv6s: ["::/0"],
+        ipv6s: firewallAllowedIPv6s,
       },
       {
         label: "allow-http",
@@ -63,7 +64,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
         protocol: "TCP",
         ports: "6443",
         ipv4s: firewallAllowedIPs,
-        ipv6s: ["::/0"],
+        ipv6s: firewallAllowedIPv6s,
       },
     ],
     inboundPolicy: "DROP",
