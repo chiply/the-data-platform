@@ -4,5 +4,3 @@ config:
   tdp-platform:prometheusRetention: "7d"
   tdp-platform:prometheusScrapeInterval: "15s"
   tdp-platform:prometheusStorageSize: "10Gi"
-  tdp-platform:grafanaAdminPassword:
-    secure: PLACEHOLDER_RUN_PULUMI_CONFIG_SET_TO_ENCRYPT

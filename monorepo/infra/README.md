@@ -105,7 +105,6 @@ Each Pulumi project has a `Pulumi.<env>.yaml` file per environment with stack-sp
 
 **Platform** (`platform/Pulumi.<env>.yaml`):
 - `clusterStackRef: <org>/tdp-cluster/<env>` — references the cluster stack for kubeconfig
-- `environment: <env>` — environment name
 - `resourceTier: minimal|standard` — selects resource sizing presets
 - `prometheusRetention` — metrics retention period (default: `"6h"`)
 - `prometheusScrapeInterval` — scrape interval (default: `"30s"`)

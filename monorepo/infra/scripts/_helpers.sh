@@ -114,6 +114,7 @@ destroy_stack() {
   local dir="$1" component="$2" stack="$3"
   echo "==> Destroying ${component} (${stack})..."
   pushd "${dir}" >/dev/null
+  npm install --silent
   pulumi destroy --stack "${stack}" --yes
   popd >/dev/null
 }

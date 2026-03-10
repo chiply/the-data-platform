@@ -58,9 +58,8 @@ else
   fi
 
   INGRESS_HOST="smoke.${CLUSTER_IP}.nip.io"
-  CURL_SCHEME="https"
-  # Handle self-signed TLS certificates on remote clusters
-  CURL_EXTRA_ARGS=("--insecure")
+  # Use HTTP for remote — the smoke test ingress has no TLS stanza
+  CURL_SCHEME="http"
 fi
 
 log "Environment: ${ENV}"
