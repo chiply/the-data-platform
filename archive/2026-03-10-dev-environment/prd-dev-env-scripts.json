@@ -1,0 +1,53 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/dev-env-scripts",
+  "description": "Extract shared helper functions from the existing production-up.sh script, then create dev lifecycle scripts (dev-up.sh, dev-down.sh) and a production-down.sh for symmetry.",
+  "sourceDesignDoc": "docs/design/004-dev-environment.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-004-06",
+      "title": "Extract shared script helpers from production-up.sh",
+      "description": "As a developer, I want common lifecycle script logic extracted into a shared helpers file so that dev and production scripts stay DRY.\n\nCreate monorepo/infra/scripts/_helpers.sh:\n- Extract: check_cmd(), prerequisite validation loop, LINODE_TOKEN check, init_stack_if_missing(), configure_secret_if_missing(), kubeconfig export pattern, access info printing template\n- Refactor production-up.sh to source _helpers.sh and call shared functions\n- Verify production-up.sh still works identically after refactor",
+      "acceptanceCriteria": [
+        "_helpers.sh exists at monorepo/infra/scripts/_helpers.sh",
+        "_helpers.sh contains check_cmd() function",
+        "_helpers.sh contains prerequisite validation loop",
+        "_helpers.sh contains LINODE_TOKEN check function",
+        "_helpers.sh contains init_stack_if_missing() function",
+        "_helpers.sh contains configure_secret_if_missing() function",
+        "_helpers.sh contains kubeconfig export helper",
+        "production-up.sh sources _helpers.sh and uses shared functions",
+        "production-up.sh behavior is unchanged after refactor"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S. Must complete before dev lifecycle scripts (TDP-004-07)."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-004-07",
+      "title": "Create dev lifecycle scripts",
+      "description": "As a developer, I want dev-up.sh, dev-down.sh, and production-down.sh scripts so that I can easily provision and tear down the dev environment and tear down production.\n\nCreate monorepo/infra/scripts/dev-up.sh:\n- Source _helpers.sh for shared functions\n- Require LINODE_TOKEN environment variable\n- Initialize dev stacks if missing, configure secrets interactively\n- pulumi up for cluster (dev stack), then platform (dev stack)\n- Export kubeconfig to ~/.kube/tdp-dev.yaml\n- Print access info (cluster IP, nip.io URLs, Grafana port-forward)\n\nCreate monorepo/infra/scripts/dev-down.sh:\n- Source _helpers.sh for shared functions\n- pulumi destroy for platform (dev stack), then cluster (dev stack)\n\nCreate monorepo/infra/scripts/production-down.sh:\n- Source _helpers.sh for shared functions\n- pulumi destroy for platform (production stack), then cluster\n- Fills the existing gap (production-up.sh exists but no teardown script)",
+      "acceptanceCriteria": [
+        "dev-up.sh exists and is executable",
+        "dev-up.sh sources _helpers.sh",
+        "dev-up.sh requires LINODE_TOKEN",
+        "dev-up.sh initializes dev stacks and configures secrets",
+        "dev-up.sh runs pulumi up for cluster then platform on dev stack",
+        "dev-up.sh exports kubeconfig to ~/.kube/tdp-dev.yaml",
+        "dev-up.sh prints access info with nip.io URLs",
+        "dev-down.sh exists and is executable",
+        "dev-down.sh destroys platform then cluster on dev stack",
+        "production-down.sh exists and is executable",
+        "production-down.sh destroys platform then cluster on production stack",
+        "All scripts source _helpers.sh for shared logic"
+      ],
+      "priority": 2,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Effort: S. Depends on US-001 (TDP-004-06) — helpers must exist first."
+    }
+  ]
+}

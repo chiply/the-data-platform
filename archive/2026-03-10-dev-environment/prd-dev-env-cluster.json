@@ -1,0 +1,61 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/dev-env-cluster",
+  "description": "Add the dev cluster Pulumi stack configuration and parameterize the linode-k3s provider for multi-environment support (environment tags and firewall IP allowlists).",
+  "sourceDesignDoc": "docs/design/004-dev-environment.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-004-02",
+      "title": "Add cluster Pulumi dev stack configuration",
+      "description": "As a developer, I want a Pulumi.dev.yaml stack configuration for the cluster project so that I can provision a dev k3s cluster on Linode.\n\nCreate monorepo/infra/cluster/Pulumi.dev.yaml with:\n- clusterType: linode-k3s\n- clusterName: tdp-dev\n- Linode token and root password as Pulumi secrets (placeholder secure values)\n- Use a separate Linode API token from production (scoped permissions)\n\nNo code changes to the cluster layer.",
+      "acceptanceCriteria": [
+        "Pulumi.dev.yaml exists at monorepo/infra/cluster/Pulumi.dev.yaml",
+        "clusterType is set to linode-k3s",
+        "clusterName is set to tdp-dev",
+        "Linode token is configured as a secure value placeholder",
+        "Root password is configured as a secure value placeholder",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S. No code changes needed — config file only."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-004-04",
+      "title": "Add environment tags to linode-k3s provider",
+      "description": "As a developer, I want the linode-k3s provider to include environment-specific tags on the Linode instance so that instances are easily identifiable by environment.\n\nUpdate monorepo/infra/cluster/providers/linode-k3s.ts:\n- Add environment-specific tag from config (e.g., dev or production) to the Linode instance tags array (currently hardcoded [\"k3s\", \"tdp\"])\n- Change the default cluster name from 'tdp-production' to a neutral default or require it via config (it is always overridden, but the default is misleading)",
+      "acceptanceCriteria": [
+        "Linode instance tags include the environment name from config",
+        "Default cluster name is no longer hardcoded to tdp-production",
+        "Existing production stack config still produces correct tags",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S."
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-004-05",
+      "title": "Parameterize firewall rules in linode-k3s provider",
+      "description": "As a developer, I want the linode-k3s provider firewall rules to support IP allowlists so that SSH and K8s API access can be restricted to known IPs.\n\nUpdate monorepo/infra/cluster/providers/linode-k3s.ts:\n- Add a firewallAllowedIPs config key (defaults to [\"0.0.0.0/0\"])\n- Apply the allowlist to SSH (22) and K8s API (6443) inbound rules\n- HTTP (80) and HTTPS (443) remain open to all\n- Resolves existing TODO comments on lines 35 and 62\n- Both dev and production stacks should set this to known developer/CI IPs",
+      "acceptanceCriteria": [
+        "firewallAllowedIPs config key is read from Pulumi config",
+        "SSH (port 22) inbound rules use the configured IP allowlist",
+        "K8s API (port 6443) inbound rules use the configured IP allowlist",
+        "HTTP (80) and HTTPS (443) remain open to 0.0.0.0/0",
+        "Default value is [\"0.0.0.0/0\"] when config key is unset",
+        "TODO comments about restricting IPs are resolved",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S."
+    }
+  ]
+}

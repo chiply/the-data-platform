@@ -65,6 +65,11 @@ cd ../platform && npm install
 cd ../components && npm install
 ```
 
+> **Tip:** The lifecycle scripts (`local-up.sh`, `dev-up.sh`, `production-up.sh`) run
+> `npm install` automatically before deploying. However, if you run `pulumi preview` or
+> `pulumi up` directly, you must run `npm install` in the relevant directory first.
+> Without it, Pulumi will fail with _"It looks like the Pulumi SDK has not been installed."_
+
 ### 2. Configure Pulumi
 
 ```bash
@@ -189,6 +194,43 @@ See `monorepo/services/README.md` for image build details and
 | In-cluster address | `k3d-tdp-local-registry:5111` |
 | Push from host | `docker push k3d-tdp-local-registry:5111/<image>` |
 
+## Dev Environment (Linode)
+
+The dev cluster is a persistent, shared environment for integration testing and demos.
+It runs k3s on Linode, identical to production but fully disposable — no backups, no
+real data.
+
+### Quick start
+
+```bash
+source .env && export PULUMI_ACCESS_TOKEN LINODE_TOKEN
+./monorepo/infra/scripts/dev-up.sh
+```
+
+### Tear down
+
+```bash
+./monorepo/infra/scripts/dev-down.sh
+```
+
+This destroys the Linode instance and all data. The cluster can be recreated from
+scratch at any time.
+
+### Accessing the dev cluster
+
+```bash
+kubectl --kubeconfig ~/.kube/tdp-dev.yaml get nodes
+k9s --kubeconfig ~/.kube/tdp-dev.yaml
+
+# Smoke test against dev
+./monorepo/infra/scripts/smoke-test.sh dev
+```
+
+Services are accessed via `<service>.<linode-ip>.nip.io` (self-signed TLS).
+
+> **Note:** Dev uses the `local-path` provisioner for persistent volumes (not Linode
+> Block Storage CSI). Data is lost on node replacement.
+
 ## Production Deployment (Linode)
 
 The production cluster runs k3s on a Linode instance. This section is only needed if you
@@ -265,8 +307,7 @@ kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n monitoring svc/
 ### 6. Tear down production
 
 ```bash
-cd monorepo/infra/platform && pulumi destroy --stack production --yes
-cd ../cluster && pulumi destroy --stack production --yes
+./monorepo/infra/scripts/production-down.sh
 ```
 
 ## Tearing Down

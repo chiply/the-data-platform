@@ -1,0 +1,3 @@
+config:
+  tdp-cluster:clusterType: linode-k3s
+  tdp-cluster:clusterName: tdp-dev

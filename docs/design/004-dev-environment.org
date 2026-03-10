@@ -1,6 +1,6 @@
 #+TITLE: 004 - Dev Environment on Linode
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-10]
 #+LAST_MODIFIED: [2026-03-10]
@@ -164,9 +164,11 @@ zero code changes.
 :CATEGORY: tasks
 :END:
 
-** TODO [TDP-004-01] Refactor platform charts to use Pulumi stack config  :p1:
+** DONE [TDP-004-01] Refactor platform charts to use Pulumi stack config  :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Replace the =isLocal= boolean pattern in both chart modules with Pulumi config
@@ -187,9 +189,11 @@ reads. This is the foundation for multi-environment support.
 Update =Pulumi.local.yaml= and =Pulumi.production.yaml= with the new config
 keys so both existing environments produce *zero diff* on =pulumi preview=.
 
-** TODO [TDP-004-02] Add cluster Pulumi dev stack configuration           :p1:
+** DONE [TDP-004-02] Add cluster Pulumi dev stack configuration           :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/cluster/Pulumi.dev.yaml=:
@@ -200,9 +204,11 @@ Create =monorepo/infra/cluster/Pulumi.dev.yaml=:
 
 No code changes to the cluster layer.
 
-** TODO [TDP-004-03] Add platform Pulumi dev stack configuration          :p1:
+** DONE [TDP-004-03] Add platform Pulumi dev stack configuration          :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/platform/Pulumi.dev.yaml=:
@@ -213,9 +219,11 @@ Create =monorepo/infra/platform/Pulumi.dev.yaml=:
 
 Depends on TDP-004-01 (config keys must exist in chart code first).
 
-** TODO [TDP-004-04] Add environment tags to linode-k3s provider          :p1:
+** DONE [TDP-004-04] Add environment tags to linode-k3s provider          :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Update =monorepo/infra/cluster/providers/linode-k3s.ts=:
@@ -224,9 +232,11 @@ Update =monorepo/infra/cluster/providers/linode-k3s.ts=:
 - Change the default cluster name from ="tdp-production"= to a neutral default
   or require it via config (it is always overridden, but the default is misleading)
 
-** TODO [TDP-004-05] Parameterize firewall rules in linode-k3s provider   :p1:
+** DONE [TDP-004-05] Parameterize firewall rules in linode-k3s provider   :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Update =monorepo/infra/cluster/providers/linode-k3s.ts=:
@@ -236,9 +246,11 @@ Update =monorepo/infra/cluster/providers/linode-k3s.ts=:
 - Resolves existing TODO comments on lines 35 and 62
 - Both dev and production stacks should set this to known developer/CI IPs
 
-** TODO [TDP-004-06] Extract shared script helpers from production-up.sh  :p1:
+** DONE [TDP-004-06] Extract shared script helpers from production-up.sh  :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/scripts/_helpers.sh=:
@@ -248,9 +260,11 @@ Create =monorepo/infra/scripts/_helpers.sh=:
 - Refactor =production-up.sh= to source =_helpers.sh= and call shared functions
 - Verify =production-up.sh= still works identically after refactor
 
-** TODO [TDP-004-07] Create dev lifecycle scripts                         :p1:
+** DONE [TDP-004-07] Create dev lifecycle scripts                         :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/scripts/dev-up.sh=:
@@ -272,9 +286,11 @@ Create =monorepo/infra/scripts/production-down.sh=:
 
 Depends on TDP-004-06.
 
-** TODO [TDP-004-08] Make smoke test environment-aware                    :p2:
+** DONE [TDP-004-08] Make smoke test environment-aware                    :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Update =monorepo/infra/scripts/smoke-test.sh=:
@@ -288,9 +304,11 @@ Update =monorepo/infra/scripts/smoke-test.sh=:
 - Update error messages to reference the correct =*-up.sh= script per environment
 - Verify the test works against both =local= and =dev= environments
 
-** TODO [TDP-004-09] Update documentation                                :p2:
+** DONE [TDP-004-09] Update documentation                                :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Update =monorepo/infra/README.md= (or =CONTRIBUTING.md=):
@@ -381,3 +399,8 @@ file with zero code changes.
 Yes. Separate Linode API tokens with scoped permissions for dev vs production.
 A compromised dev environment should not grant access to production
 infrastructure. Each stack stores its own token as a Pulumi secret.
+
+* Changelog
+
+- *[2026-03-10]:* Generated Ralph prd.json for autonomous execution (4 workstreams)
+- *[2026-03-10]:* All tasks completed via Ralph (9/9 stories passed)

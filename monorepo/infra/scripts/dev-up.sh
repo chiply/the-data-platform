@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STACK_NAME="production"
-KUBECONFIG_PATH=~/.kube/tdp-production.yaml
+STACK_NAME="dev"
+KUBECONFIG_PATH=~/.kube/tdp-dev.yaml
 
 # shellcheck source=_helpers.sh
 source "${SCRIPT_DIR}/_helpers.sh"
@@ -37,7 +37,7 @@ configure_secret_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "tdp-cluster:linode
 
 # Cluster config (non-secret)
 configure_config_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "tdp-cluster:clusterType" "linode-k3s"
-configure_config_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "tdp-cluster:clusterName" "tdp-production"
+configure_config_if_missing "${CLUSTER_DIR}" "${STACK_NAME}" "tdp-cluster:clusterName" "tdp-dev"
 
 # Platform config
 pushd "${PLATFORM_DIR}" >/dev/null
@@ -48,7 +48,7 @@ configure_config_if_missing "${PLATFORM_DIR}" "${STACK_NAME}" "tdp-platform:clus
 configure_secret_if_missing "${PLATFORM_DIR}" "${STACK_NAME}" "tdp-platform:grafanaAdminPassword" "GRAFANA_ADMIN_PASSWORD" "true"
 
 # ---------------------------------------------------------------------------
-# Bring up the production environment
+# Bring up the dev environment
 # ---------------------------------------------------------------------------
 deploy_stack "${CLUSTER_DIR}" "cluster infrastructure (tdp-cluster / ${STACK_NAME})" "${STACK_NAME}"
 
@@ -63,4 +63,10 @@ export_kubeconfig "${STACK_NAME}" "${KUBECONFIG_PATH}"
 # ---------------------------------------------------------------------------
 # Print cluster access info
 # ---------------------------------------------------------------------------
-print_access_info "Production" "${KUBECONFIG_PATH}"
+print_access_info "Dev" "${KUBECONFIG_PATH}"
+
+# Dev-specific: print nip.io URL hints
+CLUSTER_IP=$(kubectl --kubeconfig "${KUBECONFIG_PATH}" get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null || echo "<cluster-ip>")
+echo "Dev nip.io URLs (once services are deployed):"
+echo "  http://<service>.${CLUSTER_IP}.nip.io"
+echo ""

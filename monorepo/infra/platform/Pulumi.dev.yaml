@@ -1,0 +1,6 @@
+config:
+  tdp-platform:clusterStackRef: chiply-org/tdp-cluster/dev
+  tdp-platform:resourceTier: standard
+  tdp-platform:prometheusRetention: "7d"
+  tdp-platform:prometheusScrapeInterval: "15s"
+  tdp-platform:prometheusStorageSize: "10Gi"
