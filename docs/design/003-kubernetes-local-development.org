@@ -1,9 +1,9 @@
 #+TITLE: 003 - Kubernetes Local Development & Infrastructure Parity
 #+AUTHOR: Charlie Holland
-#+STATUS: Active
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-09]
-#+LAST_MODIFIED: [2026-03-09]
+#+LAST_MODIFIED: [2026-03-10]
 #+SETUPFILE: ../../org-setup.org
 
 * Summary
@@ -222,9 +222,11 @@ Kubernetes distribution in both environments:
 Implementation tasks scoped to local cluster setup and the infrastructure
 foundation.
 
-** TODO [TDP-003-00] Set up accounts and install prerequisites       :p0:human:
+** DONE [TDP-003-00] Set up accounts and install prerequisites       :p0:human:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: human
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Human-only task — the agent cannot do these for you.
@@ -247,9 +249,11 @@ These installs should be codified in a setup script (e.g., =~/setup.sh= or a
 dotfiles bootstrap) so new developers can onboard quickly and the same installs
 can be reused in CI workflows.
 
-** TODO [TDP-003-01] Initialize Pulumi cluster project                  :p1:
+** DONE [TDP-003-01] Initialize Pulumi cluster project                  :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/cluster/= with:
@@ -259,9 +263,11 @@ Create =monorepo/infra/cluster/= with:
 - =Pulumi.local.yaml= stack configuration
 - =index.ts= entrypoint that dispatches by =clusterType= config value
 
-** TODO [TDP-003-02] Implement k3d cluster provider                     :p1:
+** DONE [TDP-003-02] Implement k3d cluster provider                     :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/cluster/providers/k3d.ts=:
@@ -271,9 +277,11 @@ Create =monorepo/infra/cluster/providers/k3d.ts=:
 - Support configurable worker node count (default: 2)
 - Export kubeconfig as a Pulumi output
 
-** TODO [TDP-003-03] Initialize Pulumi platform project                 :p1:
+** DONE [TDP-003-03] Initialize Pulumi platform project                 :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/platform/= with:
@@ -282,9 +290,11 @@ Create =monorepo/infra/platform/= with:
 - Stack reference to cluster project for kubeconfig
 - =index.ts= entrypoint that installs platform charts
 
-** TODO [TDP-003-04] Verify Traefik ingress and configure platform layer :p2:
+** DONE [TDP-003-04] Verify Traefik ingress and configure platform layer :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Traefik is bundled with k3s/k3d — no separate install needed. This task:
@@ -293,9 +303,11 @@ Traefik is bundled with k3s/k3d — no separate install needed. This task:
   (cert-manager, monitoring) via stack reference to the cluster layer
 - Document how to define Ingress resources that work with Traefik
 
-** TODO [TDP-003-05] Create ServiceDeployment component resource        :p2:
+** DONE [TDP-003-05] Create ServiceDeployment component resource        :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/components/service-deployment.ts=:
@@ -304,9 +316,11 @@ Create =monorepo/infra/components/service-deployment.ts=:
 - Apply consistent =app.kubernetes.io/*= labels
 - Export as a reusable package for Layer 3 projects
 
-** TODO [TDP-003-06] Create local-up and local-down scripts             :p1:
+** DONE [TDP-003-06] Create local-up and local-down scripts             :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/scripts/=:
@@ -315,9 +329,11 @@ Create =monorepo/infra/scripts/=:
 - Validate prerequisites (docker, k3d, pulumi, node/npm)
 - Print cluster access info on success (kubeconfig path, registry URL)
 
-** TODO [TDP-003-07] Add smoke test for local cluster                   :p2:
+** DONE [TDP-003-07] Add smoke test for local cluster                   :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create a minimal verification:
@@ -325,9 +341,11 @@ Create a minimal verification:
 - Verify it's reachable via ingress on localhost
 - Can run as part of CI or as a manual =scripts/smoke-test.sh=
 
-** TODO [TDP-003-08] Implement Linode k3s cluster provider              :p2:
+** DONE [TDP-003-08] Implement Linode k3s cluster provider              :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/infra/cluster/providers/linode-k3s.ts=:
@@ -337,9 +355,11 @@ Create =monorepo/infra/cluster/providers/linode-k3s.ts=:
 - Export kubeconfig as a Pulumi output
 - Add =Pulumi.production.yaml= stack configuration
 
-** TODO [TDP-003-09] Create base Dockerfile and example service image   :p2:
+** DONE [TDP-003-09] Create base Dockerfile and example service image   :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create initial Dockerfile scaffolding:
@@ -348,9 +368,11 @@ Create initial Dockerfile scaffolding:
 - Verify the image builds and loads into k3d registry (=k3d image import=)
 - Document the image build + push workflow for local development
 
-** TODO [TDP-003-10] Document local development workflow                :p2:
+** DONE [TDP-003-10] Document local development workflow                :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Update =monorepo/infra/README.md= with:

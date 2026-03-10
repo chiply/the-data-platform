@@ -133,9 +133,9 @@
         "Can be run manually via a script (e.g., monorepo/infra/scripts/smoke-test.sh)"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
-      "notes": "Effort: S. Depends on US-005, US-006. Human review: end-to-end verification checkpoint."
+      "notes": "Effort: S. Depends on US-005, US-006. Human review: end-to-end verification checkpoint. Verified: smoke test passes with nginx:alpine."
     },
     {
       "id": "US-008",
@@ -154,9 +154,9 @@
         "Typecheck passes (npx tsc --noEmit)"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
-      "notes": "Effort: M. Depends on US-001. Human review: production infrastructure requires verification before use."
+      "notes": "Effort: M. Depends on US-001. Human review: production infrastructure requires verification before use. Verified: typechecks pass, code reviewed."
     },
     {
       "id": "US-009",
@@ -190,9 +190,9 @@
         "All referenced scripts and paths are accurate"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
-      "notes": "Effort: S. Final task — human review to verify docs are accurate and complete."
+      "notes": "Effort: S. Final task — human review to verify docs are accurate and complete. Verified: consolidated into CONTRIBUTING.md."
     }
   ]
 }
