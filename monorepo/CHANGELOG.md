@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/chiply/the-data-platform/compare/platform-v0.1.3...platform-v0.1.4) (2026-03-10)
+
+
+### Features
+
+* **infra:** migrate secrets to Pulumi ESC environments ([ba99cf1](https://github.com/chiply/the-data-platform/commit/ba99cf181e331a0e64d17f27e63e743a8db8387a))
+
 ## [0.1.3](https://github.com/chiply/the-data-platform/compare/platform-v0.1.2...platform-v0.1.3) (2026-03-10)
 
 
