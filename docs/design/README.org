@@ -46,6 +46,7 @@ this table to determine valid categories.
 | 002 | [[file:002-release-management.org][Release Management]] | Complete |
 | 003 | [[file:003-kubernetes-local-development.org][K8s Local Dev & Infra Parity]] | Complete |
 | 004 | [[file:004-dev-environment.org][Dev Environment on Linode]] | Complete |
+| 005 | [[file:005-argocd-gitops-deployment.org][ArgoCD GitOps Deployment & Local Dev]] | Accepted |
 
 * Elisp Setup
 :PROPERTIES:

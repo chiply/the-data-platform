@@ -1,0 +1,750 @@
+#+TITLE: 005 - ArgoCD GitOps Deployment & Local Development Workflow
+#+AUTHOR: Charlie Holland
+#+STATUS: Accepted
+#+CATEGORY: infra
+#+CREATED: [2026-03-10]
+#+LAST_MODIFIED: [2026-03-10]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Introduce ArgoCD as the GitOps deployment engine for all services in The Data
+Platform, alongside Tilt for local development hot-reloading. ArgoCD manages the
+outer deployment loop (git commit → deploy) for dev/staging/production
+environments, while Tilt manages the inner development loop (code change → live
+reload) on a local k3d cluster. A dummy schema-registry service serves as the
+first ArgoCD-managed deployment to validate the entire pipeline end-to-end.
+
+* Motivation
+
+Design doc [[file:003-kubernetes-local-development.org][003]] established the three-layer infrastructure (cluster / platform /
+application) and explicitly deferred ArgoCD to a future phase. The infrastructure
+is now in place:
+
+- k3d local clusters and k3s on Linode are provisioned via Pulumi
+- Platform services (Traefik, cert-manager, monitoring) are bootstrapped
+- The =ServiceDeployment= component resource handles K8s manifests
+- Dockerfiles are ready for services
+
+What's missing:
+
+1. *No GitOps deployment pipeline.* Services have no path from Git commit to
+   running in a cluster. Manual =kubectl apply= or =pulumi up= does not scale
+   and violates the "local testing is first-class" principle.
+2. *No version pinning per environment.* There is no mechanism to say "dev runs
+   schema-registry v0.2.0, production runs v0.1.0."
+3. *No local development inner loop.* Developers cannot make a code change and
+   see it reflected in a running pod within seconds.
+4. *No sample service to prove it works.* The feed reader is too complex as a
+   first deployment target. A dummy schema-registry stub is the right starting
+   point.
+
+* Design
+
+** ArgoCD Architecture
+
+ArgoCD installs as a Layer 2 platform service (per 003's layered architecture).
+Pulumi bootstraps ArgoCD into the cluster, then ArgoCD takes ownership of Layer 3
+(application deployments).
+
+#+begin_src
+┌──────────────────────────────────────────────┐
+│          Layer 3: Applications               │
+│   Managed by ArgoCD Application CRDs         │
+│   (schema-registry, feed-service, etc.)      │
+│                                              │
+│   ArgoCD watches Git → deploys manifests     │
+├──────────────────────────────────────────────┤
+│          Layer 2: Platform                   │
+│   ArgoCD itself (installed by Pulumi)        │
+│   + Traefik, cert-manager, monitoring        │
+├──────────────────────────────────────────────┤
+│          Layer 1: Cluster                    │
+│   k3d (local) / k3s on Linode (prod)         │
+│   Managed by Pulumi                          │
+└──────────────────────────────────────────────┘
+#+end_src
+
+*** Ownership Boundaries
+
+Strict ownership prevents controllers from fighting over the same resources:
+
+| Layer   | Owner  | Creates                                                 |
+|---------+--------+---------------------------------------------------------|
+| L1      | Pulumi | Cluster (k3d/k3s), registry, kubeconfig                 |
+| L2      | Pulumi | ArgoCD install, repo credentials, platform Helm charts  |
+| L3 CRDs | CI/CD  | ArgoCD Application manifests (=kubectl apply= in CI)    |
+| L3 apps | ArgoCD | Deployments, Services, Ingress rendered from Helm charts |
+| Local   | Tilt   | All of the above in the local k3d cluster               |
+
+Pulumi installs ArgoCD and configures the repo connection using =helm.v3.Release=
+(matching the existing cert-manager/monitoring pattern). Pulumi does *not* manage
+ArgoCD =Application= CRDs as Pulumi state — those are applied by CI or by ArgoCD
+itself via a seed Application pointing at =monorepo/deploy/argocd/=. This prevents
+Pulumi and ArgoCD from fighting over =Application= object status fields.
+
+The existing =ServiceDeployment= Pulumi component (design doc 003) is superseded
+for Layer 3 services once ArgoCD takes over. Services moving to ArgoCD must have
+their Pulumi-managed resources destroyed first to avoid dual ownership.
+=ServiceDeployment= remains available for one-off infra jobs and smoke tests.
+
+*** Local Resource Budget
+
+ArgoCD adds significant memory overhead. Estimated local k3d footprint:
+
+| Component                               | Memory Request | Memory Limit |
+|-----------------------------------------+----------------+--------------|
+| k3s system (Traefik, CoreDNS, metrics)  | ~300 Mi        | —            |
+| cert-manager (controller+webhook+cainjector) | 160 Mi    | 640 Mi       |
+| Monitoring (Prometheus+Grafana+exporters) | ~480 Mi      | ~1,088 Mi    |
+| ArgoCD (server+repo-server+app-controller+redis) | ~400 Mi | ~1,200 Mi |
+| schema-registry (application)           | ~128 Mi        | ~256 Mi      |
+|-----------------------------------------+----------------+--------------|
+| *Total*                                 | *~1,468 Mi*    | *~3,184 Mi*  |
+
+To keep this manageable:
+- Disable ArgoCD components not needed locally: Dex (SSO), ApplicationSet
+  controller, Notifications controller (~200 Mi saved)
+- ArgoCD is opt-in locally (=tilt up -- --argocd=); most inner-loop
+  development uses Tilt-only mode
+- Minimum Docker memory allocation: *6 GB* (8 GB recommended)
+- Configure ArgoCD repo-server for monorepo efficiency: shallow clones,
+  sparse checkout (only =monorepo/deploy/=), and
+  =server.repo.cache.expiration= to limit disk usage
+- Document this in prerequisites alongside the k3d setup
+- Note: =local-down.sh= + =local-up.sh= destroys all ArgoCD state (sync
+  history, Application status). This is expected for ephemeral local clusters
+  and should be documented so developers are not surprised
+
+*** Namespace Strategy
+
+Start with two namespaces: =argocd= (platform) and =tdp= (all applications).
+A single application namespace is appropriate at this scale. When a second real
+service is added, evaluate splitting by bounded context (e.g., =tdp-ingestion=,
+=tdp-registry=) to enable per-namespace ResourceQuotas, NetworkPolicies, and RBAC.
+
+*** Application Secrets Management
+
+Application-level secrets (database credentials, API keys) must not be stored in
+Git. The project already uses Pulumi ESC for infrastructure secrets (commit
+=ba99cf1=). For application secrets flowing into ArgoCD-managed deployments:
+
+- Store secrets in Pulumi ESC with =fn::secret=
+- Pulumi creates K8s Secrets in application namespaces during platform bootstrap
+- Helm charts reference these secrets via =secretKeyRef= in env vars or volume
+  mounts
+- ArgoCD does not manage the Secret objects — Pulumi owns them (Layer 2 concern)
+
+This avoids sealed-secrets complexity while using the existing ESC infrastructure.
+
+** Version Pinning via Image Tags
+
+Each service's version in each environment is controlled by the container image
+tag in the deployment manifest. The image reference follows the pattern:
+
+#+begin_src
+<registry>/<service-name>:<version>
+#+end_src
+
+Examples:
+- Local: =k3d-tdp-local-registry:5111/schema-registry:v0.1.0=
+- Production: =ghcr.io/charlieholland/tdp-schema-registry:v0.1.0=
+
+Dev environments may use Git SHA tags for continuous deployment; production must
+always use semver tags. Version pinning per environment is achieved through
+environment-specific Helm value files:
+
+#+begin_src yaml
+# values-dev.yaml
+image:
+  repository: ghcr.io/charlieholland/tdp-schema-registry
+  tag: v0.2.0
+
+# values-production.yaml
+image:
+  repository: ghcr.io/charlieholland/tdp-schema-registry
+  tag: v0.1.0
+#+end_src
+
+Release-please creates Git tags (e.g., =schema-registry-v0.1.0=) on merge to
+main. CI builds and pushes the image tagged with that version. To promote a
+version to an environment, update the image tag in that environment's values file
+and commit — ArgoCD detects the change and syncs.
+
+** Manifest Strategy: Helm Charts
+
+Each service gets a Helm chart in =monorepo/deploy/<service-name>/=. Helm was
+chosen over raw manifests or Kustomize because:
+
+- ArgoCD has first-class Helm support (renders charts server-side)
+- Helm's =values.yaml= mechanism maps naturally to per-environment configuration
+- Charts are self-contained, versioned, and testable (=helm lint=, =helm template=)
+- Tilt has native =helm()= support for local development
+
+#+begin_src
+monorepo/deploy/
+├── charts/
+│   ├── common/                        # Shared library chart (type: library)
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── _deployment.tpl        # Common deployment template
+│   │       ├── _service.tpl           # Common service template
+│   │       ├── _ingress.tpl           # Common ingress template
+│   │       └── _helpers.tpl           # Shared naming/labels helpers
+│   └── schema-registry/
+│       ├── Chart.yaml                 # Depends on common library chart
+│       ├── values.yaml                # Defaults
+│       ├── values.schema.json         # Values validation schema
+│       ├── values-local.yaml          # Local k3d overrides
+│       ├── values-dev.yaml            # Dev environment
+│       ├── values-production.yaml     # Production
+│       ├── .helmignore
+│       └── templates/
+│           ├── deployment.yaml
+│           ├── service.yaml
+│           ├── serviceaccount.yaml
+│           ├── configmap.yaml
+│           ├── ingress.yaml
+│           ├── _helpers.tpl
+│           ├── tests/
+│           │   └── test-connection.yaml
+│           └── NOTES.txt
+├── argocd/
+│   ├── appproject.yaml                # ArgoCD AppProject for TDP
+│   ├── apps/
+│   │   ├── schema-registry.yaml       # ArgoCD Application manifest
+│   │   └── ...
+│   └── applicationset.yaml            # Optional: auto-discover services
+└── README.md
+#+end_src
+
+** ArgoCD Application Manifests
+
+Each service has an ArgoCD Application CRD pointing at its Helm chart in the
+monorepo. Example for dev environment:
+
+#+begin_src yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: schema-registry
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: tdp
+  source:
+    repoURL: https://github.com/charlieholland/the-data-platform.git
+    targetRevision: main
+    path: monorepo/deploy/charts/schema-registry
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tdp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+#+end_src
+
+*** Per-Environment Sync Policies
+
+Sync policies must differ by environment:
+
+| Environment | targetRevision | Sync Policy                         |
+|-------------+----------------+-------------------------------------|
+| Local       | file:// URL    | Manual (Tilt manages directly)      |
+| Dev         | =main=         | Automated (prune + selfHeal)        |
+| Production  | release tag    | Manual sync, no auto-prune          |
+
+Production uses manual sync with =allowEmpty: false= (prevents syncing an
+application with zero resources, which would prune everything) and no
+auto-prune. Promotions require an explicit sync action after the
+=values-production.yaml= image tag is updated and committed.
+
+** Testing ArgoCD Locally
+
+ArgoCD runs in the local k3d cluster alongside the services it manages. This
+lets developers:
+
+1. Test ArgoCD Application manifests before pushing to Git
+2. Verify Helm chart rendering and sync behavior
+3. Debug sync failures, health checks, and hooks locally
+4. Validate the full GitOps pipeline without touching shared infrastructure
+
+Local ArgoCD configuration:
+- Install via Helm chart into =argocd= namespace (non-HA mode for local)
+- ArgoCD watches the *local filesystem* via a Git repository (the monorepo
+  itself, pointed at the local working copy or a local Git server)
+- Alternatively, ArgoCD can watch the GitHub remote, and developers test by
+  pushing to a feature branch
+
+The Tilt-managed approach (recommended for local):
+- Tiltfile boots ArgoCD as a =helm_resource= in the local k3d cluster
+- A =local_resource= syncs ArgoCD Application manifests on file change
+- Developers see ArgoCD sync status directly in the Tilt UI
+
+** Tilt for Local Development
+
+Tilt handles the inner development loop — the rapid code-change-to-running-pod
+cycle that developers need dozens of times per hour.
+
+*** Tiltfile Location and Structure
+
+#+begin_src
+monorepo/
+├── Tiltfile                          # Main Tiltfile
+├── tilt_modules/                     # Shared Tilt extensions
+│   └── argocd/                       # ArgoCD bootstrapping
+└── services/
+    └── schema-registry/
+        └── Tiltfile                  # Service-specific Tilt config (loaded by main)
+#+end_src
+
+*** Tilt Capabilities
+
+- =docker_build()= with =live_update= for sub-second code sync into running pods
+- =helm()= to render and deploy Helm charts (same charts ArgoCD uses)
+- =k8s_resource()= to configure port-forwarding, readiness, log streaming
+- =local_resource()= for build steps, test runners, code generation
+- Built-in UI dashboard showing resource status, logs, and build times
+
+*** Tilt vs ArgoCD Boundary
+
+| Development Phase       | Tool    | Cluster   | Trigger          |
+|-------------------------+---------+-----------+------------------|
+| Writing code            | Tilt    | Local k3d | File save        |
+| Testing ArgoCD configs  | Tilt    | Local k3d | File save        |
+| Deploying to dev        | ArgoCD  | Dev k3s   | Git push         |
+| Promoting to production | ArgoCD  | Prod k3s  | Tag / values PR  |
+
+*Critical rule:* Tilt and ArgoCD must never manage the same resources in the same
+cluster simultaneously. When developing locally, Tilt owns the deployment. When
+testing ArgoCD locally, Tilt boots ArgoCD but ArgoCD owns the app deployments.
+The Tiltfile must include a guard that detects running ArgoCD Application
+resources and warns/exits before taking direct ownership of the same deployments.
+
+** CI/CD Pipeline
+
+The pipeline follows the existing =post-release.yml= pattern — images are built
+on release, not on every push to main. This avoids registry bloat while ensuring
+every released version has a corresponding image.
+
+#+begin_src
+Developer pushes to main
+        │
+        ▼
+  CI (ci.yml): Build & test (Bazel)
+        │
+        ▼
+  release-please (release.yml): Creates/updates Release PR
+        │ (on merge of Release PR)
+        ▼
+  GitHub Release published
+        │
+        ▼
+  Post-release (post-release.yml):
+    Build container image
+    Scan with Trivy (fail on CRITICAL/HIGH)
+    Generate CycloneDX SBOM
+    Tag: ghcr.io/<service>:<version>
+    Attach SBOM to GitHub Release
+        │
+        ▼
+  Developer updates values-<env>.yaml
+  with new image tag and commits
+        │
+        ▼
+  ArgoCD detects change and syncs
+#+end_src
+
+The =latest= tag must not be used in production value files. Dev environments
+may use Git SHA tags for pre-release testing if needed.
+
+All CI steps must be reproducible locally via =monorepo/scripts/build-image.sh=,
+which should be called by =post-release.yml= rather than inlining Docker build
+logic.
+
+*Ordering guarantee:* The Git tag is created by release-please *before* the
+image is built by =post-release.yml=. If ArgoCD were configured to auto-sync on
+tag creation, it could attempt to deploy before the image exists in the registry.
+The manual promotion workflow (updating =values-<env>.yaml= after confirming the
+image is pushed) avoids this race condition entirely. Do not enable automatic
+tag-based deployment without solving the ordering problem first.
+
+*Image retention:* Previous image versions must remain available in ghcr.io for
+rollbacks. Define a retention policy (e.g., keep the last 10 versions per
+service, or all versions less than 90 days old). GitHub's container registry
+supports retention policies via repository settings.
+
+** Dummy Schema Registry Service
+
+A minimal FastAPI service that exercises the full deployment pipeline:
+
+#+begin_src python
+# monorepo/services/schema-registry/main.py
+from fastapi import FastAPI
+
+app = FastAPI(title="Schema Registry", version="0.1.0")
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+@app.get("/schemas")
+def list_schemas():
+    return {"schemas": []}
+
+@app.get("/schemas/{name}")
+def get_schema(name: str):
+    return {"name": name, "version": "stub", "schema": {}}
+#+end_src
+
+This stub:
+- Has a Dockerfile and Helm chart
+- Gets deployed by ArgoCD to dev/production
+- Gets deployed by Tilt for local development with hot-reload
+- Validates the entire pipeline before building real functionality
+
+* Decision
+
+- *GitOps engine:* ArgoCD (installed as Layer 2 platform service by Pulumi via =helm.v3.Release=)
+- *Manifest format:* Helm charts per service in =monorepo/deploy/charts/=, with shared library chart
+- *Version pinning:* Image tags in per-environment =values-<env>.yaml= files (semver for prod, SHA optional for dev)
+- *Sync policies:* Automated prune+selfHeal for dev; manual sync for production
+- *Local dev tool:* Tilt with =live_update= for hot-reloading (ArgoCD opt-in via =--argocd= flag)
+- *Local ArgoCD testing:* ArgoCD in k3d cluster, bootstrapped via Tiltfile
+- *Sample service:* Dummy schema-registry FastAPI stub
+- *CI:* GitHub Actions builds images on release (=post-release.yml=), with Trivy scanning and CycloneDX SBOM
+- *Secrets:* Pulumi ESC for all secrets (repo credentials, application secrets)
+- *Ownership:* Pulumi → L1+L2, CI → Application CRDs, ArgoCD → L3 app resources, Tilt → local only
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+Implementation tasks for ArgoCD + Tilt + sample service.
+
+** TODO [TDP-005-01] Install ArgoCD as Layer 2 platform service            :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Add ArgoCD Helm chart installation to =monorepo/infra/platform/=:
+- Install =argo-cd= Helm chart (pin specific version) into =argocd= namespace
+  using =helm.v3.Release= (matching cert-manager/monitoring pattern)
+- Non-HA mode for local/dev
+- Create =ArgoCD= Pulumi component in =monorepo/infra/platform/charts/argocd.ts=
+- Use =resourceTier= pattern: "minimal" preset (~400 Mi total requests)
+- Disable Dex, ApplicationSet controller, and Notifications controller for local
+  to save ~200 Mi memory
+- Configure repo credentials via Pulumi ESC (=argocd:repoUrl=,
+  =argocd:sshPrivateKey= as =fn::secret=); skip for local (uses =file://= URL)
+- Configure repo-server for monorepo: shallow clones, sparse checkout
+  (only =monorepo/deploy/=), =server.repo.cache.expiration= for disk management
+- Expose ArgoCD UI via Traefik ingress (=argocd.localhost= locally)
+- Update =local-up.sh= and =local-down.sh= scripts
+- Document minimum 6 GB Docker memory allocation in prerequisites
+- Document that cluster teardown destroys all ArgoCD state (expected for
+  ephemeral local clusters)
+
+** TODO [TDP-005-02] Create Helm chart for schema-registry stub            :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/deploy/charts/schema-registry/= (depends on common library chart):
+- =Chart.yaml= (with dependency on =common= library chart), =values.yaml=,
+  =values.schema.json=, per-environment value files, =.helmignore=
+- Templates: Deployment, Service, ServiceAccount, ConfigMap, Ingress, =NOTES.txt=
+- Health probes: liveness on =/health= (httpGet, port 8000, initialDelaySeconds: 5,
+  periodSeconds: 10), readiness (initialDelaySeconds: 3, periodSeconds: 5),
+  startupProbe for slow starts
+- Security context: =runAsNonRoot: true=, =readOnlyRootFilesystem: true=
+- Image tag parameterized: =image.repository= + =image.tag=
+- =imagePullSecrets= support for private registries (ghcr.io in production);
+  not needed locally (k3d uses trusted insecure registry)
+- Helm test hooks in =templates/tests/test-connection.yaml=
+- =helm lint= and =helm template= validation
+- Decouple chart version from app version (=version= in Chart.yaml is independent
+  of =appVersion=)
+
+** TODO [TDP-005-03] Create dummy schema-registry FastAPI service           :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =monorepo/services/schema-registry/=:
+- Minimal FastAPI app with =/health=, =/schemas=, =/schemas/{name}= endpoints
+- Dockerfile (multi-stage build, Python 3.12 slim base)
+- =requirements.txt= (fastapi, uvicorn)
+- Register in =release-please-config.json= and =.release-please-manifest.json=
+
+** TODO [TDP-005-04] Create ArgoCD Application manifests                    :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =monorepo/deploy/argocd/=:
+- =appproject.yaml= — TDP AppProject with explicit restrictions:
+  - =sourceRepos=: only the platform GitHub repo
+  - =destinations=: only =tdp= namespace (and future app namespaces)
+  - =clusterResourceWhitelist=: deny cluster-scoped resources
+- =apps/schema-registry.yaml= — Application CRD with:
+  - =finalizers= (=resources-finalizer.argocd.argoproj.io=)
+  - =syncOptions= (=CreateNamespace=true=, =ServerSideApply=true=)
+  - Retry policy (limit: 5, exponential backoff)
+  - =targetRevision: main= for dev (not =HEAD=)
+  - =targetRevision: <release-tag>= for production
+- Per-environment sync policies: automated for dev, manual for production
+- Application CRDs are applied by CI (=kubectl apply=) or ArgoCD seed
+  Application — not managed as Pulumi state
+- Document the promotion workflow (update image tag → commit → ArgoCD syncs)
+
+** TODO [TDP-005-05] Set up Tiltfile for local development                  :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/Tiltfile=:
+- =docker_build()= for schema-registry with =live_update= (sync Python files,
+  restart uvicorn on dependency changes)
+- =helm()= to render the schema-registry Helm chart with =values-local.yaml=
+- =k8s_resource()= for port-forwarding, log streaming, readiness
+- =local_resource()= for running tests, linting
+- Point at local k3d cluster and registry
+
+** TODO [TDP-005-06] Add ArgoCD bootstrapping to Tiltfile                   :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Extend Tiltfile to optionally boot ArgoCD locally:
+- =helm_resource()= for ArgoCD Helm chart (disabled by default, enable via
+  =tilt up -- --argocd=)
+- =local_resource()= to apply ArgoCD Application manifests on file change
+- When ArgoCD mode is active, Tilt manages ArgoCD but ArgoCD manages the app
+  (Tilt's =docker_build= is disabled; ArgoCD pulls from registry)
+- Document the two modes: "tilt-only" (default) and "tilt+argocd" (for testing
+  GitOps config)
+
+** TODO [TDP-005-07] CI pipeline for image builds                           :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Update =post-release.yml= and create supporting scripts:
+- Build service images on =release: [published]= event (not on every push)
+- Tag with semver version from release; remove or restrict =latest= tag
+- Add Trivy image vulnerability scanning (fail on CRITICAL/HIGH)
+- Add CycloneDX SBOM generation (per =ARCHITECTURE.md= standards)
+- Attach SBOM to GitHub Release as artifact
+- Add Docker layer caching (=cache-from: type=gha=, =cache-to: type=gha,mode=max=)
+- Create =monorepo/scripts/build-image.sh= — called by =post-release.yml= for
+  local/CI parity (accepts service name, resolves Dockerfile path)
+- Use Bazel for code build/test, Docker for image build
+
+** TODO [TDP-005-08] End-to-end local validation                            :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Verify both local development modes end-to-end:
+
+*Mode 1 — Tilt-only (default):*
+- =local-up.sh= provisions k3d cluster (no ArgoCD)
+- =tilt up= deploys schema-registry with hot-reload
+- Code change → pod update in <5 seconds
+- Schema-registry accessible at =schema-registry.localhost=
+
+*Mode 2 — Tilt+ArgoCD (GitOps testing):*
+- =tilt up -- --argocd= boots ArgoCD into k3d
+- ArgoCD Application manifest deploys schema-registry from local registry
+- ArgoCD UI accessible at =argocd.localhost=
+- Verify ArgoCD sync status shows "Synced"
+- Verify Tiltfile guard prevents concurrent ownership conflicts
+
+*Both modes:*
+- =helm lint= and =helm template= pass
+- Health probes (liveness/readiness) function correctly
+- Port usage documented: Traefik 80/443, ArgoCD UI 8080, Tilt UI 10350
+- Document in =monorepo/infra/README.md=
+
+** TODO [TDP-005-09] Environment promotion workflow documentation           :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Document the version promotion workflow:
+- How release-please creates tags and triggers image builds
+- How to promote a version to dev (update =values-dev.yaml= image tag)
+- How to promote to production (update =values-production.yaml= image tag)
+- How ArgoCD detects and syncs the change
+- Rollback procedure (revert the values file commit; verify previous image
+  version still exists in registry)
+- =ServiceDeployment= component deprecation path: document that it is no longer
+  used for Layer 3 services once ArgoCD takes over. Add a deprecation note to
+  =monorepo/infra/components/service-deployment.ts=. The component may be
+  retained for smoke tests and one-off infra jobs, or removed entirely once all
+  services are ArgoCD-managed. Follow-up: add probe support
+  (liveness/readiness) to =ServiceDeployment= if it remains in use
+
+** TODO [TDP-005-10] Evaluate ApplicationSet for auto-discovery             :p3:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Investigate ArgoCD automation features for scaling beyond a few services:
+
+*ApplicationSet:*
+- Git generator scanning =monorepo/deploy/charts/*/= for Chart.yaml files
+- Automatic Application creation per chart directory
+- Evaluate whether this simplifies or complicates the workflow
+- If beneficial, replace individual Application manifests with ApplicationSet
+
+*ArgoCD Image Updater:*
+- Watches container registries for new image tags matching a pattern
+- Automatically updates image tags in values files (write-back to Git)
+- Would automate the manual promotion step for dev environments
+- Adds operational complexity (registry polling, write-back strategies)
+- Only warranted when there are many services with frequent releases
+
+** TODO [TDP-005-11] Application secrets management strategy                :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Define how application-level secrets flow into ArgoCD-managed deployments:
+- Store secrets in Pulumi ESC with =fn::secret=
+- Pulumi creates K8s Secrets in application namespaces during platform bootstrap
+  (Layer 2 concern — Pulumi owns the Secret objects, ArgoCD does not)
+- Helm charts reference secrets via =secretKeyRef= in env vars or volume mounts
+- Document the pattern for adding new application secrets
+- Verify secrets are available before ArgoCD syncs application deployments
+
+** TODO [TDP-005-12] Create shared Helm library chart                       :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =monorepo/deploy/charts/common/= as a Helm library chart (=type: library=):
+- Common templates: =_deployment.tpl=, =_service.tpl=, =_ingress.tpl=
+- Shared helpers: consistent =app.kubernetes.io/*= labels, naming conventions
+- Standard security context defaults (=runAsNonRoot=, =readOnlyRootFilesystem=)
+- Standard health probe templates (liveness, readiness, startup)
+- Service charts depend on the library via =Chart.yaml= dependencies
+- Eliminates duplication as more services are added
+
+** TODO [TDP-005-13] Helm chart linting and testing in CI                   :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add Helm chart validation to the CI pipeline:
+- =helm lint= on all charts in =monorepo/deploy/charts/*/=
+- =helm template= renders valid YAML for each environment's value files
+- Values schema validation (=values.schema.json=)
+- Run on PRs that touch =monorepo/deploy/=
+- Script in =monorepo/scripts/lint-charts.sh= for local reproducibility
+
+** TODO [TDP-005-14] Image scanning and CycloneDX SBOM generation          :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Add supply chain security to the image build pipeline (per =ARCHITECTURE.md=
+CycloneDX standard):
+- Trivy image vulnerability scanning — fail build on CRITICAL/HIGH CVEs
+- CycloneDX SBOM generation for each image
+- Attach SBOM to GitHub Release as artifact
+- Optionally push SBOM as OCI artifact alongside the image
+- Add to =post-release.yml= and =monorepo/scripts/build-image.sh=
+
+** TODO [TDP-005-15] ArgoCD RBAC and AppProject hardening                   :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Harden ArgoCD access controls for production:
+- AppProject =sourceRepos= restricted to the platform GitHub repo only
+- AppProject =destinations= restricted to =tdp= namespace and cluster
+- =clusterResourceWhitelist= / =namespaceResourceWhitelist= to prevent
+  deploying cluster-scoped resources unless intended
+- ArgoCD should not have cluster-admin in production — scope ClusterRole
+  to only managed namespaces
+- Baseline NetworkPolicies for =argocd= namespace (allow Traefik ingress
+  to UI, inter-component traffic, egress to K8s API and GitHub)
+- Document that Flannel (k3d default) does not enforce NetworkPolicies
+  locally — this is an accepted local/production parity gap
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Should ArgoCD manage its own installation (app-of-apps)?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Pulumi manages ArgoCD permanently as a Layer 2 platform service. ArgoCD only
+manages Layer 3 (application deployments). This keeps a clear ownership boundary
+and avoids the circular bootstrap complexity of app-of-apps. Can migrate to
+app-of-apps later if the platform grows to multi-team/multi-cluster.
+
+** DECIDED Should we use Kustomize overlays instead of Helm value files?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Helm charts with per-environment value files. Helm provides a single chart
+artifact with parameterized overrides, ArgoCD renders charts server-side, and
+Tilt has native =helm()= support. Kustomize is better suited for patching
+existing raw manifests rather than building from scratch. Revisit if Helm
+templating becomes unwieldy.
+
+** DECIDED How should ArgoCD authenticate to the GitHub repository?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+SSH deploy key (read-only, per-repo). Simple, secure, scoped to a single repo,
+no expiration or rotation needed. Private key stored in Pulumi ESC with
+=fn::secret= and provisioned as a K8s Secret by the Pulumi ArgoCD component
+(=argocd:sshPrivateKey= config key). Migrate to GitHub App tokens if the project
+grows to multiple repos or team members. For local development, ArgoCD uses a
+=file://= Git URL pointing at the local working copy — no auth needed.
+
+** DECIDED Should the Tiltfile live at monorepo root or monorepo/infra/?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+=monorepo/Tiltfile= at the monorepo root. Tilt needs access to both
+=monorepo/services/= (source code) and =monorepo/deploy/= (charts), so all
+paths are relative and straightforward. Matches the ArgoCD developer guide
+convention. =cd monorepo && tilt up= is the natural workflow.
+
+** DECIDED Tilt long-term viability — when to re-evaluate?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Re-evaluate in September 2026. Check Tilt's GitHub activity, release cadence,
+and Docker's commitment. If declining, DevSpace (CNCF Sandbox) is the top
+fallback — it attaches to existing deployments (including ArgoCD-managed ones)
+rather than owning the deployment lifecycle, making migration straightforward.
