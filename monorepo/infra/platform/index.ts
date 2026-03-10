@@ -10,7 +10,6 @@ import { installMonitoring } from "./charts/monitoring";
 
 const config = new pulumi.Config();
 const clusterStackRef = config.require("clusterStackRef");
-const environment = config.get("environment") || "local";
 
 // ---------------------------------------------------------------------------
 // Cluster stack reference — imports kubeconfig from the cluster layer
@@ -90,12 +89,10 @@ const k8sProvider = new k8s.Provider("k8s-provider", {
 
 const certManager = installCertManager({
   provider: k8sProvider,
-  environment,
 });
 
 const monitoring = installMonitoring({
   provider: k8sProvider,
-  environment,
 });
 
 // ---------------------------------------------------------------------------

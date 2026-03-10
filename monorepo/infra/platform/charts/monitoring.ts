@@ -8,21 +8,108 @@ import * as k8s from "@pulumi/kubernetes";
  * node-exporter, and kube-state-metrics with pre-configured dashboards and
  * recording rules for Kubernetes.
  *
- * Environment-appropriate resource limits:
- * - Local: minimal footprint, short retention (6h), reduced scrape intervals
- * - Production: production-sized resources, 30d retention
+ * All environment-specific knobs are read from Pulumi stack config:
+ * - resourceTier (minimal | standard) — selects resource request/limit presets
+ * - prometheusRetention — Prometheus TSDB retention (default: "6h")
+ * - prometheusScrapeInterval — global scrape interval (default: "30s")
+ * - prometheusStorageSize — PVC size; empty string means no persistent storage (default: "")
+ * - grafanaAdminPassword — admin password; falls back to "admin" when unset
  */
+
+/** Resource preset for a single component. */
+interface ResourceSpec {
+  requests: { cpu: string; memory: string };
+  limits: { cpu: string; memory: string };
+}
+
+interface MonitoringPresets {
+  prometheus: ResourceSpec;
+  grafana: ResourceSpec;
+  alertmanager: ResourceSpec;
+  nodeExporter: ResourceSpec;
+  kubeStateMetrics: ResourceSpec;
+}
+
+const resourcePresets: Record<string, MonitoringPresets> = {
+  minimal: {
+    prometheus: {
+      requests: { cpu: "100m", memory: "256Mi" },
+      limits: { cpu: "500m", memory: "512Mi" },
+    },
+    grafana: {
+      requests: { cpu: "50m", memory: "128Mi" },
+      limits: { cpu: "200m", memory: "256Mi" },
+    },
+    alertmanager: {
+      requests: { cpu: "25m", memory: "32Mi" },
+      limits: { cpu: "100m", memory: "128Mi" },
+    },
+    nodeExporter: {
+      requests: { cpu: "25m", memory: "32Mi" },
+      limits: { cpu: "100m", memory: "64Mi" },
+    },
+    kubeStateMetrics: {
+      requests: { cpu: "25m", memory: "32Mi" },
+      limits: { cpu: "100m", memory: "128Mi" },
+    },
+  },
+  standard: {
+    prometheus: {
+      requests: { cpu: "500m", memory: "1Gi" },
+      limits: { cpu: "1000m", memory: "2Gi" },
+    },
+    grafana: {
+      requests: { cpu: "200m", memory: "256Mi" },
+      limits: { cpu: "500m", memory: "512Mi" },
+    },
+    alertmanager: {
+      requests: { cpu: "100m", memory: "128Mi" },
+      limits: { cpu: "200m", memory: "256Mi" },
+    },
+    nodeExporter: {
+      requests: { cpu: "50m", memory: "64Mi" },
+      limits: { cpu: "200m", memory: "128Mi" },
+    },
+    kubeStateMetrics: {
+      requests: { cpu: "50m", memory: "64Mi" },
+      limits: { cpu: "200m", memory: "256Mi" },
+    },
+  },
+};
+
 export interface MonitoringArgs {
   /** The Kubernetes provider to deploy into. */
   provider: k8s.Provider;
-  /** Environment name ("local" or "production") for resource sizing. */
-  environment: string;
 }
 
 export function installMonitoring(args: MonitoringArgs): k8s.helm.v3.Release {
-  const { provider, environment } = args;
+  const { provider } = args;
 
-  const isLocal = environment === "local";
+  const config = new pulumi.Config();
+  const resourceTier = config.get("resourceTier") || "minimal";
+  const prometheusRetention = config.get("prometheusRetention") || "6h";
+  const prometheusScrapeInterval = config.get("prometheusScrapeInterval") || "30s";
+  const prometheusStorageSize = config.get("prometheusStorageSize") || "";
+  const grafanaAdminPassword = config.get("grafanaAdminPassword")
+    ? config.requireSecret("grafanaAdminPassword")
+    : "admin";
+
+  const preset = resourcePresets[resourceTier] ?? resourcePresets["minimal"];
+
+  // Build storageSpec: empty object when no size is configured (no PVC),
+  // otherwise create a volume claim template with the requested size.
+  const storageSpec = prometheusStorageSize
+    ? {
+        volumeClaimTemplate: {
+          spec: {
+            accessModes: ["ReadWriteOnce"],
+            resources: {
+              requests: { storage: prometheusStorageSize },
+            },
+          },
+        },
+      }
+    : {};
 
   const monitoring = new k8s.helm.v3.Release(
     "kube-prometheus-stack",
@@ -38,88 +125,34 @@ export function installMonitoring(args: MonitoringArgs): k8s.helm.v3.Release {
         // Prometheus configuration
         prometheus: {
           prometheusSpec: {
-            retention: isLocal ? "6h" : "30d",
-            resources: isLocal
-              ? {
-                  requests: { cpu: "100m", memory: "256Mi" },
-                  limits: { cpu: "500m", memory: "512Mi" },
-                }
-              : {
-                  requests: { cpu: "500m", memory: "1Gi" },
-                  limits: { cpu: "1000m", memory: "2Gi" },
-                },
-            // Longer scrape interval locally (30s) to reduce resource usage
-            scrapeInterval: isLocal ? "30s" : "15s",
-            // Disable persistent storage locally to save resources
-            storageSpec: isLocal
-              ? {}
-              : {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ["ReadWriteOnce"],
-                      resources: {
-                        requests: { storage: "50Gi" },
-                      },
-                    },
-                  },
-                },
+            retention: prometheusRetention,
+            resources: preset.prometheus,
+            scrapeInterval: prometheusScrapeInterval,
+            storageSpec,
           },
         },
 
         // Grafana configuration
         grafana: {
-          resources: isLocal
-            ? {
-                requests: { cpu: "50m", memory: "128Mi" },
-                limits: { cpu: "200m", memory: "256Mi" },
-              }
-            : {
-                requests: { cpu: "200m", memory: "256Mi" },
-                limits: { cpu: "500m", memory: "512Mi" },
-              },
-          // Local: default admin password; production: must be set via Pulumi secret config
-          adminPassword: isLocal ? "admin" : new pulumi.Config("tdp-platform").requireSecret("grafanaAdminPassword"),
+          resources: preset.grafana,
+          adminPassword: grafanaAdminPassword,
         },
 
         // Alertmanager configuration
         alertmanager: {
           alertmanagerSpec: {
-            resources: isLocal
-              ? {
-                  requests: { cpu: "25m", memory: "32Mi" },
-                  limits: { cpu: "100m", memory: "128Mi" },
-                }
-              : {
-                  requests: { cpu: "100m", memory: "128Mi" },
-                  limits: { cpu: "200m", memory: "256Mi" },
-                },
+            resources: preset.alertmanager,
           },
         },
 
-        // Node exporter — lighter limits locally
+        // Node exporter
         "prometheus-node-exporter": {
-          resources: isLocal
-            ? {
-                requests: { cpu: "25m", memory: "32Mi" },
-                limits: { cpu: "100m", memory: "64Mi" },
-              }
-            : {
-                requests: { cpu: "50m", memory: "64Mi" },
-                limits: { cpu: "200m", memory: "128Mi" },
-              },
+          resources: preset.nodeExporter,
         },
 
         // kube-state-metrics
         "kube-state-metrics": {
-          resources: isLocal
-            ? {
-                requests: { cpu: "25m", memory: "32Mi" },
-                limits: { cpu: "100m", memory: "128Mi" },
-              }
-            : {
-                requests: { cpu: "50m", memory: "64Mi" },
-                limits: { cpu: "200m", memory: "256Mi" },
-              },
+          resources: preset.kubeStateMetrics,
         },
       },
     },

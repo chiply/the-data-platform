@@ -1,3 +1,5 @@
 config:
   tdp-platform:clusterStackRef: chiply-org/tdp-cluster/local
-  tdp-platform:environment: local
+  tdp-platform:resourceTier: minimal
+  tdp-platform:prometheusRetention: "6h"
+  tdp-platform:prometheusScrapeInterval: "30s"
