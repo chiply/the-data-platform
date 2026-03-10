@@ -1,6 +1,6 @@
 #+TITLE: 004 - Dev Environment on Linode
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Active
 #+CATEGORY: infra
 #+CREATED: [2026-03-10]
 #+LAST_MODIFIED: [2026-03-10]
@@ -381,3 +381,7 @@ file with zero code changes.
 Yes. Separate Linode API tokens with scoped permissions for dev vs production.
 A compromised dev environment should not grant access to production
 infrastructure. Each stack stores its own token as a Pulumi secret.
+
+* Changelog
+
+- *[2026-03-10]:* Generated Ralph prd.json for autonomous execution (4 workstreams)

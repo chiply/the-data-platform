@@ -1,0 +1,48 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/dev-env-testing-docs",
+  "description": "Make the smoke test script environment-aware and update documentation to cover the new dev environment, lifecycle scripts, and Pulumi stack config approach.",
+  "sourceDesignDoc": "docs/design/004-dev-environment.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-004-08",
+      "title": "Make smoke test environment-aware",
+      "description": "As a developer, I want the smoke test script to work against any environment so that I can validate both local and remote deployments.\n\nUpdate monorepo/infra/scripts/smoke-test.sh:\n- Accept an optional environment argument (default: local)\n- Use appropriate kubeconfig (~/.kube/tdp-<env>.yaml)\n- For remote clusters: discover Linode public IP from kubeconfig server URL or Pulumi stack output, use nip.io hostname (smoke.<ip>.nip.io) instead of smoke.localhost, use normal DNS resolution instead of --resolve flag, handle self-signed TLS (--insecure or --cacert for cert-manager certs)\n- Update error messages to reference the correct *-up.sh script per environment\n- Verify the test works against both local and dev environments",
+      "acceptanceCriteria": [
+        "smoke-test.sh accepts an optional environment argument",
+        "Default environment is local when no argument provided",
+        "Remote environments use correct kubeconfig path",
+        "Remote environments discover Linode IP and use nip.io hostnames",
+        "Remote environments handle self-signed TLS certificates",
+        "Error messages reference the correct *-up.sh script for the environment",
+        "Script works against local environment (existing behavior preserved)",
+        "Script works against dev environment with nip.io URLs"
+      ],
+      "priority": 1,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Effort: M."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-004-09",
+      "title": "Update documentation",
+      "description": "As a developer, I want the infrastructure documentation to cover the dev environment so that contributors understand how to use and extend the multi-environment setup.\n\nUpdate monorepo/infra/README.md (or CONTRIBUTING.md):\n- Add dev environment section alongside local and production\n- Document dev-up.sh / dev-down.sh / production-down.sh usage\n- Document the Pulumi stack config approach for contributors adding platform charts (read config values, provide sensible defaults, no isLocal checks)\n- Document multi-kubeconfig workflow (KUBECONFIG env var or --kubeconfig flag)\n- Update environment comparison tables\n- Note that dev is fully disposable — no backups, dev-down.sh destroys everything\n- Note that k3s uses local-path provisioner (not Linode Block Storage CSI) for persistent volumes — data is lost on node replacement",
+      "acceptanceCriteria": [
+        "README.md documents the dev environment alongside local and production",
+        "dev-up.sh and dev-down.sh usage is documented",
+        "production-down.sh usage is documented",
+        "Pulumi stack config approach is documented for contributors",
+        "Multi-kubeconfig workflow is documented",
+        "Environment comparison table includes dev",
+        "Dev disposability is clearly noted",
+        "local-path provisioner caveat is documented"
+      ],
+      "priority": 2,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Effort: S."
+    }
+  ]
+}

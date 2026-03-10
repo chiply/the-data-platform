@@ -1,0 +1,49 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/dev-env-platform-config",
+  "description": "Refactor platform chart modules to read configuration from Pulumi stack config files instead of branching on the isLocal boolean, then add the dev stack configuration. This enables multi-environment support where adding a new environment requires only a new YAML file with zero code changes.",
+  "sourceDesignDoc": "docs/design/004-dev-environment.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-004-01",
+      "title": "Refactor platform charts to use Pulumi stack config",
+      "description": "As a developer, I want the platform chart modules to read per-environment configuration from Pulumi stack config files instead of using the isLocal boolean, so that adding new environments requires only a new YAML file with zero code changes.\n\nIn monorepo/infra/platform/charts/cert-manager.ts:\n- Replace isLocal ternaries with a resourceTier config key (minimal | standard)\n- Define two inline resource presets; select based on config value\n- Default to minimal (preserves current local behavior)\n\nIn monorepo/infra/platform/charts/monitoring.ts:\n- Replace isLocal ternaries with config reads for resourceTier, prometheusRetention, prometheusScrapeInterval, prometheusStorageSize\n- Grafana password: use config.get('grafanaAdminPassword') with fallback to 'admin' when unset (local), requireSecret() when set (dev/production)\n- Defaults match current local values exactly\n\nUpdate Pulumi.local.yaml and Pulumi.production.yaml with the new config keys so both existing environments produce zero diff on pulumi preview.",
+      "acceptanceCriteria": [
+        "cert-manager.ts uses resourceTier config key instead of isLocal boolean",
+        "monitoring.ts reads prometheusRetention, prometheusScrapeInterval, prometheusStorageSize, and resourceTier from Pulumi config",
+        "Grafana password uses config.get() with fallback to 'admin' when unset",
+        "Pulumi.local.yaml has new config keys added",
+        "Pulumi.production.yaml has new config keys added",
+        "No references to isLocal remain in chart modules",
+        "Default values match current local behavior exactly",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Effort: M. This is the foundation task — must complete before dev stack config (TDP-004-03) can be added."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-004-03",
+      "title": "Add platform Pulumi dev stack configuration",
+      "description": "As a developer, I want a Pulumi.dev.yaml stack configuration for the platform project so that I can deploy the platform services to the dev cluster.\n\nCreate monorepo/infra/platform/Pulumi.dev.yaml with:\n- Stack reference: chiply-org/tdp-cluster/dev\n- Environment: dev, resource tier: standard\n- Prometheus: 7d retention, 15s scrape, 10Gi storage\n- Grafana admin password as Pulumi secret placeholder",
+      "acceptanceCriteria": [
+        "Pulumi.dev.yaml exists at monorepo/infra/platform/Pulumi.dev.yaml",
+        "clusterStackRef points to chiply-org/tdp-cluster/dev",
+        "environment is set to dev",
+        "resourceTier is set to standard",
+        "prometheusRetention is 7d",
+        "prometheusScrapeInterval is 15s",
+        "prometheusStorageSize is 10Gi",
+        "grafanaAdminPassword is configured as a secure value placeholder",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Effort: S. Depends on US-001 (TDP-004-01) — config keys must exist in chart code first."
+    }
+  ]
+}
