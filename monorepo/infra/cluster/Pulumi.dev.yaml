@@ -1,0 +1,7 @@
+config:
+  tdp-cluster:clusterType: linode-k3s
+  tdp-cluster:clusterName: tdp-dev
+  linode:token:
+    secure: PLACEHOLDER_REPLACE_WITH_PULUMI_SECRET
+  tdp-cluster:linodeRootPassword:
+    secure: PLACEHOLDER_REPLACE_WITH_PULUMI_SECRET
