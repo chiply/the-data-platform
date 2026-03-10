@@ -46,7 +46,7 @@ brew install k3d pulumi kubectl derailed/k9s/k9s node
 | [Docker Desktop](https://docs.docker.com/get-docker/) | Container runtime — must be running | `docker info` |
 | [k3d](https://k3d.io/) | Runs lightweight k3s clusters in Docker | `k3d version` |
 | [Pulumi](https://www.pulumi.com/docs/install/) | Infrastructure-as-code engine | `pulumi version` |
-| [Node.js](https://nodejs.org/) | Runs Pulumi TypeScript programs | `node --version` (v18+) |
+| [Node.js](https://nodejs.org/) | Runs Pulumi TypeScript programs | `node --version` (v20+) |
 | [kubectl](https://kubernetes.io/docs/tasks/tools/) | Kubernetes CLI | `kubectl version --client` |
 | [k9s](https://k9scli.io/) | Terminal UI for Kubernetes cluster management | `k9s version` |
 

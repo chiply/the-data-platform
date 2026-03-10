@@ -4,8 +4,10 @@ import * as k8s from "@pulumi/kubernetes";
  * Installs cert-manager via Helm chart.
  *
  * cert-manager automates the management and issuance of TLS certificates.
- * - Local: uses self-signed issuers (no external DNS or ACME needed)
- * - Production: uses Let's Encrypt via ACME HTTP-01 or DNS-01 challenges
+ *
+ * This module only installs the cert-manager chart and its CRDs; it does not
+ * create any Issuer or ClusterIssuer resources. Those must be defined
+ * separately if needed.
  *
  * installCRDs is set to true so that Certificate, Issuer, and ClusterIssuer
  * CRDs are created automatically during the Helm install.

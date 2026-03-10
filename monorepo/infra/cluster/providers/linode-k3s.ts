@@ -93,7 +93,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
         user: "root",
         password: rootPassword,
       },
-      create: "curl -sfL https://get.k3s.io | sh -",
+      create: pulumi.interpolate`curl -sfL https://get.k3s.io | sh -s - --tls-san ${instance.ipAddress}`,
     },
     { dependsOn: [instance] },
   );

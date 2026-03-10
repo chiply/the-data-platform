@@ -1,3 +1,4 @@
+import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
 /**
@@ -76,8 +77,8 @@ export function installMonitoring(args: MonitoringArgs): k8s.helm.v3.Release {
                 requests: { cpu: "200m", memory: "256Mi" },
                 limits: { cpu: "500m", memory: "512Mi" },
               },
-          // Default admin credentials (override in production via secrets)
-          adminPassword: isLocal ? "admin" : undefined,
+          // Local: default admin password; production: must be set via Pulumi secret config
+          adminPassword: isLocal ? "admin" : new pulumi.Config("tdp-platform").requireSecret("grafanaAdminPassword"),
         },
 
         // Alertmanager configuration

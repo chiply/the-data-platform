@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # --- Configuration ---
 NAMESPACE="smoke-test"
 DEPLOY_NAME="smoke-hello"
@@ -109,6 +107,7 @@ kind: Ingress
 metadata:
   name: ${INGRESS_NAME}
 spec:
+  ingressClassName: traefik
   rules:
   - host: ${INGRESS_HOST}
     http:
