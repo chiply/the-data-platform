@@ -14,8 +14,8 @@ After creating your Pulumi account, generate a personal access token at
 **Settings > Access Tokens** and store it in a `.env` file at the repo root:
 
 ```bash
-# .env (gitignored — never committed)
-PULUMI_ACCESS_TOKEN=pul-xxxxx
+cp .env.example .env
+# Edit .env and fill in your PULUMI_ACCESS_TOKEN
 ```
 
 Then source it before running Pulumi commands:
@@ -25,8 +25,7 @@ source .env && export PULUMI_ACCESS_TOKEN
 ```
 
 > **Note:** A Linode/Akamai account is only needed for production deployments, not local
-> development. If you need one, generate an API token and store it as a Pulumi secret:
-> `pulumi config set --secret linode:token <token>`
+> development. See [Production Deployment](#production-deployment-linode) below for setup.
 
 ### Required tools
 
@@ -189,6 +188,86 @@ See `monorepo/services/README.md` for image build details and
 | Host port | `5111` |
 | In-cluster address | `k3d-tdp-local-registry:5111` |
 | Push from host | `docker push k3d-tdp-local-registry:5111/<image>` |
+
+## Production Deployment (Linode)
+
+The production cluster runs k3s on a Linode instance. This section is only needed if you
+are deploying to production.
+
+### 1. Create a Linode account
+
+Sign up at [Linode/Akamai Cloud](https://login.linode.com/signup). Generate a personal
+access token at **My Profile > API Tokens** with Read/Write access for Linodes, Firewalls,
+and StackScripts.
+
+### 2. Store credentials
+
+Add these to your `.env` file (see `.env.example` for the full template):
+
+```bash
+# .env (gitignored)
+LINODE_TOKEN=<your-linode-api-token>
+LINODE_ROOT_PASSWORD=<strong-password>          # openssl rand -base64 24
+GRAFANA_ADMIN_PASSWORD=<strong-password>        # openssl rand -base64 24
+```
+
+Then configure the Pulumi production stack:
+
+```bash
+source .env && export PULUMI_ACCESS_TOKEN
+
+cd monorepo/infra/cluster
+pulumi stack select production  # or: pulumi stack init production
+
+# Store Linode API token (encrypted in Pulumi state)
+pulumi config set --secret --stack production linode:token "$LINODE_TOKEN"
+
+# Store root password for the k3s instance (encrypted)
+pulumi config set --secret --stack production tdp-cluster:linodeRootPassword "$LINODE_ROOT_PASSWORD"
+```
+
+### 3. Configure the platform stack
+
+```bash
+cd monorepo/infra/platform
+pulumi stack init production
+pulumi config set --stack production tdp-platform:clusterStackRef "<your-org>/tdp-cluster/production"
+pulumi config set --stack production tdp-platform:environment production
+pulumi config set --secret --stack production tdp-platform:grafanaAdminPassword "$GRAFANA_ADMIN_PASSWORD"
+```
+
+### 4. Deploy everything
+
+```bash
+./monorepo/infra/scripts/production-up.sh
+```
+
+This single command:
+1. Provisions a **Linode Standard 2** (4GB/2CPU) in `us-east` with k3s installed
+2. Configures a firewall (SSH, HTTP, HTTPS, K8s API)
+3. Installs **cert-manager** and the **Prometheus/Grafana monitoring stack**
+4. Exports the kubeconfig to `~/.kube/tdp-production.yaml`
+
+### 5. Access the production cluster
+
+```bash
+# Verify nodes
+kubectl --kubeconfig ~/.kube/tdp-production.yaml get nodes
+
+# Browse with k9s
+k9s --kubeconfig ~/.kube/tdp-production.yaml
+
+# View Grafana dashboards (port-forward to localhost:3001)
+kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n monitoring svc/<grafana-svc-name> 3001:80
+# Then open: http://localhost:3001 — login: admin / $GRAFANA_ADMIN_PASSWORD
+```
+
+### 6. Tear down production
+
+```bash
+cd monorepo/infra/platform && pulumi destroy --stack production --yes
+cd ../cluster && pulumi destroy --stack production --yes
+```
 
 ## Tearing Down
 

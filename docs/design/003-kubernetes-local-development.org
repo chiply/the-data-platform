@@ -58,7 +58,7 @@ production diverge significantly. The output is a kubeconfig — everything abov
 consumes only that.
 
 - *Local:* k3d (k3s in Docker) creates a multi-node cluster in ~20-30 seconds
-- *Production:* k3s on Linode 2GB ($12/mo) via =@pulumi/linode= + Command provider
+- *Production:* k3s on Linode 4GB ($24/mo) via =@pulumi/linode= + Command provider
 
 Both environments run k3s, maximizing parity. Pulumi stacks differentiate them:
 
@@ -128,7 +128,9 @@ monorepo/infra/
 │
 └── scripts/
     ├── local-up.sh             # pulumi up for cluster + platform (local)
-    └── local-down.sh           # pulumi destroy for local stack
+    ├── local-down.sh           # pulumi destroy for local stack
+    ├── production-up.sh        # pulumi up for cluster + platform (production)
+    └── smoke-test.sh           # deploy nginx, test ingress, clean up
 #+end_src
 
 ** Local Kubernetes Tool: k3d
@@ -208,7 +210,7 @@ This design prepares for Argo CD GitOps without requiring it now:
 Three-layer Pulumi infrastructure (cluster / platform / application) with k3s as the
 Kubernetes distribution in both environments:
 - *Local:* k3d (k3s in Docker) for fast, throwaway clusters
-- *Production:* k3s on Linode 2GB ($12/mo) for architectural consistency
+- *Production:* k3s on Linode 4GB ($24/mo) for architectural consistency
 - *Ingress:* Traefik (bundled with k3s) everywhere — zero extra setup
 - *State:* Pulumi Cloud (free tier) for managed state and secrets
 - *Build:* Bazel for code/tests, Pulumi for infra, shell scripts to orchestrate
@@ -349,7 +351,7 @@ Create a minimal verification:
 :END:
 
 Create =monorepo/infra/cluster/providers/linode-k3s.ts=:
-- Use =@pulumi/linode= to provision a Linode 2GB instance
+- Use =@pulumi/linode= to provision a Linode 4GB/2CPU instance (=g6-standard-2=)
 - Use =@pulumi/command= remote provisioner to install k3s via =curl -sfL https://get.k3s.io | sh -=
 - Configure firewall rules (allow 80, 443, 6443 for K8s API)
 - Export kubeconfig as a Pulumi output
@@ -392,7 +394,7 @@ Update =monorepo/infra/README.md= with:
 :DECIDED: [2026-03-09]
 :END:
 
-k3s on Linode 2GB ($12/mo). This is architecturally consistent with the local k3d
+k3s on Linode 4GB ($24/mo). This is architecturally consistent with the local k3d
 setup (same k3s distribution, same Traefik ingress, same containerd runtime). Pulumi
 provisions the Linode instance via =@pulumi/linode= and installs k3s via the Command
 provider — same pattern as the local k3d cluster provider.
@@ -403,7 +405,7 @@ For production HA, additional nodes can be added to the k3s cluster, or migratio
 LKE (managed control plane) is straightforward.
 
 Cost comparison considered: Hetzner (~$22/mo, EU-only), DigitalOcean (~$87/mo),
-Vultr (~$82/mo), AWS EKS (~$180/mo). Linode at $12/mo (single node, no NodeBalancer)
+Vultr (~$82/mo), AWS EKS (~$180/mo). Linode at $24/mo (4GB single node, no NodeBalancer)
 is the best balance of cost, Pulumi support, and architectural consistency.
 
 ** DECIDED Should we disable k3d's bundled Traefik in favor of NGINX ingress?

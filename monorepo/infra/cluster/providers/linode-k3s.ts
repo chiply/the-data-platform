@@ -18,7 +18,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
   const config = new pulumi.Config();
   const clusterName = config.get("clusterName") || "tdp-production";
   const region = config.get("linodeRegion") || "us-east";
-  const instanceType = config.get("linodeInstanceType") || "g6-nanode-1"; // Linode 2GB (Nanode)
+  const instanceType = config.get("linodeInstanceType") || "g6-standard-2"; // Linode 4GB/2CPU
   const image = config.get("linodeImage") || "linode/ubuntu22.04";
   const rootPassword = config.requireSecret("linodeRootPassword");
 

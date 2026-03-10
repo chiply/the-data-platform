@@ -59,6 +59,13 @@ pulumi up --stack "${STACK_NAME}" --yes
 popd >/dev/null
 
 # ---------------------------------------------------------------------------
+# Export kubeconfig
+# ---------------------------------------------------------------------------
+mkdir -p ~/.kube
+echo "==> Exporting kubeconfig to ~/.kube/tdp-local.yaml..."
+(cd "${CLUSTER_DIR}" && pulumi stack output kubeconfig --stack "${STACK_NAME}" --show-secrets > ~/.kube/tdp-local.yaml)
+
+# ---------------------------------------------------------------------------
 # Print cluster access info
 # ---------------------------------------------------------------------------
 CLUSTER_NAME=$(cd "${CLUSTER_DIR}" && pulumi stack output clusterName --stack "${STACK_NAME}" 2>/dev/null || echo "tdp-local")
@@ -69,8 +76,12 @@ echo "========================================"
 echo "  Local environment is ready!"
 echo "========================================"
 echo ""
-echo "Cluster access (k3d sets kubeconfig automatically):"
-echo "  kubectl config use-context k3d-${CLUSTER_NAME}"
+echo "Kubeconfig:"
+echo "  ~/.kube/tdp-local.yaml"
+echo ""
+echo "Cluster access:"
+echo "  kubectl --kubeconfig ~/.kube/tdp-local.yaml get nodes"
+echo "  k9s --kubeconfig ~/.kube/tdp-local.yaml"
 echo ""
 echo "Local container registry:"
 echo "  ${REGISTRY_URL}"
