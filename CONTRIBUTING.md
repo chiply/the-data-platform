@@ -10,19 +10,13 @@ Everything a new developer needs to get the platform running locally.
 |---------|---------|-------|
 | [Pulumi Cloud](https://app.pulumi.com/signup) | Infrastructure state management (free tier) | Sign up, then run `pulumi login` |
 
-After creating your Pulumi account, generate a personal access token at
-**Settings > Access Tokens** and store it in a `.env` file at the repo root:
+After creating your Pulumi account, log in from the CLI:
 
 ```bash
-cp .env.example .env
-# Edit .env and fill in your PULUMI_ACCESS_TOKEN
+pulumi login
 ```
 
-Then source it before running Pulumi commands:
-
-```bash
-source .env && export PULUMI_ACCESS_TOKEN
-```
+This stores your credentials in `~/.pulumi/credentials.json`. You only need to do this once.
 
 > **Note:** A Linode/Akamai account is only needed for production deployments, not local
 > development. See [Production Deployment](#production-deployment-linode) below for setup.
@@ -73,9 +67,6 @@ cd ../components && npm install
 ### 2. Configure Pulumi
 
 ```bash
-source .env && export PULUMI_ACCESS_TOKEN
-pulumi login
-
 # Initialize local stacks (one-time)
 cd monorepo/infra/cluster && pulumi stack init local
 cd ../platform && pulumi stack init local
@@ -203,12 +194,11 @@ real data.
 ### Quick start
 
 ```bash
-source .env && export PULUMI_ACCESS_TOKEN
 ./monorepo/infra/scripts/dev-up.sh
 ```
 
 Secrets (Linode token, root password, Grafana password) are provided automatically by
-the Pulumi ESC environment `tdp/dev`. No `.env` entries needed beyond `PULUMI_ACCESS_TOKEN`.
+the Pulumi ESC environment `tdp/dev`. No env vars needed — just `pulumi login`.
 
 ### Tear down
 
