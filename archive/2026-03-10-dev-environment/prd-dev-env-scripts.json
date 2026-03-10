@@ -21,7 +21,7 @@
         "production-up.sh behavior is unchanged after refactor"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Must complete before dev lifecycle scripts (TDP-004-07)."
     },
@@ -45,7 +45,7 @@
         "All scripts source _helpers.sh for shared logic"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Effort: S. Depends on US-001 (TDP-004-06) — helpers must exist first."
     }

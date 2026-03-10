@@ -20,7 +20,7 @@
         "Script works against dev environment with nip.io URLs"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Effort: M."
     },
@@ -40,7 +40,7 @@
         "local-path provisioner caveat is documented"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S."
     }

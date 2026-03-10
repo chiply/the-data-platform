@@ -8,15 +8,6 @@ Active tasks checked out from design docs.
 ** Active
 # Queue tasks here with /task-queue or M-x backlog/task-queue
 
-*** WIP [Ralph] Design doc 004 - Dev Environment on Linode
-:PROPERTIES:
-:DESIGN: [[file:docs/design/004-dev-environment.org][004 Dev Environment on Linode]]
-:DELEGATED_TO: ralph
-:PRD_FILES: tasks/prd-dev-env-platform-config.json, tasks/prd-dev-env-cluster.json, tasks/prd-dev-env-scripts.json, tasks/prd-dev-env-testing-docs.json
-:END:
-
-Tasks from this design doc are being executed autonomously via Ralph.
-Track progress in tasks/prd-*.json and progress.txt.
 
 
 
