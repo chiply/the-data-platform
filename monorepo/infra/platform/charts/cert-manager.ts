@@ -1,3 +1,4 @@
+import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
 /**
@@ -11,18 +12,61 @@ import * as k8s from "@pulumi/kubernetes";
  *
  * installCRDs is set to true so that Certificate, Issuer, and ClusterIssuer
  * CRDs are created automatically during the Helm install.
+ *
+ * Resource sizing is controlled by the `resourceTier` config key:
+ * - minimal: reduced footprint suitable for local development
+ * - standard: production-sized resources
  */
+
+/** Resource preset for a single component. */
+interface ResourceSpec {
+  requests: { cpu: string; memory: string };
+  limits: { cpu: string; memory: string };
+}
+
+/** Resource presets keyed by tier. */
+const resourcePresets: Record<string, { controller: ResourceSpec; webhook: ResourceSpec; cainjector: ResourceSpec }> = {
+  minimal: {
+    controller: {
+      requests: { cpu: "50m", memory: "64Mi" },
+      limits: { cpu: "200m", memory: "256Mi" },
+    },
+    webhook: {
+      requests: { cpu: "25m", memory: "32Mi" },
+      limits: { cpu: "100m", memory: "128Mi" },
+    },
+    cainjector: {
+      requests: { cpu: "25m", memory: "64Mi" },
+      limits: { cpu: "100m", memory: "256Mi" },
+    },
+  },
+  standard: {
+    controller: {
+      requests: { cpu: "100m", memory: "128Mi" },
+      limits: { cpu: "500m", memory: "512Mi" },
+    },
+    webhook: {
+      requests: { cpu: "50m", memory: "64Mi" },
+      limits: { cpu: "200m", memory: "256Mi" },
+    },
+    cainjector: {
+      requests: { cpu: "50m", memory: "128Mi" },
+      limits: { cpu: "200m", memory: "512Mi" },
+    },
+  },
+};
+
 export interface CertManagerArgs {
   /** The Kubernetes provider to deploy into. */
   provider: k8s.Provider;
-  /** Environment name ("local" or "production") for resource sizing. */
-  environment: string;
 }
 
 export function installCertManager(args: CertManagerArgs): k8s.helm.v3.Release {
-  const { provider, environment } = args;
+  const { provider } = args;
 
-  const isLocal = environment === "local";
+  const config = new pulumi.Config();
+  const resourceTier = config.get("resourceTier") || "minimal";
+  const preset = resourcePresets[resourceTier] ?? resourcePresets["minimal"];
 
   const certManager = new k8s.helm.v3.Release(
     "cert-manager",
@@ -36,36 +80,12 @@ export function installCertManager(args: CertManagerArgs): k8s.helm.v3.Release {
       createNamespace: true,
       values: {
         installCRDs: true,
-        resources: isLocal
-          ? {
-              requests: { cpu: "50m", memory: "64Mi" },
-              limits: { cpu: "200m", memory: "256Mi" },
-            }
-          : {
-              requests: { cpu: "100m", memory: "128Mi" },
-              limits: { cpu: "500m", memory: "512Mi" },
-            },
+        resources: preset.controller,
         webhook: {
-          resources: isLocal
-            ? {
-                requests: { cpu: "25m", memory: "32Mi" },
-                limits: { cpu: "100m", memory: "128Mi" },
-              }
-            : {
-                requests: { cpu: "50m", memory: "64Mi" },
-                limits: { cpu: "200m", memory: "256Mi" },
-              },
+          resources: preset.webhook,
         },
         cainjector: {
-          resources: isLocal
-            ? {
-                requests: { cpu: "25m", memory: "64Mi" },
-                limits: { cpu: "100m", memory: "256Mi" },
-              }
-            : {
-                requests: { cpu: "50m", memory: "128Mi" },
-                limits: { cpu: "200m", memory: "512Mi" },
-              },
+          resources: preset.cainjector,
         },
       },
     },
