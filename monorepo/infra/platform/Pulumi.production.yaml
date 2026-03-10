@@ -1,0 +1,5 @@
+config:
+  tdp-platform:clusterStackRef: chiply-org/tdp-cluster/production
+  tdp-platform:environment: production
+  tdp-platform:grafanaAdminPassword:
+    secure: AAABAKgvwMez4vodua3Bpe0uQvTUX4ASBSrqjay1Kuivvx/MUfQHMlJJLyc1hN4WOpiJS0aykiFU2M7mCuMnEg==

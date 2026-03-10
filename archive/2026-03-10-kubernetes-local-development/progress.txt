@@ -1,0 +1,64 @@
+# Ralph Progress Log
+Started: 2026-03-09
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-kubernetes-local-development.json
+
+## Codebase Patterns
+- Pulumi config keys are namespaced by project name (e.g., `tdp-cluster:clusterType`), so stack config files must use the `config:` top-level key with fully qualified names.
+- The provider dispatch pattern (switch on clusterType in index.ts, delegate to provider modules in `providers/`) is extensible.
+- @pulumi/command is useful for wrapping CLI tools (like k3d) that don't have native Pulumi providers.
+---
+
+## US-001 - Initialize Pulumi cluster project
+- What was implemented: Complete Pulumi project for cluster provisioning at monorepo/infra/cluster/. Includes Pulumi.yaml, Pulumi.local.yaml, package.json, tsconfig.json, index.ts with provider dispatch, and a k3d provider stub.
+- Files changed: monorepo/infra/cluster/{Pulumi.yaml, Pulumi.local.yaml, package.json, package-lock.json, tsconfig.json, index.ts, providers/index.ts, providers/k3d.ts}
+---
+
+## US-002 - Implement k3d cluster provider
+- What was implemented: Full k3d provider using @pulumi/command. Creates local registry, k3d cluster with port mappings (80/443), configurable worker count, kubeconfig export. Includes cleanup commands.
+- Files changed: monorepo/infra/cluster/providers/k3d.ts (full implementation), monorepo/infra/cluster/index.ts (updated exports)
+- Learnings: K3dClusterResult interface with kubeconfig/registryUrl/clusterName outputs is the contract for downstream stack references.
+---
+
+## US-003 - Initialize Pulumi platform project
+- What was implemented: tdp-platform Pulumi project at monorepo/infra/platform/ with StackReference to tdp-cluster for kubeconfig, k8s.Provider creation.
+- Files changed: monorepo/infra/platform/{Pulumi.yaml, Pulumi.local.yaml, package.json, package-lock.json, tsconfig.json, index.ts}
+- Learnings: Config keys namespaced by project name (tdp-platform:clusterStackRef). k8sProvider exported for downstream chart modules.
+---
+
+## US-004 - Verify Traefik ingress and configure platform layer
+- What was implemented: Updated platform index.ts with Traefik docs, created charts/cert-manager.ts and charts/monitoring.ts with Helm chart installations and environment-appropriate resource limits.
+- Files changed: monorepo/infra/platform/{index.ts, charts/cert-manager.ts, charts/monitoring.ts}
+- Learnings: Chart modules accept { provider, environment } as a clean interface pattern for future chart additions.
+---
+
+## US-005 - Create ServiceDeployment component resource
+- What was implemented: ServiceDeployment ComponentResource at monorepo/infra/components/ with Deployment + Service + optional Ingress. Consistent app.kubernetes.io/* labels.
+- Files changed: monorepo/infra/components/{package.json, package-lock.json, tsconfig.json, service-deployment.ts, index.ts}
+- Learnings: ComponentResource type strings follow `tdp:components:<ClassName>` convention. pulumi.Input<T> wrapping needed for args from other outputs.
+---
+
+## US-006 - Create local-up and local-down scripts
+- What was implemented: local-up.sh and local-down.sh scripts with prerequisite validation, pulumi up/destroy sequencing, and cluster access info output.
+- Files changed: monorepo/infra/scripts/{local-up.sh, local-down.sh}
+---
+
+## US-007 - Add smoke test for local cluster [NEEDS HUMAN REVIEW]
+- What was implemented: smoke-test.sh that deploys nginx to smoke-test namespace, tests HTTP via Traefik ingress with curl --resolve, cleans up via trap.
+- Files changed: monorepo/infra/scripts/smoke-test.sh
+---
+
+## US-008 - Implement Linode k3s cluster provider [NEEDS HUMAN REVIEW]
+- What was implemented: linode-k3s.ts provider using @pulumi/linode for Nanode 2GB instance with k3s, firewall (80/443/6443), kubeconfig retrieval with IP rewriting. Pulumi.production.yaml stack config.
+- Files changed: monorepo/infra/cluster/providers/linode-k3s.ts, index.ts, providers/index.ts, package.json, Pulumi.production.yaml
+---
+
+## US-009 - Create base Dockerfile and example service image
+- What was implemented: Multi-stage Python 3.12 base Dockerfile, example FastAPI service with Dockerfile, README with build+push workflow docs.
+- Files changed: monorepo/services/{Dockerfile.base, requirements-base.txt, README.md, example/Dockerfile, example/main.py, example/requirements.txt}
+---
+
+## US-010 - Document local development workflow [NEEDS HUMAN REVIEW]
+- What was implemented: Comprehensive infra/README.md covering prerequisites, quick start, deploying services, ingress access, teardown, registry, troubleshooting.
+- Files changed: monorepo/infra/README.md
+---

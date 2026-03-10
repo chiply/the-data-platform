@@ -8,19 +8,6 @@ Active tasks checked out from design docs.
 ** Active
 # Queue tasks here with /task-queue or M-x backlog/task-queue
 
-*** WIP [Ralph] Design doc 003 - K8s Local Dev & Infra Parity
-:PROPERTIES:
-:DESIGN: [[file:docs/design/003-kubernetes-local-development.org][003 K8s Local Dev & Infra Parity]]
-:DELEGATED_TO: ralph
-:PRD_FILES: tasks/prd-kubernetes-local-development.json
-:END:
-
-Tasks from this design doc are being executed autonomously via Ralph.
-Track progress in tasks/prd-kubernetes-local-development.json and progress.txt.
-
-*Excluded (human-only):*
-- [TDP-003-00] Set up accounts and install prerequisites — requires manual account creation and tool installs
-
 
 
 ** Blocked

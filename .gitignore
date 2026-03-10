@@ -28,6 +28,7 @@ Thumbs.db
 # Environment
 .env
 .env.*
+!.env.example
 
 # Claude Code local settings (machine-specific MCP config)
 .claude/settings.local.json

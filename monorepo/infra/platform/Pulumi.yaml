@@ -1,0 +1,3 @@
+name: tdp-platform
+runtime: nodejs
+description: Platform layer — installs core services (ingress verification, cert-manager, monitoring) onto any cluster provisioned by the cluster layer.
