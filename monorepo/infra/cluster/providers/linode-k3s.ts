@@ -16,7 +16,8 @@ export type LinodeK3sClusterResult = K3dClusterResult;
 
 export function createLinodeK3sCluster(): LinodeK3sClusterResult {
   const config = new pulumi.Config();
-  const clusterName = config.get("clusterName") || "tdp-production";
+  const clusterName = config.require("clusterName");
+  const environment = config.get("environment") || clusterName.replace(/^tdp-/, "");
   const region = config.get("linodeRegion") || "us-east";
   const instanceType = config.get("linodeInstanceType") || "g6-standard-2"; // Linode 4GB/2CPU
   const image = config.get("linodeImage") || "linode/ubuntu22.04";
@@ -80,7 +81,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
       rootPass: rootPassword,
       authorizedUsers: [],
       firewallId: firewall.id.apply((id) => Number(id)),
-      tags: ["k3s", "tdp"],
+      tags: ["k3s", "tdp", environment],
     },
   );
 
