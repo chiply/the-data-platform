@@ -44,7 +44,6 @@ pushd "${PLATFORM_DIR}" >/dev/null
 ORG_NAME=$(pulumi whoami 2>/dev/null || echo "organization")
 popd >/dev/null
 configure_config_if_missing "${PLATFORM_DIR}" "${STACK_NAME}" "tdp-platform:clusterStackRef" "${ORG_NAME}/tdp-cluster/${STACK_NAME}"
-configure_config_if_missing "${PLATFORM_DIR}" "${STACK_NAME}" "tdp-platform:environment" "production"
 
 configure_secret_if_missing "${PLATFORM_DIR}" "${STACK_NAME}" "tdp-platform:grafanaAdminPassword" "GRAFANA_ADMIN_PASSWORD" "true"
 
