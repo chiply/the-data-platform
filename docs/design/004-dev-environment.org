@@ -1,0 +1,383 @@
+#+TITLE: 004 - Dev Environment on Linode
+#+AUTHOR: Charlie Holland
+#+STATUS: Accepted
+#+CATEGORY: infra
+#+CREATED: [2026-03-10]
+#+LAST_MODIFIED: [2026-03-10]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Add a remote =dev= environment (k3s on Linode) alongside the existing =local=
+(k3d) and =production= (k3s on Linode) environments. This gives the project a
+persistent, shared cluster for integration testing and demo purposes without
+risking the production stack. Staging is intentionally omitted to avoid
+unnecessary cost at this stage.
+
+* Motivation
+
+The platform currently has two environments: =local= (ephemeral, per-developer)
+and =production= (persistent, real workloads). There is no middle ground for:
+
+1. *Integration testing* — validating that services work together on real
+   infrastructure before promoting to production
+2. *Continuous deployment target* — a place for CI to deploy =main= branch
+   builds automatically, catching issues before they reach production
+3. *Demo / review* — a persistent URL for stakeholders or PR previews
+4. *Validating infra changes* — testing Pulumi changes on a real Linode instance
+   without touching production
+
+Adding =dev= is low-cost (~$25/mo for a second Linode 4GB node + block storage)
+and the three-layer architecture from [[file:003-kubernetes-local-development.org][design doc 003]] was built to support
+additional environments via Pulumi stack configuration.
+
+* Design
+
+The =dev= environment is architecturally identical to =production=: a k3s
+instance on Linode, provisioned by the same =linode-k3s= provider, with the
+same platform services. The differences are operational:
+
+| Concern                 | Dev                               | Production                        |
+|-------------------------+-----------------------------------+-----------------------------------|
+| Cluster name            | =tdp-dev=                         | =tdp-production=                  |
+| Linode instance         | 4GB (=g6-standard-2=)             | 4GB (=g6-standard-2=)             |
+| Linode tags             | =["k3s", "tdp", "dev"]=          | =["k3s", "tdp", "production"]=   |
+| DNS                     | =<svc>.<ip>.nip.io=              | =*.tdp.example.com=               |
+| TLS                     | Self-signed (cert-manager)        | Let's Encrypt (production issuer) |
+| Monitoring retention    | 7d                                | 30d                               |
+| Monitoring storage      | 10Gi (local-path)                 | 50Gi (local-path)                 |
+| Grafana password        | Pulumi secret                     | Pulumi secret                     |
+| Deploy frequency        | Every push to =main=              | Manual / release-gated            |
+| Data                    | Synthetic / seed data             | Real data                         |
+| Disposability           | Fully disposable, no backups      | Persistent, backed up             |
+| Cost                    | ~$25/mo                           | ~$24/mo                           |
+
+** Per-Environment Configuration via Pulumi Stack Config
+
+The current platform code uses a binary =isLocal= boolean to branch on resource
+sizing and behavioral config. Rather than introducing a TypeScript abstraction
+layer, we move these values into Pulumi stack config files where they belong.
+
+This means:
+- Behavioral config (retention, scrape interval, storage size) becomes explicit
+  per-stack config values read via =config.get()= with sensible defaults
+- Resource sizing uses a =resourceTier= config key (=minimal= or =standard=)
+  to select between two inline presets in each chart module
+- The Grafana password uses =config.get()= with a fallback to ="admin"= for
+  local, and =config.requireSecret()= for remote environments
+- Adding a future environment (staging, etc.) requires *only a new YAML file*
+  — zero code changes
+
+#+begin_src yaml
+# monorepo/infra/platform/Pulumi.local.yaml (existing, add new keys)
+config:
+  tdp-platform:clusterStackRef: chiply-org/tdp-cluster/local
+  tdp-platform:environment: local
+  tdp-platform:resourceTier: minimal
+  tdp-platform:prometheusRetention: "6h"
+  tdp-platform:prometheusScrapeInterval: "30s"
+
+# monorepo/infra/platform/Pulumi.dev.yaml (new)
+config:
+  tdp-platform:clusterStackRef: chiply-org/tdp-cluster/dev
+  tdp-platform:environment: dev
+  tdp-platform:resourceTier: standard
+  tdp-platform:prometheusRetention: "7d"
+  tdp-platform:prometheusScrapeInterval: "15s"
+  tdp-platform:prometheusStorageSize: "10Gi"
+  tdp-platform:grafanaAdminPassword:
+    secure: <encrypted>
+
+# monorepo/infra/platform/Pulumi.production.yaml (existing, add new keys)
+config:
+  tdp-platform:clusterStackRef: chiply-org/tdp-cluster/production
+  tdp-platform:environment: production
+  tdp-platform:resourceTier: standard
+  tdp-platform:prometheusRetention: "30d"
+  tdp-platform:prometheusScrapeInterval: "15s"
+  tdp-platform:prometheusStorageSize: "50Gi"
+  tdp-platform:grafanaAdminPassword:
+    secure: <encrypted>
+#+end_src
+
+The chart modules then read these values with defaults that preserve current
+local behavior:
+
+#+begin_src typescript
+// In monitoring.ts
+const platformConfig = new pulumi.Config("tdp-platform");
+const resourceTier = platformConfig.get("resourceTier") || "minimal";
+const retention = platformConfig.get("prometheusRetention") || "6h";
+const scrapeInterval = platformConfig.get("prometheusScrapeInterval") || "30s";
+const storageSize = platformConfig.get("prometheusStorageSize"); // undefined = no PV
+const grafanaPassword = platformConfig.get("grafanaAdminPassword")
+  ? platformConfig.requireSecret("grafanaAdminPassword")
+  : "admin";
+#+end_src
+
+** Cluster Stack Configuration
+
+#+begin_src yaml
+# monorepo/infra/cluster/Pulumi.dev.yaml (new)
+config:
+  tdp-cluster:clusterType: linode-k3s
+  tdp-cluster:clusterName: tdp-dev
+  linode:token:
+    secure: <encrypted>
+  tdp-cluster:linodeRootPassword:
+    secure: <encrypted>
+#+end_src
+
+** Lifecycle Scripts
+
+=dev-up.sh= and =dev-down.sh= follow the same pattern as the production
+scripts, targeting the =dev= Pulumi stack. Common logic (prerequisite checks,
+stack initialization, secret configuration, kubeconfig export) is extracted
+into =_helpers.sh= and shared with =production-up.sh=. A =production-down.sh=
+is also created for symmetry.
+
+** Firewall Hardening
+
+The existing =linode-k3s.ts= opens SSH (22) and K8s API (6443) to =0.0.0.0/0=
+with TODO comments to restrict. This design adds a =firewallAllowedIPs= config
+key so dev and production can specify IP allowlists for sensitive ports, while
+HTTP/HTTPS remain open.
+
+** What Does NOT Change
+
+- Cluster layer code (=index.ts=, =k3d.ts=, =linode-k3s.ts=) — no modifications
+  needed (except Linode tags and firewall parameterization)
+- =ServiceDeployment= component — already environment-agnostic
+- Helm chart versions — same charts everywhere
+
+* Decision
+
+Add =dev= as a third Pulumi stack for both the =cluster= and =platform=
+projects, reusing the existing =linode-k3s= provider. Refactor the platform
+charts to read configuration from Pulumi stack YAML files instead of branching
+on the =isLocal= boolean — each environment's config is fully specified in its
+stack file, and adding future environments requires only a new YAML file with
+zero code changes.
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+** TODO [TDP-004-01] Refactor platform charts to use Pulumi stack config  :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Replace the =isLocal= boolean pattern in both chart modules with Pulumi config
+reads. This is the foundation for multi-environment support.
+
+=monorepo/infra/platform/charts/cert-manager.ts=:
+- Replace =isLocal= ternaries with a =resourceTier= config key (=minimal= | =standard=)
+- Define two inline resource presets; select based on config value
+- Default to =minimal= (preserves current local behavior)
+
+=monorepo/infra/platform/charts/monitoring.ts=:
+- Replace =isLocal= ternaries with config reads for =resourceTier=,
+  =prometheusRetention=, =prometheusScrapeInterval=, =prometheusStorageSize=
+- Grafana password: use =config.get("grafanaAdminPassword")= with fallback
+  to ="admin"= when unset (local), =requireSecret()= when set (dev/production)
+- Defaults match current local values exactly
+
+Update =Pulumi.local.yaml= and =Pulumi.production.yaml= with the new config
+keys so both existing environments produce *zero diff* on =pulumi preview=.
+
+** TODO [TDP-004-02] Add cluster Pulumi dev stack configuration           :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =monorepo/infra/cluster/Pulumi.dev.yaml=:
+- =clusterType: linode-k3s=
+- =clusterName: tdp-dev=
+- Linode token and root password as Pulumi secrets
+- Use a *separate* Linode API token from production (scoped permissions)
+
+No code changes to the cluster layer.
+
+** TODO [TDP-004-03] Add platform Pulumi dev stack configuration          :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =monorepo/infra/platform/Pulumi.dev.yaml=:
+- Stack reference: =chiply-org/tdp-cluster/dev=
+- Environment: =dev=, resource tier: =standard=
+- Prometheus: 7d retention, 15s scrape, 10Gi storage
+- Grafana admin password as Pulumi secret
+
+Depends on TDP-004-01 (config keys must exist in chart code first).
+
+** TODO [TDP-004-04] Add environment tags to linode-k3s provider          :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update =monorepo/infra/cluster/providers/linode-k3s.ts=:
+- Add environment-specific tag from config (e.g., =dev= or =production=) to
+  the Linode instance tags array (currently hardcoded =["k3s", "tdp"]=)
+- Change the default cluster name from ="tdp-production"= to a neutral default
+  or require it via config (it is always overridden, but the default is misleading)
+
+** TODO [TDP-004-05] Parameterize firewall rules in linode-k3s provider   :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update =monorepo/infra/cluster/providers/linode-k3s.ts=:
+- Add a =firewallAllowedIPs= config key (defaults to =["0.0.0.0/0"]=)
+- Apply the allowlist to SSH (22) and K8s API (6443) inbound rules
+- HTTP (80) and HTTPS (443) remain open to all
+- Resolves existing TODO comments on lines 35 and 62
+- Both dev and production stacks should set this to known developer/CI IPs
+
+** TODO [TDP-004-06] Extract shared script helpers from production-up.sh  :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =monorepo/infra/scripts/_helpers.sh=:
+- Extract: =check_cmd()=, prerequisite validation loop, =LINODE_TOKEN= check,
+  =init_stack_if_missing()=, =configure_secret_if_missing()=, kubeconfig
+  export pattern, access info printing template
+- Refactor =production-up.sh= to source =_helpers.sh= and call shared functions
+- Verify =production-up.sh= still works identically after refactor
+
+** TODO [TDP-004-07] Create dev lifecycle scripts                         :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =monorepo/infra/scripts/dev-up.sh=:
+- Source =_helpers.sh= for shared functions
+- Require =LINODE_TOKEN= environment variable
+- Initialize dev stacks if missing, configure secrets interactively
+- =pulumi up= for cluster (dev stack), then platform (dev stack)
+- Export kubeconfig to =~/.kube/tdp-dev.yaml=
+- Print access info (cluster IP, nip.io URLs, Grafana port-forward)
+
+Create =monorepo/infra/scripts/dev-down.sh=:
+- Source =_helpers.sh= for shared functions
+- =pulumi destroy= for platform (dev stack), then cluster (dev stack)
+
+Create =monorepo/infra/scripts/production-down.sh=:
+- Source =_helpers.sh= for shared functions
+- =pulumi destroy= for platform (production stack), then cluster
+- Fills the existing gap (=production-up.sh= exists but no teardown script)
+
+Depends on TDP-004-06.
+
+** TODO [TDP-004-08] Make smoke test environment-aware                    :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Update =monorepo/infra/scripts/smoke-test.sh=:
+- Accept an optional environment argument (default: =local=)
+- Use appropriate kubeconfig (=~/.kube/tdp-<env>.yaml=)
+- For remote clusters:
+  - Discover Linode public IP from kubeconfig server URL or Pulumi stack output
+  - Use nip.io hostname (=smoke.<ip>.nip.io=) instead of =smoke.localhost=
+  - Use normal DNS resolution instead of =--resolve= flag
+  - Handle self-signed TLS (=--insecure= or =--cacert= for cert-manager certs)
+- Update error messages to reference the correct =*-up.sh= script per environment
+- Verify the test works against both =local= and =dev= environments
+
+** TODO [TDP-004-09] Update documentation                                :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update =monorepo/infra/README.md= (or =CONTRIBUTING.md=):
+- Add dev environment section alongside local and production
+- Document =dev-up.sh= / =dev-down.sh= / =production-down.sh= usage
+- Document the Pulumi stack config approach for contributors adding platform
+  charts (read config values, provide sensible defaults, no =isLocal= checks)
+- Document multi-kubeconfig workflow (=KUBECONFIG= env var or =--kubeconfig= flag)
+- Update environment comparison tables
+- Note that dev is fully disposable — no backups, =dev-down.sh= destroys everything
+- Note that k3s uses =local-path= provisioner (not Linode Block Storage CSI)
+  for persistent volumes — data is lost on node replacement
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED What domain should dev use?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+=nip.io= wildcard DNS. Services are accessed via =<svc>.<linode-ip>.nip.io=,
+which resolves to the Linode public IP with zero DNS configuration. This avoids
+the need for a real domain or manual DNS setup. Real domains can be layered on
+later when needed.
+
+** DECIDED Should dev-up.sh share code with production-up.sh?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Shared helper functions via a common =_helpers.sh= script. Both =dev-up.sh= and
+=production-up.sh= source shared functions for prerequisite checks, stack
+initialization, secret configuration, and kubeconfig export. Each script remains
+its own entrypoint with environment-specific defaults.
+
+** DECIDED Should the dev Linode instance be smaller to save cost?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Same size — Linode 4GB (=g6-standard-2=, ~$24/mo). Keeps full parity with
+production and avoids resource pressure from the monitoring stack. The $12/mo
+savings from a 2GB instance isn't worth the risk of OOM issues or misleading
+resource behavior during integration testing.
+
+** DECIDED What TLS strategy for dev?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Self-signed certificates via cert-manager. Let's Encrypt does not work reliably
+with nip.io domains — rate limits apply per registered domain, and =nip.io= is
+shared globally across all users. Self-signed certs are sufficient for dev
+(integration testing, not public-facing). The cert-manager self-signed
+ClusterIssuer is simple to configure and avoids external dependencies.
+
+** DECIDED Is the dev environment disposable?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Yes, fully disposable. No backups, no disaster recovery. =dev-down.sh= destroys
+the Linode instance and all data including monitoring history. The dev cluster
+can be recreated from scratch via =dev-up.sh= at any time. This is appropriate
+because dev uses synthetic/seed data, not real user data.
+
+** DECIDED How to handle multi-environment config without code changes?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Pulumi stack config files. Instead of a TypeScript =environment-config.ts=
+module with type definitions and lookup functions, all per-environment values
+(retention, scrape interval, storage size, resource tier) are specified directly
+in each =Pulumi.<env>.yaml= file. Chart code reads values via =config.get()=
+with defaults matching current local behavior. This is simpler, avoids new
+abstractions, and means adding a future environment requires only a new YAML
+file with zero code changes.
+
+** DECIDED Should dev and production use separate Linode API tokens?
+:PROPERTIES:
+:DECIDED: [2026-03-10]
+:END:
+
+Yes. Separate Linode API tokens with scoped permissions for dev vs production.
+A compromised dev environment should not grant access to production
+infrastructure. Each stack stores its own token as a Pulumi secret.
