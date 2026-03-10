@@ -164,11 +164,9 @@ export class ServiceDeployment extends pulumi.ComponentResource {
                 {
                     metadata: {
                         labels,
-                        annotations: {
-                            "kubernetes.io/ingress.class": "nginx",
-                        },
                     },
                     spec: {
+                        ingressClassName: "traefik",
                         tls: ingressTls,
                         rules: [
                             {

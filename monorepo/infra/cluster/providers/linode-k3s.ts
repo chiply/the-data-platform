@@ -31,6 +31,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
     label: `${clusterName}-fw`,
     inbounds: [
       {
+        // TODO: restrict to known IPs (CI/CD, VPN) before production use
         label: "allow-ssh",
         action: "ACCEPT",
         protocol: "TCP",
@@ -108,7 +109,7 @@ export function createLinodeK3sCluster(): LinodeK3sClusterResult {
         user: "root",
         password: rootPassword,
       },
-      create: pulumi.interpolate`cat /etc/rancher/k3s/k3s.yaml | sed "s/127.0.0.1/${instance.ipAddress}/g"`,
+      create: pulumi.interpolate`for i in $(seq 1 30); do [ -f /etc/rancher/k3s/k3s.yaml ] && systemctl is-active --quiet k3s && break; sleep 2; done && cat /etc/rancher/k3s/k3s.yaml | sed "s/127.0.0.1/${instance.ipAddress}/g"`,
     },
     { dependsOn: [installK3s] },
   );
