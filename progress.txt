@@ -46,4 +46,9 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Dev/Prod: environment import + config overrides in Pulumi.<env>.yaml
 - Platform references cluster via clusterStackRef
 
+## US-002 - Create dummy schema-registry FastAPI service
+- What was implemented: Minimal FastAPI stub service at monorepo/services/schema-registry/ with three endpoints (/health, /schemas, /schemas/{name}), a multi-stage Dockerfile using Python 3.12 slim, requirements.txt with fastapi and uvicorn, and registration in release-please config/manifest.
+- Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json
+- Learnings: The repo has a Dockerfile.base pattern in monorepo/services/ that future services could extend. Release-please uses component field for tags in format <component>-vX.Y.Z.
+
 ---

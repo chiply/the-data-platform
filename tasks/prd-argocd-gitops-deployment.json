@@ -39,7 +39,7 @@
         "Service registered in release-please-config.json and .release-please-manifest.json"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Simple stub service — the goal is pipeline validation, not real functionality."
     },
