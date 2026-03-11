@@ -2,12 +2,19 @@
 
 from fastapi import FastAPI
 
-app = FastAPI(title="Schema Registry", version="0.1.0")
+APP_VERSION = "0.2.0"
+
+app = FastAPI(title="Schema Registry", version=APP_VERSION)
 
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+
+@app.get("/version")
+async def version():
+    return {"service": "schema-registry", "version": APP_VERSION}
 
 
 @app.get("/schemas")

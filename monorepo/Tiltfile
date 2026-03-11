@@ -12,7 +12,7 @@
 #
 #   tilt+argocd (for testing GitOps config):
 #     cd monorepo && tilt up -- --argocd
-#     - Tilt installs ArgoCD via helm_resource
+#     - Requires ArgoCD already running (installed by Pulumi via local-up.sh)
 #     - ArgoCD manages application deployments (docker_build disabled)
 #     - ArgoCD Application manifests applied via local_resource on file change
 #     - ArgoCD pulls images from the k3d registry
@@ -29,9 +29,6 @@ config.define_bool("argocd", usage="Enable ArgoCD mode (boots ArgoCD, disables d
 cfg = config.parse()
 argocd_mode = cfg.get("argocd", False)
 
-# helm_resource is a Tilt extension for managing Helm releases as Tilt resources.
-# Must be loaded at top level (Starlark requires load() outside conditionals).
-load("ext://helm_resource", "helm_resource")
 
 # ---------------------------------------------------------------------------
 # Cluster & Registry
@@ -83,49 +80,68 @@ if not argocd_mode:
 # ---------------------------------------------------------------------------
 
 if argocd_mode:
-    # Install ArgoCD via Helm into argocd namespace.
-    # Non-HA mode, disabled components to save memory (~200 Mi saved).
-    # Matches the Pulumi Layer 2 installation from design doc 005.
-    helm_resource(
-        "argocd",
-        "argo-cd",
-        namespace="argocd",
-        flags=[
-            "--create-namespace",
-            "--version=7.7.16",  # Keep in sync with infra/platform/charts/argocd.ts
-            "--repo=https://argoproj.github.io/argo-helm",
-            "--set=dex.enabled=false",
-            "--set=applicationSet.enabled=false",
-            "--set=notifications.enabled=false",
-            "--set=server.service.type=ClusterIP",
-            "--set=server.ingress.enabled=true",
-            "--set=server.ingress.ingressClassName=traefik",
-            "--set=server.ingress.hosts[0]=argocd.localhost",
-            "--set=server.ingress.tls=false",
-            "--set=configs.params.server\\.insecure=true",
-            "--set=global.logging.level=info",
-        ],
-        resource_deps=[],
-        labels=["argocd"],
+    # ArgoCD is installed by Pulumi as a Layer 2 platform service (local-up.sh).
+    # In argocd mode, Tilt only manages Application manifests — it does not
+    # install ArgoCD itself. Verify ArgoCD is running before proceeding.
+    argocd_pods = local(
+        "kubectl get pods -n argocd -l app.kubernetes.io/part-of=argocd -o name 2>/dev/null || true",
+        quiet=True,
+    )
+    if not str(argocd_pods).strip():
+        fail(
+            "\n"
+            + "=" * 70 + "\n"
+            + "  ArgoCD is not running in the cluster.\n"
+            + "\n"
+            + "  ArgoCD is installed by Pulumi as a platform service.\n"
+            + "  Run local-up.sh first:\n"
+            + "    cd monorepo/infra/scripts && ./local-up.sh\n"
+            + "=" * 70 + "\n"
+        )
+
+    # Detect current git branch for ArgoCD targetRevision.
+    _current_branch = str(local("git rev-parse --abbrev-ref HEAD", quiet=True)).strip()
+
+    # Build and push image to k3d registry so ArgoCD can pull it.
+    # Unlike tilt-only mode, no live_update — ArgoCD manages the deployment.
+    local_resource(
+        "schema-registry-build",
+        cmd=(
+            "docker build -t k3d-tdp-local-registry:5111/schema-registry:latest"
+            " services/schema-registry"
+            " && docker push k3d-tdp-local-registry:5111/schema-registry:latest"
+        ),
+        deps=["services/schema-registry/"],
+        labels=["build"],
     )
 
-    # Apply ArgoCD AppProject and Application manifests on file change.
-    # This lets developers iterate on ArgoCD configuration locally.
+    # Push current branch to GitHub so ArgoCD can fetch the chart.
+    local_resource(
+        "git-push",
+        cmd="git push -u origin HEAD",
+        labels=["build"],
+        auto_init=True,
+        trigger_mode=TRIGGER_MODE_MANUAL,
+    )
+
+    # Patch the local Application manifest's targetRevision to the current branch,
+    # then apply it. This avoids manually editing the YAML.
     local_resource(
         "argocd-appproject",
         cmd="kubectl apply -f deploy/argocd/appproject.yaml",
         deps=["deploy/argocd/appproject.yaml"],
-        resource_deps=["argocd"],
         labels=["argocd"],
     )
 
-    # Only apply the local Application manifest — dev/prod Applications reference
-    # release tags and ghcr images that don't exist in the k3d cluster.
     local_resource(
         "argocd-applications",
-        cmd="kubectl apply -f deploy/argocd/apps/schema-registry-local.yaml",
+        cmd=(
+            "kubectl apply -f deploy/argocd/apps/schema-registry-local.yaml"
+            " && kubectl patch application schema-registry-local -n argocd"
+            " --type=merge -p '{\"spec\":{\"source\":{\"targetRevision\":\"" + _current_branch + "\"}}}'"
+        ),
         deps=["deploy/argocd/apps/schema-registry-local.yaml"],
-        resource_deps=["argocd-appproject"],
+        resource_deps=["argocd-appproject", "schema-registry-build"],
         labels=["argocd"],
     )
 
@@ -134,7 +150,7 @@ if argocd_mode:
         "argocd-rbac",
         cmd="kubectl apply -f deploy/argocd/rbac/",
         deps=["deploy/argocd/rbac"],
-        resource_deps=["argocd"],
+        resource_deps=["argocd-appproject"],
         labels=["argocd"],
     )
 
@@ -143,7 +159,7 @@ if argocd_mode:
         "argocd-network-policies",
         cmd="kubectl apply -f deploy/argocd/network-policies/",
         deps=["deploy/argocd/network-policies"],
-        resource_deps=["argocd"],
+        resource_deps=["argocd-appproject"],
         labels=["argocd"],
     )
 
