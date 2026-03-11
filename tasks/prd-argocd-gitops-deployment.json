@@ -171,7 +171,7 @@
         "Two modes documented: tilt-only (default) and tilt+argocd"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: M. Depends on US-001 (ArgoCD install) and US-007 (Tiltfile)."
     },
@@ -188,7 +188,7 @@
         "monorepo/scripts/lint-charts.sh exists for local reproducibility"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Depends on US-005 (Helm charts must exist to lint)."
     },
@@ -205,7 +205,7 @@
         "Pipeline fails clearly on vulnerability threshold breach"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Effort: M. Depends on US-008 (CI pipeline). humanReview: true — security scanning configuration needs careful verification."
     },

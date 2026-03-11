@@ -56,6 +56,21 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json
 - Learnings: The repo has a Dockerfile.base pattern in monorepo/services/ that future services could extend. Release-please uses component field for tags in format <component>-vX.Y.Z.
 
+## US-009 - Add ArgoCD bootstrapping to Tiltfile
+- What was implemented: Dual-mode Tiltfile with config.define_bool("argocd"). ArgoCD mode: helm_resource for argo-cd v7.7.16, local_resource to apply Application manifests. Guard checks for existing ArgoCD Applications in tilt-only mode.
+- Files changed: monorepo/Tiltfile (updated)
+- Learnings: Guard uses kubectl get applications.argoproj.io with || true for graceful CRD absence handling.
+
+## US-010 - Helm chart linting and testing in CI
+- What was implemented: monorepo/scripts/lint-charts.sh (finds charts, skips library type, runs helm dependency update + lint + template for each env). Added helm-lint job to ci.yml with azure/setup-helm@v4, triggers on monorepo/deploy/ changes.
+- Files changed: monorepo/scripts/lint-charts.sh, .github/workflows/ci.yml
+- Learnings: Library charts (type: library) must be skipped for helm template. Change detection uses relative paths from working-directory.
+
+## US-011 - Image scanning and CycloneDX SBOM generation
+- What was implemented: Trivy scan step in post-release.yml (CRITICAL/HIGH, exit-code 1). CycloneDX SBOM generation + upload to GitHub Release. --scan flag added to build-image.sh for local Trivy scanning.
+- Files changed: .github/workflows/post-release.yml, monorepo/scripts/build-image.sh
+- Learnings: permissions.contents needs write for release asset uploads. Trivy action uses exit-code as string.
+
 ## US-007 - Set up Tiltfile for local development
 - What was implemented: monorepo/Tiltfile with docker_build + live_update, helm() rendering, k8s_resource port-forwarding, local_resource for tests/lint. Fixed during review: venv pip path (/opt/venv/bin/pip), added restart_container() for uvicorn reload.
 - Files changed: monorepo/Tiltfile
