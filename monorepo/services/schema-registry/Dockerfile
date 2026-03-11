@@ -38,7 +38,10 @@ RUN groupadd --gid 1000 app && \
 
 WORKDIR /app
 
-COPY main.py .
+RUN chown app:app /app
+
+COPY --chown=app:app main.py .
+RUN chmod u+w /app/main.py
 
 USER app
 
