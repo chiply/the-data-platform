@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: tdp
+  namespace: argocd
+spec:
+  description: The Data Platform project
+  sourceRepos:
+    - https://github.com/charlieholland/the-data-platform.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: tdp
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
