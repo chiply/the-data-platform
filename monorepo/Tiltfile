@@ -1,0 +1,107 @@
+# Tiltfile for The Data Platform — local development with k3d
+#
+# Prerequisites:
+#   - k3d cluster "tdp-local" running (see infra/ for setup)
+#   - Registry at k3d-tdp-local-registry:5111
+#
+# Usage:
+#   cd monorepo/
+#   tilt up
+#
+# IMPORTANT: Tilt and ArgoCD must never manage the same resources simultaneously.
+# ArgoCD should be disabled or paused for any namespace Tilt is managing.
+
+# ---------------------------------------------------------------------------
+# Cluster configuration
+# ---------------------------------------------------------------------------
+
+# Only allow Tilt to connect to the local k3d cluster — never production.
+allow_k8s_contexts("k3d-tdp-local")
+
+# Use the k3d local registry for image builds.
+default_registry("k3d-tdp-local-registry:5111")
+
+# ---------------------------------------------------------------------------
+# Schema Registry — docker_build with live_update
+# ---------------------------------------------------------------------------
+
+# live_update enables sub-second code syncing without full image rebuilds:
+#   - Python file changes are synced directly into the container. Uvicorn's
+#     --reload flag (set in values-local.yaml) picks them up automatically.
+#   - requirements.txt changes trigger pip install inside the container and
+#     then restart the process so new packages are available.
+#   - Dockerfile changes fall back to a full image rebuild.
+
+docker_build(
+    "schema-registry",
+    context="services/schema-registry",
+    dockerfile="services/schema-registry/Dockerfile",
+    live_update=[
+        # If the Dockerfile itself changes, do a full rebuild (no live update).
+        fall_back_on(["services/schema-registry/Dockerfile"]),
+
+        # Sync all files into the container's /app directory.
+        sync("services/schema-registry/", "/app/"),
+
+        # When requirements.txt changes, re-install dependencies and restart
+        # the process so new packages are loaded.
+        run(
+            "pip install --no-cache-dir -r /app/requirements.txt",
+            trigger=["services/schema-registry/requirements.txt"],
+        ),
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# Schema Registry — Helm chart
+# ---------------------------------------------------------------------------
+
+# Ensure Helm dependencies (common library chart) are up to date before
+# rendering the chart. This runs once at Tiltfile load time.
+local_resource(
+    "schema-registry-helm-deps",
+    cmd="helm dependency update deploy/charts/schema-registry",
+    deps=["deploy/charts/schema-registry/Chart.yaml"],
+    labels=["setup"],
+)
+
+k8s_yaml(
+    helm(
+        "deploy/charts/schema-registry",
+        name="schema-registry",
+        values=["deploy/charts/schema-registry/values-local.yaml"],
+    )
+)
+
+# ---------------------------------------------------------------------------
+# Schema Registry — k8s_resource configuration
+# ---------------------------------------------------------------------------
+
+k8s_resource(
+    "schema-registry",
+    port_forwards=["8000:8000"],
+    labels=["services"],
+    resource_deps=["schema-registry-helm-deps"],
+)
+
+# ---------------------------------------------------------------------------
+# Local resources — tests and linting
+# ---------------------------------------------------------------------------
+
+local_resource(
+    "schema-registry-test",
+    cmd="cd services/schema-registry && python -m pytest tests/ -v",
+    deps=["services/schema-registry/"],
+    labels=["test"],
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
+
+local_resource(
+    "schema-registry-lint",
+    cmd="cd services/schema-registry && python -m ruff check .",
+    deps=["services/schema-registry/"],
+    labels=["lint"],
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
