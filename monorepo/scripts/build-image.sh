@@ -20,11 +20,13 @@ Options:
   -p, --push              Push image to registry after build
   --cache-from CACHE      Docker cache-from spec (can be repeated)
   --cache-to CACHE        Docker cache-to spec (can be repeated)
+  -s, --scan              Run Trivy vulnerability scan and generate CycloneDX SBOM (requires trivy)
   -h, --help              Show this help message
 
 Examples:
   $(basename "$0") schema-registry
   $(basename "$0") -v 1.2.3 --push schema-registry
+  $(basename "$0") -v 1.2.3 --scan schema-registry
   $(basename "$0") -v 1.2.3 --cache-from type=gha --cache-to type=gha,mode=max schema-registry
 EOF
   exit 0
@@ -35,6 +37,7 @@ VERSION="dev"
 REGISTRY="ghcr.io"
 ORG=""
 PUSH=false
+SCAN=false
 CACHE_FROM_ARGS=()
 CACHE_TO_ARGS=()
 
@@ -55,6 +58,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -p|--push)
       PUSH=true
+      shift
+      ;;
+    -s|--scan)
+      SCAN=true
       shift
       ;;
     --cache-from)
@@ -150,3 +157,26 @@ BUILD_ARGS+=("${CONTEXT_DIR}")
 "${BUILD_ARGS[@]}"
 
 echo "Successfully built: ${IMAGE_TAG}"
+
+# ---------------------------------------------------------------------------
+# Optional: Trivy vulnerability scan and CycloneDX SBOM generation
+# ---------------------------------------------------------------------------
+
+if [ "$SCAN" = true ]; then
+  if ! command -v trivy &>/dev/null; then
+    echo "WARNING: trivy not found — skipping vulnerability scan and SBOM generation." >&2
+    echo "Install: https://aquasecurity.github.io/trivy/latest/getting-started/installation/"
+  else
+    echo ""
+    echo "Running Trivy vulnerability scan (CRITICAL/HIGH)..."
+    trivy image --severity CRITICAL,HIGH --exit-code 1 "${IMAGE_TAG}" || {
+      echo "ERROR: Trivy found CRITICAL/HIGH vulnerabilities in ${IMAGE_TAG}" >&2
+      exit 1
+    }
+
+    SBOM_FILE="sbom-${SERVICE_NAME}-${VERSION}.cdx.json"
+    echo "Generating CycloneDX SBOM: ${SBOM_FILE}"
+    trivy image --format cyclonedx --output "${SBOM_FILE}" "${IMAGE_TAG}"
+    echo "SBOM written to: ${SBOM_FILE}"
+  fi
+fi
