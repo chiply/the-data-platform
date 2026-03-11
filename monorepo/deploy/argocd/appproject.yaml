@@ -8,7 +8,7 @@ spec:
 
   # AC-1: sourceRepos restricted to platform GitHub repo only
   sourceRepos:
-    - "https://github.com/charlieholland/the-data-platform.git"
+    - "https://github.com/chiply/the-data-platform.git"
 
   # AC-2: destinations restricted to tdp namespace on in-cluster only
   destinations:

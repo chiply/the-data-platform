@@ -22,7 +22,7 @@ metadata:
 spec:
   project: tdp
   source:
-    repoURL: https://github.com/charlieholland/the-data-platform.git
+    repoURL: https://github.com/chiply/the-data-platform.git
     # Set this to your working branch
     targetRevision: ralph/argocd-gitops-deployment
     path: monorepo/deploy/charts/schema-registry
