@@ -1,6 +1,6 @@
 #+TITLE: 005 - ArgoCD GitOps Deployment & Local Development Workflow
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-10]
 #+LAST_MODIFIED: [2026-03-10]
@@ -439,9 +439,11 @@ This stub:
 
 Implementation tasks for ArgoCD + Tilt + sample service.
 
-** TODO [TDP-005-01] Install ArgoCD as Layer 2 platform service            :p1:
+** DONE [TDP-005-01] Install ArgoCD as Layer 2 platform service            :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Add ArgoCD Helm chart installation to =monorepo/infra/platform/=:
@@ -462,9 +464,11 @@ Add ArgoCD Helm chart installation to =monorepo/infra/platform/=:
 - Document that cluster teardown destroys all ArgoCD state (expected for
   ephemeral local clusters)
 
-** TODO [TDP-005-02] Create Helm chart for schema-registry stub            :p1:
+** DONE [TDP-005-02] Create Helm chart for schema-registry stub            :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/deploy/charts/schema-registry/= (depends on common library chart):
@@ -483,9 +487,11 @@ Create =monorepo/deploy/charts/schema-registry/= (depends on common library char
 - Decouple chart version from app version (=version= in Chart.yaml is independent
   of =appVersion=)
 
-** TODO [TDP-005-03] Create dummy schema-registry FastAPI service           :p1:
+** DONE [TDP-005-03] Create dummy schema-registry FastAPI service           :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/services/schema-registry/=:
@@ -494,9 +500,11 @@ Create =monorepo/services/schema-registry/=:
 - =requirements.txt= (fastapi, uvicorn)
 - Register in =release-please-config.json= and =.release-please-manifest.json=
 
-** TODO [TDP-005-04] Create ArgoCD Application manifests                    :p1:
+** DONE [TDP-005-04] Create ArgoCD Application manifests                    :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/deploy/argocd/=:
@@ -515,9 +523,11 @@ Create =monorepo/deploy/argocd/=:
   Application — not managed as Pulumi state
 - Document the promotion workflow (update image tag → commit → ArgoCD syncs)
 
-** TODO [TDP-005-05] Set up Tiltfile for local development                  :p1:
+** DONE [TDP-005-05] Set up Tiltfile for local development                  :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/Tiltfile=:
@@ -528,9 +538,11 @@ Create =monorepo/Tiltfile=:
 - =local_resource()= for running tests, linting
 - Point at local k3d cluster and registry
 
-** TODO [TDP-005-06] Add ArgoCD bootstrapping to Tiltfile                   :p2:
+** DONE [TDP-005-06] Add ArgoCD bootstrapping to Tiltfile                   :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Extend Tiltfile to optionally boot ArgoCD locally:
@@ -542,9 +554,11 @@ Extend Tiltfile to optionally boot ArgoCD locally:
 - Document the two modes: "tilt-only" (default) and "tilt+argocd" (for testing
   GitOps config)
 
-** TODO [TDP-005-07] CI pipeline for image builds                           :p1:
+** DONE [TDP-005-07] CI pipeline for image builds                           :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Update =post-release.yml= and create supporting scripts:
@@ -558,9 +572,11 @@ Update =post-release.yml= and create supporting scripts:
   local/CI parity (accepts service name, resolves Dockerfile path)
 - Use Bazel for code build/test, Docker for image build
 
-** TODO [TDP-005-08] End-to-end local validation                            :p2:
+** DONE [TDP-005-08] End-to-end local validation                            :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: manual
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Verify both local development modes end-to-end:
@@ -584,9 +600,11 @@ Verify both local development modes end-to-end:
 - Port usage documented: Traefik 80/443, ArgoCD UI 8080, Tilt UI 10350
 - Document in =monorepo/infra/README.md=
 
-** TODO [TDP-005-09] Environment promotion workflow documentation           :p2:
+** DONE [TDP-005-09] Environment promotion workflow documentation           :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Document the version promotion workflow:
@@ -603,29 +621,79 @@ Document the version promotion workflow:
   services are ArgoCD-managed. Follow-up: add probe support
   (liveness/readiness) to =ServiceDeployment= if it remains in use
 
-** TODO [TDP-005-10] Evaluate ApplicationSet for auto-discovery             :p3:
+** DONE [TDP-005-10] Evaluate ApplicationSet for auto-discovery             :p3:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: manual
+:COMPLETED_AT: [2026-03-10]
 :END:
 
-Investigate ArgoCD automation features for scaling beyond a few services:
+Investigate ArgoCD automation features for scaling beyond a few services.
 
-*ApplicationSet:*
-- Git generator scanning =monorepo/deploy/charts/*/= for Chart.yaml files
-- Automatic Application creation per chart directory
-- Evaluate whether this simplifies or complicates the workflow
-- If beneficial, replace individual Application manifests with ApplicationSet
+*** Evaluation: ApplicationSet with Git Generator
 
-*ArgoCD Image Updater:*
-- Watches container registries for new image tags matching a pattern
-- Automatically updates image tags in values files (write-back to Git)
-- Would automate the manual promotion step for dev environments
-- Adds operational complexity (registry polling, write-back strategies)
-- Only warranted when there are many services with frequent releases
+The Git generator would scan =monorepo/deploy/charts/*/= for =Chart.yaml=
+files and auto-create an Application per chart directory per environment.
 
-** TODO [TDP-005-11] Application secrets management strategy                :p1:
+*Pros:*
+- Zero boilerplate: adding a new chart directory auto-creates Applications
+- Consistent sync policies enforced via template (no copy-paste drift)
+- Scales well to 10+ services
+
+*Cons:*
+- Per-environment config is harder: dev uses =automated= sync with
+  =targetRevision: main=, production uses manual sync with a release tag.
+  ApplicationSet templates cannot easily express this divergence without
+  either (a) a matrix generator combining chart dirs × environments, which
+  requires an environment config file in each chart dir, or (b) multiple
+  ApplicationSets (one per environment), which defeats the simplicity gain
+- Production =targetRevision= is per-service (=schema-registry-v0.1.0=) and
+  changes on each promotion. ApplicationSet templates use static values —
+  a dynamic per-service revision requires a config file per chart that the
+  template reads, which is equivalent complexity to individual manifests
+- Library charts (=common/=) must be excluded (no =type: application= filter
+  in the Git generator — would need a path exclude or sentinel file)
+- Debugging: ApplicationSet-generated Applications are harder to reason
+  about than explicit manifests, especially during incident response
+- The platform currently has 1 service and expects ~5 (feed reader
+  components). Individual manifests are manageable at this scale
+
+*Decision:* Do not adopt ApplicationSet now. Re-evaluate when a third
+service is added or the boilerplate per service exceeds ~3 manifests.
+The ApplicationSet controller remains enabled in dev/production (already
+configured in =argocd.ts=) so it can be adopted without infra changes.
+
+*** Evaluation: ArgoCD Image Updater
+
+Image Updater watches container registries for new tags and automatically
+updates image references in Git (write-back) or in-memory (imperative).
+
+*Pros:*
+- Automates the dev promotion step (new image tag → auto-deploy)
+- Reduces the manual "update values file, commit, push" cycle
+
+*Cons:*
+- Write-back to Git creates automated commits that clutter history and
+  can conflict with human commits to the same values files
+- Imperative (non-write-back) mode breaks GitOps — the running state
+  diverges from Git, defeating the purpose of ArgoCD
+- Adds a new controller to manage, monitor, and debug
+- The current release-please → post-release → manual promotion flow is
+  explicit and auditable. The "update image tag, commit" step is
+  intentional friction that prevents accidental deployments
+- Registry polling adds latency and API rate limit concerns for ghcr.io
+- Not needed at current scale (1 service, infrequent releases)
+
+*Decision:* Do not adopt Image Updater. The manual promotion workflow is
+appropriate for a small team. Re-evaluate if release frequency exceeds
+~10/week across all services, at which point the manual step becomes
+a bottleneck rather than a safety valve
+
+** DONE [TDP-005-11] Application secrets management strategy                :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Define how application-level secrets flow into ArgoCD-managed deployments:
@@ -636,9 +704,11 @@ Define how application-level secrets flow into ArgoCD-managed deployments:
 - Document the pattern for adding new application secrets
 - Verify secrets are available before ArgoCD syncs application deployments
 
-** TODO [TDP-005-12] Create shared Helm library chart                       :p2:
+** DONE [TDP-005-12] Create shared Helm library chart                       :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/deploy/charts/common/= as a Helm library chart (=type: library=):
@@ -649,9 +719,11 @@ Create =monorepo/deploy/charts/common/= as a Helm library chart (=type: library=
 - Service charts depend on the library via =Chart.yaml= dependencies
 - Eliminates duplication as more services are added
 
-** TODO [TDP-005-13] Helm chart linting and testing in CI                   :p2:
+** DONE [TDP-005-13] Helm chart linting and testing in CI                   :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Add Helm chart validation to the CI pipeline:
@@ -661,9 +733,11 @@ Add Helm chart validation to the CI pipeline:
 - Run on PRs that touch =monorepo/deploy/=
 - Script in =monorepo/scripts/lint-charts.sh= for local reproducibility
 
-** TODO [TDP-005-14] Image scanning and CycloneDX SBOM generation          :p1:
+** DONE [TDP-005-14] Image scanning and CycloneDX SBOM generation          :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Add supply chain security to the image build pipeline (per =ARCHITECTURE.md=
@@ -674,9 +748,11 @@ CycloneDX standard):
 - Optionally push SBOM as OCI artifact alongside the image
 - Add to =post-release.yml= and =monorepo/scripts/build-image.sh=
 
-** TODO [TDP-005-15] ArgoCD RBAC and AppProject hardening                   :p2:
+** DONE [TDP-005-15] ArgoCD RBAC and AppProject hardening                   :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Harden ArgoCD access controls for production:
@@ -690,6 +766,22 @@ Harden ArgoCD access controls for production:
   to UI, inter-component traffic, egress to K8s API and GitHub)
 - Document that Flannel (k3d default) does not enforce NetworkPolicies
   locally — this is an accepted local/production parity gap
+
+** DONE [TDP-005-16] Platform UI access helper script                        :p2:
+:PROPERTIES:
+:EFFORT: S
+:COMPLETED_BY: claude
+:COMPLETED_AT: [2026-03-10]
+:END:
+
+Add a convenience script for accessing ArgoCD and Grafana UIs across all
+environments:
+- =monorepo/infra/scripts/ui-access.sh= — port-forwards and retrieves credentials
+- Local ArgoCD accessible via Traefik ingress (=argocd.localhost=); dev/production
+  use =kubectl port-forward= (same pattern as Grafana)
+- Update =CONTRIBUTING.md= with "Accessing Platform UIs" section
+- Update =_helpers.sh= =print_access_info= to reference the script and differentiate
+  local vs remote access patterns
 
 * Questions
 :PROPERTIES:
@@ -748,3 +840,9 @@ Re-evaluate in September 2026. Check Tilt's GitHub activity, release cadence,
 and Docker's commitment. If declining, DevSpace (CNCF Sandbox) is the top
 fallback — it attaches to existing deployments (including ArgoCD-managed ones)
 rather than owning the deployment lifecycle, making migration straightforward.
+
+* Changelog
+
+- *[2026-03-10]:* All 16 tasks completed. Design doc status → Complete
+- *[2026-03-10]:* Reconciled Ralph results — updated remaining tasks (TDP-005-08, TDP-005-10) to DONE
+- *[2026-03-10]:* Generated Ralph prd.json for autonomous execution (tasks/prd-argocd-gitops-deployment.json)

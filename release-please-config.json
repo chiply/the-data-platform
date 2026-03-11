@@ -7,6 +7,13 @@
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true
+    },
+    "monorepo/services/schema-registry": {
+      "release-type": "simple",
+      "component": "schema-registry",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
     }
   },
   "separate-pull-requests": false,

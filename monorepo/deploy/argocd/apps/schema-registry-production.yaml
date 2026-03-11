@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: schema-registry-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: tdp
+  source:
+    repoURL: https://github.com/chiply/the-data-platform.git
+    # Use a release tag for production — never track HEAD of main.
+    # Update this to the release tag when promoting (e.g., schema-registry-v0.1.0).
+    targetRevision: schema-registry-v0.1.0
+    path: monorepo/deploy/charts/schema-registry
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-production.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tdp
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

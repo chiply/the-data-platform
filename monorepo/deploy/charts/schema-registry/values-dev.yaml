@@ -1,0 +1,28 @@
+# Dev environment values for schema-registry.
+
+image:
+  repository: ghcr.io/chiply/the-data-platform/schema-registry
+  pullPolicy: IfNotPresent
+  # tag must be set to an explicit semver on each promotion.
+  # Do NOT use "latest" — ArgoCD cannot detect image changes with mutable tags.
+  tag: "0.1.0"
+
+imagePullSecrets:
+  - name: ghcr-credentials
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: schema-registry.dev.example.com
+      paths:
+        - path: /
+          pathType: Prefix

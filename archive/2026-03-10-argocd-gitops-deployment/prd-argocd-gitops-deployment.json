@@ -1,0 +1,249 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/argocd-gitops-deployment",
+  "description": "Introduce ArgoCD as the GitOps deployment engine for all services in The Data Platform, alongside Tilt for local development hot-reloading. ArgoCD manages the outer deployment loop (git commit → deploy) for dev/staging/production environments, while Tilt manages the inner development loop (code change → live reload) on a local k3d cluster. A dummy schema-registry service serves as the first ArgoCD-managed deployment to validate the entire pipeline end-to-end.",
+  "sourceDesignDoc": "docs/design/005-argocd-gitops-deployment.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-005-01",
+      "title": "Install ArgoCD as Layer 2 platform service",
+      "description": "As a platform engineer, I want ArgoCD installed as a Layer 2 platform service so that it can manage Layer 3 application deployments via GitOps.\n\nAdd ArgoCD Helm chart installation to monorepo/infra/platform/:\n- Install argo-cd Helm chart (pin specific version) into argocd namespace using helm.v3.Release (matching cert-manager/monitoring pattern)\n- Non-HA mode for local/dev\n- Create ArgoCD Pulumi component in monorepo/infra/platform/charts/argocd.ts\n- Use resourceTier pattern: \"minimal\" preset (~400 Mi total requests)\n- Disable Dex, ApplicationSet controller, and Notifications controller for local to save ~200 Mi memory\n- Configure repo credentials via Pulumi ESC (argocd:repoUrl, argocd:sshPrivateKey as fn::secret); skip for local (uses file:// URL)\n- Configure repo-server for monorepo: shallow clones, sparse checkout (only monorepo/deploy/), server.repo.cache.expiration for disk management\n- Expose ArgoCD UI via Traefik ingress (argocd.localhost locally)\n- Update local-up.sh and local-down.sh scripts\n- Document minimum 6 GB Docker memory allocation in prerequisites\n- Document that cluster teardown destroys all ArgoCD state (expected for ephemeral local clusters)",
+      "acceptanceCriteria": [
+        "ArgoCD Pulumi component exists at monorepo/infra/platform/charts/argocd.ts",
+        "ArgoCD installs into argocd namespace via helm.v3.Release",
+        "Dex, ApplicationSet controller, and Notifications controller are disabled for local",
+        "Repo credentials configured via Pulumi ESC with fn::secret",
+        "Repo-server configured for monorepo efficiency (shallow clones, sparse checkout)",
+        "ArgoCD UI exposed via Traefik ingress at argocd.localhost",
+        "local-up.sh and local-down.sh updated for ArgoCD lifecycle",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: M. Follows existing cert-manager/monitoring Helm chart pattern in monorepo/infra/platform/."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-005-03",
+      "title": "Create dummy schema-registry FastAPI service",
+      "description": "As a platform engineer, I want a minimal schema-registry FastAPI service so that I have a concrete deployment target to validate the full GitOps pipeline end-to-end.\n\nCreate monorepo/services/schema-registry/:\n- Minimal FastAPI app with /health, /schemas, /schemas/{name} endpoints\n- Dockerfile (multi-stage build, Python 3.12 slim base)\n- requirements.txt (fastapi, uvicorn)\n- Register in release-please-config.json and .release-please-manifest.json",
+      "acceptanceCriteria": [
+        "FastAPI app exists at monorepo/services/schema-registry/main.py",
+        "/health endpoint returns {\"status\": \"healthy\"}",
+        "/schemas endpoint returns {\"schemas\": []}",
+        "/schemas/{name} endpoint returns stub response",
+        "Multi-stage Dockerfile exists with Python 3.12 slim base",
+        "requirements.txt includes fastapi and uvicorn",
+        "Service registered in release-please-config.json and .release-please-manifest.json"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S. Simple stub service — the goal is pipeline validation, not real functionality."
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-005-12",
+      "title": "Create shared Helm library chart",
+      "description": "As a platform engineer, I want a shared Helm library chart so that service charts can reuse common templates and maintain consistent conventions.\n\nCreate monorepo/deploy/charts/common/ as a Helm library chart (type: library):\n- Common templates: _deployment.tpl, _service.tpl, _ingress.tpl\n- Shared helpers: consistent app.kubernetes.io/* labels, naming conventions\n- Standard security context defaults (runAsNonRoot, readOnlyRootFilesystem)\n- Standard health probe templates (liveness, readiness, startup)\n- Service charts depend on the library via Chart.yaml dependencies",
+      "acceptanceCriteria": [
+        "Library chart exists at monorepo/deploy/charts/common/ with type: library in Chart.yaml",
+        "Common templates exist: _deployment.tpl, _service.tpl, _ingress.tpl, _helpers.tpl",
+        "Templates produce consistent app.kubernetes.io/* labels",
+        "Security context defaults include runAsNonRoot and readOnlyRootFilesystem",
+        "Health probe templates cover liveness, readiness, and startup probes",
+        "helm lint passes on the library chart"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: M. Elevated from p2 to priority 1 because TDP-005-02 (schema-registry Helm chart) depends on it."
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-005-11",
+      "title": "Application secrets management strategy",
+      "description": "As a platform engineer, I want a clear pattern for flowing application-level secrets into ArgoCD-managed deployments so that services can securely access credentials without storing them in Git.\n\nDefine how application-level secrets flow into ArgoCD-managed deployments:\n- Store secrets in Pulumi ESC with fn::secret\n- Pulumi creates K8s Secrets in application namespaces during platform bootstrap (Layer 2 concern — Pulumi owns the Secret objects, ArgoCD does not)\n- Helm charts reference secrets via secretKeyRef in env vars or volume mounts\n- Document the pattern for adding new application secrets\n- Verify secrets are available before ArgoCD syncs application deployments",
+      "acceptanceCriteria": [
+        "Pulumi code creates K8s Secrets in tdp namespace from ESC secrets",
+        "Helm chart values support secretKeyRef references for environment variables",
+        "Documentation exists for the pattern of adding new application secrets",
+        "Secrets are created during platform bootstrap (before ArgoCD syncs apps)",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: M. Builds on existing Pulumi ESC infrastructure from commit ba99cf1."
+    },
+    {
+      "id": "US-005",
+      "sourceTaskId": "TDP-005-02",
+      "title": "Create Helm chart for schema-registry stub",
+      "description": "As a platform engineer, I want a Helm chart for the schema-registry service so that it can be deployed consistently across local, dev, and production environments.\n\nCreate monorepo/deploy/charts/schema-registry/ (depends on common library chart):\n- Chart.yaml (with dependency on common library chart), values.yaml, values.schema.json, per-environment value files, .helmignore\n- Templates: Deployment, Service, ServiceAccount, ConfigMap, Ingress, NOTES.txt\n- Health probes: liveness on /health (httpGet, port 8000, initialDelaySeconds: 5, periodSeconds: 10), readiness (initialDelaySeconds: 3, periodSeconds: 5), startupProbe for slow starts\n- Security context: runAsNonRoot: true, readOnlyRootFilesystem: true\n- Image tag parameterized: image.repository + image.tag\n- imagePullSecrets support for private registries (ghcr.io in production)\n- Helm test hooks in templates/tests/test-connection.yaml\n- Decouple chart version from app version",
+      "acceptanceCriteria": [
+        "Chart exists at monorepo/deploy/charts/schema-registry/ with Chart.yaml depending on common library",
+        "values.yaml, values.schema.json, values-local.yaml, values-dev.yaml, values-production.yaml exist",
+        "Templates include Deployment, Service, ServiceAccount, ConfigMap, Ingress, NOTES.txt",
+        "Health probes configured: liveness on /health:8000, readiness, startup",
+        "Security context sets runAsNonRoot and readOnlyRootFilesystem",
+        "Image tag parameterized via image.repository and image.tag",
+        "imagePullSecrets configurable for private registries",
+        "Helm test hook exists at templates/tests/test-connection.yaml",
+        "helm lint passes",
+        "helm template renders valid YAML for each environment values file"
+      ],
+      "priority": 2,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Effort: M. Depends on US-003 (common library chart). humanReview: true — major deliverable, verify chart structure and template correctness."
+    },
+    {
+      "id": "US-006",
+      "sourceTaskId": "TDP-005-04",
+      "title": "Create ArgoCD Application manifests",
+      "description": "As a platform engineer, I want ArgoCD Application CRDs so that ArgoCD can manage schema-registry deployments across environments.\n\nCreate monorepo/deploy/argocd/:\n- appproject.yaml — TDP AppProject with explicit restrictions (sourceRepos: only platform GitHub repo, destinations: only tdp namespace, clusterResourceWhitelist: deny cluster-scoped resources)\n- apps/schema-registry.yaml — Application CRD with finalizers, syncOptions (CreateNamespace=true, ServerSideApply=true), retry policy (limit: 5, exponential backoff), targetRevision: main for dev\n- Per-environment sync policies: automated prune+selfHeal for dev, manual for production\n- Document the promotion workflow (update image tag → commit → ArgoCD syncs)",
+      "acceptanceCriteria": [
+        "AppProject manifest exists at monorepo/deploy/argocd/appproject.yaml",
+        "AppProject restricts sourceRepos to platform GitHub repo only",
+        "AppProject restricts destinations to tdp namespace",
+        "Application manifest exists at monorepo/deploy/argocd/apps/schema-registry.yaml",
+        "Application has resources-finalizer.argocd.argoproj.io finalizer",
+        "syncOptions include CreateNamespace=true and ServerSideApply=true",
+        "Retry policy configured with limit 5 and exponential backoff",
+        "Dev uses automated sync with prune and selfHeal",
+        "Production uses manual sync without auto-prune"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S. Depends on US-005 (schema-registry Helm chart must exist for Application to reference)."
+    },
+    {
+      "id": "US-007",
+      "sourceTaskId": "TDP-005-05",
+      "title": "Set up Tiltfile for local development",
+      "description": "As a developer, I want a Tiltfile for local development so that I can make code changes and see them reflected in running pods within seconds.\n\nCreate monorepo/Tiltfile:\n- docker_build() for schema-registry with live_update (sync Python files, restart uvicorn on dependency changes)\n- helm() to render the schema-registry Helm chart with values-local.yaml\n- k8s_resource() for port-forwarding, log streaming, readiness\n- local_resource() for running tests, linting\n- Point at local k3d cluster and registry",
+      "acceptanceCriteria": [
+        "Tiltfile exists at monorepo/Tiltfile",
+        "docker_build() configured for schema-registry with live_update",
+        "helm() renders schema-registry chart with values-local.yaml",
+        "k8s_resource() configures port-forwarding and readiness",
+        "local_resource() defined for test and lint tasks",
+        "Tiltfile points at local k3d cluster and k3d-tdp-local-registry"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Effort: M. Depends on US-005 (Helm chart) and US-002 (FastAPI service). humanReview: true — Tiltfile is complex with many moving parts."
+    },
+    {
+      "id": "US-008",
+      "sourceTaskId": "TDP-005-07",
+      "title": "CI pipeline for image builds",
+      "description": "As a platform engineer, I want a CI pipeline that builds and publishes container images on release so that ArgoCD can deploy versioned images to environments.\n\nUpdate post-release.yml and create supporting scripts:\n- Build service images on release: [published] event (not on every push)\n- Tag with semver version from release; remove or restrict latest tag\n- Add Docker layer caching (cache-from: type=gha, cache-to: type=gha,mode=max)\n- Create monorepo/scripts/build-image.sh — called by post-release.yml for local/CI parity (accepts service name, resolves Dockerfile path)\n- Use Bazel for code build/test, Docker for image build",
+      "acceptanceCriteria": [
+        "post-release.yml builds container images on release published event",
+        "Images tagged with semver version from release (no latest in production)",
+        "Docker layer caching configured with GitHub Actions cache",
+        "monorepo/scripts/build-image.sh exists and is called by post-release.yml",
+        "build-image.sh accepts service name and resolves Dockerfile path",
+        "Pipeline is reproducible locally via build-image.sh"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Effort: M. Depends on US-002 (FastAPI service with Dockerfile). humanReview: true — CI pipeline changes need careful review."
+    },
+    {
+      "id": "US-009",
+      "sourceTaskId": "TDP-005-06",
+      "title": "Add ArgoCD bootstrapping to Tiltfile",
+      "description": "As a developer, I want to optionally boot ArgoCD in my local k3d cluster so that I can test ArgoCD Application manifests and GitOps configuration locally.\n\nExtend Tiltfile to optionally boot ArgoCD locally:\n- helm_resource() for ArgoCD Helm chart (disabled by default, enable via tilt up -- --argocd)\n- local_resource() to apply ArgoCD Application manifests on file change\n- When ArgoCD mode is active, Tilt manages ArgoCD but ArgoCD manages the app (Tilt's docker_build is disabled; ArgoCD pulls from registry)\n- Document the two modes: \"tilt-only\" (default) and \"tilt+argocd\" (for testing GitOps config)\n- Include guard that detects running ArgoCD Application resources and warns/exits before taking direct ownership",
+      "acceptanceCriteria": [
+        "helm_resource() for ArgoCD Helm chart in Tiltfile, disabled by default",
+        "ArgoCD mode enabled via tilt up -- --argocd flag",
+        "local_resource() applies ArgoCD Application manifests on file change",
+        "In ArgoCD mode, docker_build is disabled and ArgoCD manages app deployments",
+        "Guard prevents concurrent Tilt and ArgoCD ownership of same resources",
+        "Two modes documented: tilt-only (default) and tilt+argocd"
+      ],
+      "priority": 4,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: M. Depends on US-001 (ArgoCD install) and US-007 (Tiltfile)."
+    },
+    {
+      "id": "US-010",
+      "sourceTaskId": "TDP-005-13",
+      "title": "Helm chart linting and testing in CI",
+      "description": "As a platform engineer, I want Helm chart validation in CI so that chart errors are caught before merge.\n\nAdd Helm chart validation to the CI pipeline:\n- helm lint on all charts in monorepo/deploy/charts/*/\n- helm template renders valid YAML for each environment's value files\n- Values schema validation (values.schema.json)\n- Run on PRs that touch monorepo/deploy/\n- Script in monorepo/scripts/lint-charts.sh for local reproducibility",
+      "acceptanceCriteria": [
+        "CI runs helm lint on all charts in monorepo/deploy/charts/",
+        "CI runs helm template for each environment values file",
+        "values.schema.json validation runs in CI",
+        "Chart validation triggers on PRs touching monorepo/deploy/",
+        "monorepo/scripts/lint-charts.sh exists for local reproducibility"
+      ],
+      "priority": 4,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S. Depends on US-005 (Helm charts must exist to lint)."
+    },
+    {
+      "id": "US-011",
+      "sourceTaskId": "TDP-005-14",
+      "title": "Image scanning and CycloneDX SBOM generation",
+      "description": "As a platform engineer, I want image vulnerability scanning and SBOM generation so that the supply chain security meets ARCHITECTURE.md standards.\n\nAdd supply chain security to the image build pipeline:\n- Trivy image vulnerability scanning — fail build on CRITICAL/HIGH CVEs\n- CycloneDX SBOM generation for each image\n- Attach SBOM to GitHub Release as artifact\n- Optionally push SBOM as OCI artifact alongside the image\n- Add to post-release.yml and monorepo/scripts/build-image.sh",
+      "acceptanceCriteria": [
+        "Trivy scans images in post-release.yml and fails on CRITICAL/HIGH CVEs",
+        "CycloneDX SBOM generated for each image",
+        "SBOM attached to GitHub Release as artifact",
+        "Scanning and SBOM generation integrated into monorepo/scripts/build-image.sh",
+        "Pipeline fails clearly on vulnerability threshold breach"
+      ],
+      "priority": 4,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Effort: M. Depends on US-008 (CI pipeline). humanReview: true — security scanning configuration needs careful verification."
+    },
+    {
+      "id": "US-012",
+      "sourceTaskId": "TDP-005-15",
+      "title": "ArgoCD RBAC and AppProject hardening",
+      "description": "As a platform engineer, I want hardened ArgoCD access controls so that production deployments follow the principle of least privilege.\n\nHarden ArgoCD access controls:\n- AppProject sourceRepos restricted to platform GitHub repo only\n- AppProject destinations restricted to tdp namespace and cluster\n- clusterResourceWhitelist / namespaceResourceWhitelist to prevent deploying cluster-scoped resources\n- ArgoCD ClusterRole scoped to only managed namespaces (not cluster-admin in production)\n- Baseline NetworkPolicies for argocd namespace (allow Traefik ingress to UI, inter-component traffic, egress to K8s API and GitHub)\n- Document that Flannel (k3d default) does not enforce NetworkPolicies locally",
+      "acceptanceCriteria": [
+        "AppProject sourceRepos restricted to platform GitHub repo",
+        "AppProject destinations restricted to tdp namespace",
+        "clusterResourceWhitelist denies cluster-scoped resources by default",
+        "ArgoCD ClusterRole scoped to managed namespaces only",
+        "NetworkPolicies exist for argocd namespace",
+        "Documentation notes Flannel does not enforce NetworkPolicies locally"
+      ],
+      "priority": 5,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S. Some overlap with US-006 AppProject restrictions — this story hardens beyond the initial setup."
+    },
+    {
+      "id": "US-013",
+      "sourceTaskId": "TDP-005-09",
+      "title": "Environment promotion workflow documentation",
+      "description": "As a developer, I want clear documentation of the version promotion workflow so that I can confidently deploy and roll back services across environments.\n\nDocument the version promotion workflow:\n- How release-please creates tags and triggers image builds\n- How to promote a version to dev (update values-dev.yaml image tag)\n- How to promote to production (update values-production.yaml image tag)\n- How ArgoCD detects and syncs the change\n- Rollback procedure (revert the values file commit; verify previous image version still exists in registry)\n- ServiceDeployment component deprecation path: document that it is no longer used for Layer 3 services once ArgoCD takes over",
+      "acceptanceCriteria": [
+        "Documentation covers release-please → image build → promotion flow",
+        "Dev promotion procedure documented (values-dev.yaml update)",
+        "Production promotion procedure documented (values-production.yaml update)",
+        "Rollback procedure documented with image registry verification step",
+        "ServiceDeployment deprecation note added to monorepo/infra/components/service-deployment.ts",
+        "Documentation lives in monorepo/deploy/README.md or monorepo/infra/README.md"
+      ],
+      "priority": 5,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S."
+    }
+  ]
+}

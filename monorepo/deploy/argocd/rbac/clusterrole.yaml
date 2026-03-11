@@ -1,0 +1,21 @@
+# ArgoCD ClusterRole — cluster-scoped read-only permissions only.
+#
+# This ClusterRole grants ONLY namespace read access so ArgoCD can verify
+# destination namespaces exist. All resource management permissions are
+# handled by the namespace-scoped Role in namespace-role.yaml.
+#
+# This replaces the default cluster-admin binding that ArgoCD ships with.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-managed-namespaces
+  labels:
+    app.kubernetes.io/part-of: argocd
+rules:
+  # Read access to namespaces so ArgoCD can verify destination namespaces exist.
+  # Note: resourceNames filtering does not apply to list/watch verbs in K8s RBAC,
+  # but we include it for documentation intent. The actual namespace restriction
+  # is enforced by the AppProject destinations configuration.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]

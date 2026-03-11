@@ -1,0 +1,114 @@
+# Ralph Progress Log
+Started: 2026-03-10
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-argocd-gitops-deployment.json
+
+## Codebase Patterns
+
+### Pulumi Helm Chart Pattern
+- Charts installed in monorepo/infra/platform/charts/<name>.ts
+- Use k8s.helm.v3.Release with pinned chart version
+- resourceTier pattern: "minimal" and "standard" presets with per-component CPU/memory
+- Config read via `new pulumi.Config()`, tier via `config.get("resourceTier") || "minimal"`
+- Each chart component (e.g., cert-manager has controller/webhook/cainjector) gets its own resource spec
+
+### Pulumi ESC Pattern
+- Local: no ESC, no secrets needed
+- Dev/Production: import ESC environment in Pulumi.<env>.yaml via `environment: [tdp/<env>]`
+- Secrets referenced via `config.requireSecret("<key>")`
+- ESC environments at chiply-org/tdp/<env>
+
+### Infrastructure Scripts
+- monorepo/infra/scripts/_helpers.sh provides reusable functions
+- local-up.sh: validates prerequisites, deploys cluster then platform via pulumi up --stack local --yes
+- local-down.sh: destroys platform then cluster in reverse order
+- Kubeconfig exported to ~/.kube/tdp-local.yaml
+
+### Post-Release Pipeline
+- Triggers on release: [published] event
+- Parses tag format: <component>-vMAJOR.MINOR.PATCH
+- Uses jq to resolve component path from release-please-config.json
+- Builds + pushes to ghcr.io/<repo>/<component>:<version> and :latest
+
+### Release-Please Config
+- release-please-config.json: packages map path → component name
+- .release-please-manifest.json: tracks current versions
+- Currently only "monorepo" → "platform" at v0.1.4
+
+### ServiceDeployment Component
+- monorepo/infra/components/service-deployment.ts
+- Creates Deployment + Service + optional Ingress
+- Uses app.kubernetes.io/* labels, traefik ingress class
+- Being superseded by ArgoCD for Layer 3 services
+
+### Stack Config Pattern
+- Local: config via Pulumi.local.yaml (no environment import)
+- Dev/Prod: environment import + config overrides in Pulumi.<env>.yaml
+- Platform references cluster via clusterStackRef
+
+## US-001 - Install ArgoCD as Layer 2 platform service
+- What was implemented: ArgoCD Pulumi component at monorepo/infra/platform/charts/argocd.ts. Installs argo-cd Helm chart v7.7.16 into argocd namespace. Resource tier presets (minimal/standard). Dex/ApplicationSet/Notifications disabled. Repo credentials via ESC. Repo-server with shallow clones. ArgoCD UI via Traefik at argocd.localhost. Updated local-up.sh with 6GB Docker memory check.
+- Files changed: monorepo/infra/platform/charts/argocd.ts, index.ts, Pulumi.dev.yaml, Pulumi.production.yaml, local-up.sh, _helpers.sh
+- Learnings: local-down.sh needs no changes (ArgoCD is part of platform stack). argo-cd chart name (not argocd) from argoproj.github.io/argo-helm. ArgoCD server needs --insecure behind reverse proxy. Uses separate `argocd` config namespace.
+
+## US-002 - Create dummy schema-registry FastAPI service
+- What was implemented: Minimal FastAPI stub service at monorepo/services/schema-registry/ with three endpoints (/health, /schemas, /schemas/{name}), a multi-stage Dockerfile using Python 3.12 slim, requirements.txt with fastapi and uvicorn, and registration in release-please config/manifest.
+- Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json
+- Learnings: The repo has a Dockerfile.base pattern in monorepo/services/ that future services could extend. Release-please uses component field for tags in format <component>-vX.Y.Z.
+
+## US-009 - Add ArgoCD bootstrapping to Tiltfile
+- What was implemented: Dual-mode Tiltfile with config.define_bool("argocd"). ArgoCD mode: helm_resource for argo-cd v7.7.16, local_resource to apply Application manifests. Guard checks for existing ArgoCD Applications in tilt-only mode.
+- Files changed: monorepo/Tiltfile (updated)
+- Learnings: Guard uses kubectl get applications.argoproj.io with || true for graceful CRD absence handling.
+
+## US-010 - Helm chart linting and testing in CI
+- What was implemented: monorepo/scripts/lint-charts.sh (finds charts, skips library type, runs helm dependency update + lint + template for each env). Added helm-lint job to ci.yml with azure/setup-helm@v4, triggers on monorepo/deploy/ changes.
+- Files changed: monorepo/scripts/lint-charts.sh, .github/workflows/ci.yml
+- Learnings: Library charts (type: library) must be skipped for helm template. Change detection uses relative paths from working-directory.
+
+## US-011 - Image scanning and CycloneDX SBOM generation
+- What was implemented: Trivy scan step in post-release.yml (CRITICAL/HIGH, exit-code 1). CycloneDX SBOM generation + upload to GitHub Release. --scan flag added to build-image.sh for local Trivy scanning.
+- Files changed: .github/workflows/post-release.yml, monorepo/scripts/build-image.sh
+- Learnings: permissions.contents needs write for release asset uploads. Trivy action uses exit-code as string.
+
+## US-007 - Set up Tiltfile for local development
+- What was implemented: monorepo/Tiltfile with docker_build + live_update, helm() rendering, k8s_resource port-forwarding, local_resource for tests/lint. Fixed during review: venv pip path (/opt/venv/bin/pip), added restart_container() for uvicorn reload.
+- Files changed: monorepo/Tiltfile
+- Learnings: Dockerfile venv path must match live_update pip path. restart_container() needed when image CMD doesn't include --reload.
+
+## US-008 - CI pipeline for image builds
+- What was implemented: monorepo/scripts/build-image.sh (standalone, resolves Dockerfile from release-please-config.json, supports --version/--push/--cache-from/--cache-to). Updated post-release.yml to call build-image.sh with GHA layer caching. No :latest tag.
+- Files changed: monorepo/scripts/build-image.sh, .github/workflows/post-release.yml
+- Learnings: docker buildx build with --load locally vs --push in CI. jq component lookup pattern reusable across scripts.
+
+## US-006 - Create ArgoCD Application manifests
+- What was implemented: AppProject (sourceRepos restricted, destinations to tdp namespace, empty clusterResourceWhitelist). Dev Application with automated prune+selfHeal. Production Application with manual sync (no automated block). Both have finalizers, CreateNamespace=true, ServerSideApply=true, retry limit 5 with exponential backoff.
+- Files changed: monorepo/deploy/argocd/appproject.yaml, apps/schema-registry.yaml, apps/schema-registry-production.yaml
+- Learnings: Production manual sync = omit `automated` block entirely. Empty clusterResourceWhitelist denies all cluster-scoped resources.
+
+## US-005 - Create Helm chart for schema-registry stub
+- What was implemented: Complete Helm chart at monorepo/deploy/charts/schema-registry/ with common library dependency. All templates (Deployment, Service, ServiceAccount, ConfigMap, Ingress, NOTES.txt), health probes, security context, per-environment values files, values.schema.json, test hook.
+- Files changed: 16 files in monorepo/deploy/charts/schema-registry/
+- Learnings: Common library uses `include` with `nindent`. `helm dependency update` creates Chart.lock and charts/*.tgz. ServiceAccount not in common library — service-specific template needed.
+
+## US-004 - Application secrets management strategy
+- What was implemented: Created monorepo/infra/platform/app-secrets.ts creating tdp namespace and K8s Secrets (tdp-db-credentials, tdp-app-credentials) from Pulumi config/ESC. Wired into index.ts before platform charts. Updated Pulumi.dev.yaml and Pulumi.production.yaml. Created monorepo/infra/docs/app-secrets.md.
+- Files changed: app-secrets.ts, index.ts, tsconfig.json, Pulumi.dev.yaml, Pulumi.production.yaml, docs/app-secrets.md
+- Learnings: config.get()/config.requireSecret() pattern for optional-in-local, required-in-prod secrets. tsconfig.json uses explicit `files` array so new .ts files must be added.
+
+## US-003 - Create shared Helm library chart
+- What was implemented: Helm library chart at monorepo/deploy/charts/common/ with _helpers.tpl, _deployment.tpl, _service.tpl, _ingress.tpl. Consistent app.kubernetes.io/* labels, security context defaults (runAsNonRoot, readOnlyRootFilesystem), configurable health probes.
+- Files changed: monorepo/deploy/charts/common/ (Chart.yaml, values.yaml, templates/_helpers.tpl, _deployment.tpl, _service.tpl, _ingress.tpl)
+- Learnings: Library charts use `define` blocks called via `include`. Consuming charts add dependency in Chart.yaml and call templates like `{{ include "common.deployment" . }}`.
+
+## US-012 - ArgoCD RBAC and AppProject hardening
+- What was implemented: Enhanced AppProject with explicit namespaceResourceWhitelist (16 resource types), orphanedResources warning. K8s RBAC manifests: ClusterRole/ClusterRoleBinding for ArgoCD controller, namespace-scoped Role for tdp namespace. NetworkPolicies: default-deny ingress/egress, allow-traefik-ingress, allow-inter-component, allow-egress-kube-api, allow-egress-github. README documenting RBAC and NetworkPolicy setup.
+- Files changed: monorepo/deploy/argocd/appproject.yaml (enhanced), rbac/clusterrole.yaml, rbac/clusterrolebinding.yaml, rbac/namespace-role.yaml, network-policies/default-deny.yaml, network-policies/allow-traefik-ingress.yaml, network-policies/allow-inter-component.yaml, network-policies/allow-egress-kube-api.yaml, network-policies/allow-egress-github.yaml, README.md
+- Learnings: Empty clusterResourceWhitelist denies all cluster-scoped resources. Flannel (k3d default CNI) does not enforce NetworkPolicies — documented for local dev awareness. Merge conflict resolved: kept US-012's detailed resource whitelist with US-006's `tdp` project name.
+
+## US-013 - Environment promotion workflow documentation
+- What was implemented: Comprehensive monorepo/deploy/README.md documenting the full promotion workflow: release-please creates releases → post-release CI builds + pushes images → update values-<env>.yaml image tag → ArgoCD syncs. Includes rollback procedures, local development notes, and ArgoCD dashboard usage. Deprecated service-deployment.ts with @deprecated JSDoc.
+- Files changed: monorepo/deploy/README.md, monorepo/infra/components/service-deployment.ts
+- Learnings: ArgoCD rollback via `argocd app history` + `argocd app rollback`. Promotion is git-based: update image tag in values file, commit, push.
+
+---

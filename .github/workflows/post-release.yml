@@ -4,14 +4,17 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
   build-container:
     name: Build Container Image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      component: ${{ steps.parse.outputs.component }}
+      version: ${{ steps.parse.outputs.version }}
+      has-dockerfile: ${{ steps.dockerfile.outputs.exists }}
     steps:
       - uses: actions/checkout@v4
 
@@ -88,10 +91,63 @@ jobs:
 
       - name: Build and push container image
         if: steps.dockerfile.outputs.exists == 'true'
-        uses: docker/build-push-action@v6
+        run: |
+          ./monorepo/scripts/build-image.sh \
+            --version "${{ steps.parse.outputs.version }}" \
+            --registry ghcr.io \
+            --org "${{ github.repository }}" \
+            --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            "${{ steps.parse.outputs.component }}"
+        # NOTE: Latest tag is intentionally omitted. ArgoCD deployments
+        # should reference explicit semver tags for reproducibility.
+        # If a latest tag is needed for development, add a separate
+        # docker tag command here.
+
+      - name: Trivy vulnerability scan
+        if: steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@0.34.2
         with:
-          context: ${{ steps.resolve.outputs.path }}
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
-            ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:latest
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Generate CycloneDX SBOM
+        if: always() && steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
+          format: cyclonedx
+          output: sbom-${{ steps.parse.outputs.component }}-${{ steps.parse.outputs.version }}.cdx.json
+
+      - name: Upload SBOM artifact
+        if: always() && steps.dockerfile.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom-${{ steps.parse.outputs.component }}-${{ steps.parse.outputs.version }}.cdx.json
+
+  upload-sbom:
+    name: Upload SBOM to Release
+    needs: build-container
+    if: always() && needs.build-container.outputs.has-dockerfile == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom
+
+      - name: Upload SBOM to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "sbom-${{ needs.build-container.outputs.component }}-${{ needs.build-container.outputs.version }}.cdx.json" \
+            --clobber \
+            --repo "${{ github.repository }}"

@@ -1,0 +1,36 @@
+# Allow ArgoCD components egress on ports 443 and 6443 (K8s API).
+#
+# WARNING: This policy allows egress to ANY destination on these ports,
+# not just the K8s API server. For tighter control, use ipBlock with the
+# API server's ClusterIP (kubectl get svc kubernetes -o jsonpath='{.spec.clusterIP}').
+#
+# NOTE: Flannel (the default CNI in k3d) does NOT enforce NetworkPolicies.
+# See default-deny.yaml for details on the local/production parity gap.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-kube-api
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: argocd
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution (required for all egress policies)
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow traffic to the Kubernetes API server
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443

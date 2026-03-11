@@ -1,0 +1,15 @@
+schema-registry has been deployed.
+
+Release: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+{{- if and .Values.ingress .Values.ingress.enabled }}
+Ingress is enabled. Access the service at:
+{{- range (.Values.ingress.hosts | default list) }}
+  http://{{ .host }}
+{{- end }}
+{{- else }}
+To access the service, use port-forward:
+  kubectl port-forward svc/{{ include "common.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+  Then visit: http://localhost:{{ .Values.service.port }}/health
+{{- end }}
