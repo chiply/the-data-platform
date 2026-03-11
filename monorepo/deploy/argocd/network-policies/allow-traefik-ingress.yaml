@@ -1,0 +1,28 @@
+# Allow Traefik ingress controller to reach argocd-server on port 8080.
+#
+# NOTE: Flannel (the default CNI in k3d) does NOT enforce NetworkPolicies.
+# See default-deny.yaml for details on the local/production parity gap.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-to-argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080

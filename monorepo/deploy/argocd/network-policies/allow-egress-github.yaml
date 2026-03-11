@@ -1,0 +1,39 @@
+# Allow ArgoCD repo-server to reach GitHub for repository sync.
+#
+# Permits egress to GitHub on:
+# - Port 443 (HTTPS) for HTTPS-based git operations
+# - Port 22 (SSH) for SSH-based git operations
+#
+# NOTE: Flannel (the default CNI in k3d) does NOT enforce NetworkPolicies.
+# See default-deny.yaml for details on the local/production parity gap.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-github
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: argocd
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution (required for resolving github.com)
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow HTTPS to GitHub
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow SSH to GitHub
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 22
