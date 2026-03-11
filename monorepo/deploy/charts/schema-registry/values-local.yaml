@@ -1,0 +1,17 @@
+# Local development values for schema-registry (k3d cluster).
+
+image:
+  repository: k3d-tdp-local-registry:5111/schema-registry
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+
+ingress:
+  enabled: true
+  className: traefik
+  hosts:
+    - host: schema-registry.localhost
+      paths:
+        - path: /
+          pathType: Prefix

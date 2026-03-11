@@ -1,0 +1,28 @@
+# Production environment values for schema-registry.
+
+image:
+  repository: ghcr.io/charlieholland/tdp-schema-registry
+  pullPolicy: IfNotPresent
+  # tag is set per-release, do not default to latest
+
+imagePullSecrets:
+  - name: ghcr-credentials
+
+replicaCount: 2
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: schema-registry.prod.example.com
+      paths:
+        - path: /
+          pathType: Prefix
