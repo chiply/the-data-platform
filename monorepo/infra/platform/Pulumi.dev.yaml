@@ -6,3 +6,9 @@ config:
   tdp-platform:prometheusRetention: "7d"
   tdp-platform:prometheusScrapeInterval: "15s"
   tdp-platform:prometheusStorageSize: "10Gi"
+  # Application secrets — values sourced from ESC environment tdp/dev
+  tdp-platform:dbHost: db.dev.internal
+  tdp-platform:dbPort: "5432"
+  tdp-platform:dbName: tdp
+  tdp-platform:dbUsername: tdp_app
+  # dbPassword, appApiKey, appSessionSecret are provided by ESC (fn::secret)
