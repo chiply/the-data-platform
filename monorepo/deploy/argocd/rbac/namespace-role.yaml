@@ -11,13 +11,19 @@ rules:
   - apiGroups: [""]
     resources:
       - configmaps
-      - secrets
       - services
       - serviceaccounts
       - persistentvolumeclaims
       - pods
       - events
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Secrets are owned by Pulumi — ArgoCD only needs read access to reference
+  # them via secretKeyRef in pod envFrom/env.
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get", "list", "watch"]
 
   - apiGroups: ["apps"]
     resources:

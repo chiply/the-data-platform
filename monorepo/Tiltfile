@@ -119,10 +119,12 @@ if argocd_mode:
         labels=["argocd"],
     )
 
+    # Only apply the local Application manifest — dev/prod Applications reference
+    # release tags and ghcr images that don't exist in the k3d cluster.
     local_resource(
         "argocd-applications",
-        cmd="kubectl apply -f deploy/argocd/apps/",
-        deps=["deploy/argocd/apps"],
+        cmd="kubectl apply -f deploy/argocd/apps/schema-registry-local.yaml",
+        deps=["deploy/argocd/apps/schema-registry-local.yaml"],
         resource_deps=["argocd-appproject"],
         labels=["argocd"],
     )

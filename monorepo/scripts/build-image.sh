@@ -32,6 +32,14 @@ EOF
   exit "${1:-0}"
 }
 
+# Prerequisite check
+for cmd in docker jq; do
+  if ! command -v "$cmd" &>/dev/null; then
+    echo "ERROR: Required tool '$cmd' is not installed." >&2
+    exit 1
+  fi
+done
+
 # Defaults
 VERSION="dev"
 REGISTRY="ghcr.io"

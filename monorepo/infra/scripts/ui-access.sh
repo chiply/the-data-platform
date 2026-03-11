@@ -82,12 +82,12 @@ argocd_access() {
   echo "  Username: admin"
 
   local password
-  password=$(kubectl ${KC} -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+  password=$(kubectl ${KC} -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
   if [[ -n "${password}" ]]; then
     echo "  Password: ${password}"
   else
     echo "  Password: (run manually)"
-    echo "    kubectl ${KC} -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+    echo "    kubectl ${KC} -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode"
   fi
   echo ""
 }
@@ -116,12 +116,12 @@ grafana_access() {
   echo "  Username: admin"
 
   local password
-  password=$(kubectl ${KC} -n monitoring get secret -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+  password=$(kubectl ${KC} -n monitoring get secret -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
   if [[ -n "${password}" ]]; then
     echo "  Password: ${password}"
   else
     echo "  Password: (run manually)"
-    echo "    kubectl ${KC} -n monitoring get secret -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' | base64 -d"
+    echo "    kubectl ${KC} -n monitoring get secret -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' | base64 --decode"
   fi
   echo ""
 }

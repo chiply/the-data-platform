@@ -65,17 +65,26 @@ export function createAppSecrets(args: AppSecretsArgs): AppSecretsResult {
   // Uses config.getSecret() to avoid leaking secret values to plaintext state.
   // For local development, all secrets fall back to hardcoded defaults.
 
+  // Determine if we're running in a non-local stack where secrets are required.
+  const stackName = pulumi.getStack();
+  const isLocal = stackName === "local";
+
   // Database credentials
   const dbHost = config.get("dbHost") || "localhost";
   const dbPort = config.get("dbPort") || "5432";
   const dbName = config.get("dbName") || "tdp";
   const dbUsername = config.get("dbUsername") || "tdp";
-  const dbPassword = config.getSecret("dbPassword") ?? "local-dev-password";
+  const dbPassword = isLocal
+    ? (config.getSecret("dbPassword") ?? "local-dev-password")
+    : config.requireSecret("dbPassword");
 
   // Application-level secrets
-  const apiKey = config.getSecret("appApiKey") ?? "local-dev-api-key";
-  const sessionSecret =
-    config.getSecret("appSessionSecret") ?? "local-dev-session-secret";
+  const apiKey = isLocal
+    ? (config.getSecret("appApiKey") ?? "local-dev-api-key")
+    : config.requireSecret("appApiKey");
+  const sessionSecret = isLocal
+    ? (config.getSecret("appSessionSecret") ?? "local-dev-session-secret")
+    : config.requireSecret("appSessionSecret");
 
   // ---------------------------------------------------------------------------
   // Kubernetes Secrets

@@ -25,8 +25,8 @@ spec:
   namespaceResourceWhitelist:
     - group: ""
       kind: ConfigMap
-    - group: ""
-      kind: Secret
+    # Secret is intentionally excluded — Pulumi owns Secret objects.
+    # ArgoCD can read secrets (via RBAC) but should not create/manage them.
     - group: ""
       kind: Service
     - group: ""
