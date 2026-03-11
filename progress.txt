@@ -46,6 +46,11 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Dev/Prod: environment import + config overrides in Pulumi.<env>.yaml
 - Platform references cluster via clusterStackRef
 
+## US-001 - Install ArgoCD as Layer 2 platform service
+- What was implemented: ArgoCD Pulumi component at monorepo/infra/platform/charts/argocd.ts. Installs argo-cd Helm chart v7.7.16 into argocd namespace. Resource tier presets (minimal/standard). Dex/ApplicationSet/Notifications disabled. Repo credentials via ESC. Repo-server with shallow clones. ArgoCD UI via Traefik at argocd.localhost. Updated local-up.sh with 6GB Docker memory check.
+- Files changed: monorepo/infra/platform/charts/argocd.ts, index.ts, Pulumi.dev.yaml, Pulumi.production.yaml, local-up.sh, _helpers.sh
+- Learnings: local-down.sh needs no changes (ArgoCD is part of platform stack). argo-cd chart name (not argocd) from argoproj.github.io/argo-helm. ArgoCD server needs --insecure behind reverse proxy. Uses separate `argocd` config namespace.
+
 ## US-002 - Create dummy schema-registry FastAPI service
 - What was implemented: Minimal FastAPI stub service at monorepo/services/schema-registry/ with three endpoints (/health, /schemas, /schemas/{name}), a multi-stage Dockerfile using Python 3.12 slim, requirements.txt with fastapi and uvicorn, and registration in release-please config/manifest.
 - Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json

@@ -20,7 +20,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: M. Follows existing cert-manager/monitoring Helm chart pattern in monorepo/infra/platform/."
     },
