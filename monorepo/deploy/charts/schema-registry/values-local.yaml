@@ -7,8 +7,8 @@ image:
 
 imagePullSecrets: []
 
-# Relax security context for local dev — Tilt live_update needs
-# write access to the container filesystem to sync files.
+# Security context for local dev — readOnlyRootFilesystem is disabled
+# so Tilt live_update can sync files into the container.
 securityContext:
   runAsNonRoot: true
   readOnlyRootFilesystem: false
