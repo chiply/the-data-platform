@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/chiply/the-data-platform/compare/platform-v0.1.6...platform-v0.1.7) (2026-03-11)
+
+
+### Features
+
+* add /version endpoint and fix Tilt ArgoCD mode ([#15](https://github.com/chiply/the-data-platform/issues/15)) ([25b2882](https://github.com/chiply/the-data-platform/commit/25b2882093212d708651acde0889538c6f79777b))
+
 ## [0.1.6](https://github.com/chiply/the-data-platform/compare/platform-v0.1.5...platform-v0.1.6) (2026-03-11)
 
 
