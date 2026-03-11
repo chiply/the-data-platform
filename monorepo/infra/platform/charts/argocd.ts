@@ -140,10 +140,8 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
               "traefik.ingress.kubernetes.io/router.entrypoints": "web",
             },
           },
-          // Run insecure (no TLS) behind reverse proxy for local dev only.
-          // Production should terminate TLS at the ingress or use ArgoCD's
-          // built-in TLS with a cert-manager certificate.
-          ...(isLocal ? { extraArgs: ["--insecure"] } : {}),
+          // Insecure mode is set via configs.params below, not extraArgs,
+          // so the Helm chart also configures the ingress backend correctly.
         },
 
         // Repo server — configured for monorepo efficiency
@@ -196,6 +194,12 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
           params: {
             // Cache expiration for repo-server disk management
             "reposerver.repo.cache.expiration": "24h",
+            // Run insecure (no TLS) behind reverse proxy for local dev only.
+            // This also tells the Helm chart to route the ingress backend to
+            // the HTTP port instead of HTTPS. Production should use TLS.
+            ...(isLocal
+              ? { "server.insecure": "true" }
+              : {}),
           },
         },
       },
