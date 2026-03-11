@@ -5,7 +5,7 @@ on:
     types: [published]
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -95,3 +95,30 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
             ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:latest
+
+      - name: Trivy vulnerability scan
+        if: steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Generate CycloneDX SBOM
+        if: steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
+          format: cyclonedx
+          output: sbom-${{ steps.parse.outputs.component }}-${{ steps.parse.outputs.version }}.cdx.json
+
+      - name: Upload SBOM to GitHub Release
+        if: steps.dockerfile.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "sbom-${{ steps.parse.outputs.component }}-${{ steps.parse.outputs.version }}.cdx.json" \
+            --clobber
