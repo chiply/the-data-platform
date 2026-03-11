@@ -8,6 +8,16 @@ Active tasks checked out from design docs.
 ** Active
 # Queue tasks here with /task-queue or M-x backlog/task-queue
 
+*** WIP [Ralph] Design doc 005 - ArgoCD GitOps Deployment & Local Dev Workflow
+:PROPERTIES:
+:DESIGN: [[file:docs/design/005-argocd-gitops-deployment.org][005 ArgoCD GitOps Deployment]]
+:DELEGATED_TO: ralph
+:PRD_FILES: tasks/prd-argocd-gitops-deployment.json
+:END:
+
+Tasks from this design doc are being executed autonomously via Ralph.
+Track progress in tasks/prd-argocd-gitops-deployment.json and progress.txt.
+
 
 
 

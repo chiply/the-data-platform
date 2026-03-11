@@ -1,6 +1,6 @@
 #+TITLE: 005 - ArgoCD GitOps Deployment & Local Development Workflow
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Active
 #+CATEGORY: infra
 #+CREATED: [2026-03-10]
 #+LAST_MODIFIED: [2026-03-10]
@@ -748,3 +748,7 @@ Re-evaluate in September 2026. Check Tilt's GitHub activity, release cadence,
 and Docker's commitment. If declining, DevSpace (CNCF Sandbox) is the top
 fallback — it attaches to existing deployments (including ArgoCD-managed ones)
 rather than owning the deployment lifecycle, making migration straightforward.
+
+* Changelog
+
+- *[2026-03-10]:* Generated Ralph prd.json for autonomous execution (tasks/prd-argocd-gitops-deployment.json)

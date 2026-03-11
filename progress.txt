@@ -1,0 +1,49 @@
+# Ralph Progress Log
+Started: 2026-03-10
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-argocd-gitops-deployment.json
+
+## Codebase Patterns
+
+### Pulumi Helm Chart Pattern
+- Charts installed in monorepo/infra/platform/charts/<name>.ts
+- Use k8s.helm.v3.Release with pinned chart version
+- resourceTier pattern: "minimal" and "standard" presets with per-component CPU/memory
+- Config read via `new pulumi.Config()`, tier via `config.get("resourceTier") || "minimal"`
+- Each chart component (e.g., cert-manager has controller/webhook/cainjector) gets its own resource spec
+
+### Pulumi ESC Pattern
+- Local: no ESC, no secrets needed
+- Dev/Production: import ESC environment in Pulumi.<env>.yaml via `environment: [tdp/<env>]`
+- Secrets referenced via `config.requireSecret("<key>")`
+- ESC environments at chiply-org/tdp/<env>
+
+### Infrastructure Scripts
+- monorepo/infra/scripts/_helpers.sh provides reusable functions
+- local-up.sh: validates prerequisites, deploys cluster then platform via pulumi up --stack local --yes
+- local-down.sh: destroys platform then cluster in reverse order
+- Kubeconfig exported to ~/.kube/tdp-local.yaml
+
+### Post-Release Pipeline
+- Triggers on release: [published] event
+- Parses tag format: <component>-vMAJOR.MINOR.PATCH
+- Uses jq to resolve component path from release-please-config.json
+- Builds + pushes to ghcr.io/<repo>/<component>:<version> and :latest
+
+### Release-Please Config
+- release-please-config.json: packages map path → component name
+- .release-please-manifest.json: tracks current versions
+- Currently only "monorepo" → "platform" at v0.1.4
+
+### ServiceDeployment Component
+- monorepo/infra/components/service-deployment.ts
+- Creates Deployment + Service + optional Ingress
+- Uses app.kubernetes.io/* labels, traefik ingress class
+- Being superseded by ArgoCD for Layer 3 services
+
+### Stack Config Pattern
+- Local: config via Pulumi.local.yaml (no environment import)
+- Dev/Prod: environment import + config overrides in Pulumi.<env>.yaml
+- Platform references cluster via clusterStackRef
+
+---
