@@ -1,6 +1,6 @@
 #+TITLE: 005 - ArgoCD GitOps Deployment & Local Development Workflow
 #+AUTHOR: Charlie Holland
-#+STATUS: Active
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-10]
 #+LAST_MODIFIED: [2026-03-10]
@@ -621,25 +621,73 @@ Document the version promotion workflow:
   services are ArgoCD-managed. Follow-up: add probe support
   (liveness/readiness) to =ServiceDeployment= if it remains in use
 
-** TODO [TDP-005-10] Evaluate ApplicationSet for auto-discovery             :p3:
+** DONE [TDP-005-10] Evaluate ApplicationSet for auto-discovery             :p3:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: manual
+:COMPLETED_AT: [2026-03-10]
 :END:
 
-Investigate ArgoCD automation features for scaling beyond a few services:
+Investigate ArgoCD automation features for scaling beyond a few services.
 
-*ApplicationSet:*
-- Git generator scanning =monorepo/deploy/charts/*/= for Chart.yaml files
-- Automatic Application creation per chart directory
-- Evaluate whether this simplifies or complicates the workflow
-- If beneficial, replace individual Application manifests with ApplicationSet
+*** Evaluation: ApplicationSet with Git Generator
 
-*ArgoCD Image Updater:*
-- Watches container registries for new image tags matching a pattern
-- Automatically updates image tags in values files (write-back to Git)
-- Would automate the manual promotion step for dev environments
-- Adds operational complexity (registry polling, write-back strategies)
-- Only warranted when there are many services with frequent releases
+The Git generator would scan =monorepo/deploy/charts/*/= for =Chart.yaml=
+files and auto-create an Application per chart directory per environment.
+
+*Pros:*
+- Zero boilerplate: adding a new chart directory auto-creates Applications
+- Consistent sync policies enforced via template (no copy-paste drift)
+- Scales well to 10+ services
+
+*Cons:*
+- Per-environment config is harder: dev uses =automated= sync with
+  =targetRevision: main=, production uses manual sync with a release tag.
+  ApplicationSet templates cannot easily express this divergence without
+  either (a) a matrix generator combining chart dirs × environments, which
+  requires an environment config file in each chart dir, or (b) multiple
+  ApplicationSets (one per environment), which defeats the simplicity gain
+- Production =targetRevision= is per-service (=schema-registry-v0.1.0=) and
+  changes on each promotion. ApplicationSet templates use static values —
+  a dynamic per-service revision requires a config file per chart that the
+  template reads, which is equivalent complexity to individual manifests
+- Library charts (=common/=) must be excluded (no =type: application= filter
+  in the Git generator — would need a path exclude or sentinel file)
+- Debugging: ApplicationSet-generated Applications are harder to reason
+  about than explicit manifests, especially during incident response
+- The platform currently has 1 service and expects ~5 (feed reader
+  components). Individual manifests are manageable at this scale
+
+*Decision:* Do not adopt ApplicationSet now. Re-evaluate when a third
+service is added or the boilerplate per service exceeds ~3 manifests.
+The ApplicationSet controller remains enabled in dev/production (already
+configured in =argocd.ts=) so it can be adopted without infra changes.
+
+*** Evaluation: ArgoCD Image Updater
+
+Image Updater watches container registries for new tags and automatically
+updates image references in Git (write-back) or in-memory (imperative).
+
+*Pros:*
+- Automates the dev promotion step (new image tag → auto-deploy)
+- Reduces the manual "update values file, commit, push" cycle
+
+*Cons:*
+- Write-back to Git creates automated commits that clutter history and
+  can conflict with human commits to the same values files
+- Imperative (non-write-back) mode breaks GitOps — the running state
+  diverges from Git, defeating the purpose of ArgoCD
+- Adds a new controller to manage, monitor, and debug
+- The current release-please → post-release → manual promotion flow is
+  explicit and auditable. The "update image tag, commit" step is
+  intentional friction that prevents accidental deployments
+- Registry polling adds latency and API rate limit concerns for ghcr.io
+- Not needed at current scale (1 service, infrequent releases)
+
+*Decision:* Do not adopt Image Updater. The manual promotion workflow is
+appropriate for a small team. Re-evaluate if release frequency exceeds
+~10/week across all services, at which point the manual step becomes
+a bottleneck rather than a safety valve
 
 ** DONE [TDP-005-11] Application secrets management strategy                :p1:
 :PROPERTIES:
@@ -793,5 +841,6 @@ rather than owning the deployment lifecycle, making migration straightforward.
 
 * Changelog
 
+- *[2026-03-10]:* All 16 tasks completed. Design doc status → Complete
 - *[2026-03-10]:* Reconciled Ralph results — 13/15 tasks DONE, 2 remain TODO (TDP-005-08, TDP-005-10)
 - *[2026-03-10]:* Generated Ralph prd.json for autonomous execution (tasks/prd-argocd-gitops-deployment.json)
