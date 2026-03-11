@@ -96,7 +96,7 @@
         "helm template renders valid YAML for each environment values file"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Effort: M. Depends on US-003 (common library chart). humanReview: true — major deliverable, verify chart structure and template correctness."
     },

@@ -56,6 +56,11 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json
 - Learnings: The repo has a Dockerfile.base pattern in monorepo/services/ that future services could extend. Release-please uses component field for tags in format <component>-vX.Y.Z.
 
+## US-005 - Create Helm chart for schema-registry stub
+- What was implemented: Complete Helm chart at monorepo/deploy/charts/schema-registry/ with common library dependency. All templates (Deployment, Service, ServiceAccount, ConfigMap, Ingress, NOTES.txt), health probes, security context, per-environment values files, values.schema.json, test hook.
+- Files changed: 16 files in monorepo/deploy/charts/schema-registry/
+- Learnings: Common library uses `include` with `nindent`. `helm dependency update` creates Chart.lock and charts/*.tgz. ServiceAccount not in common library — service-specific template needed.
+
 ## US-004 - Application secrets management strategy
 - What was implemented: Created monorepo/infra/platform/app-secrets.ts creating tdp namespace and K8s Secrets (tdp-db-credentials, tdp-app-credentials) from Pulumi config/ESC. Wired into index.ts before platform charts. Updated Pulumi.dev.yaml and Pulumi.production.yaml. Created monorepo/infra/docs/app-secrets.md.
 - Files changed: app-secrets.ts, index.ts, tsconfig.json, Pulumi.dev.yaml, Pulumi.production.yaml, docs/app-secrets.md
