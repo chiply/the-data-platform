@@ -88,10 +88,16 @@ jobs:
 
       - name: Build and push container image
         if: steps.dockerfile.outputs.exists == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ steps.resolve.outputs.path }}
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
-            ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:latest
+        run: |
+          ./monorepo/scripts/build-image.sh \
+            --version "${{ steps.parse.outputs.version }}" \
+            --registry ghcr.io \
+            --org "${{ github.repository }}" \
+            --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            "${{ steps.parse.outputs.component }}"
+        # NOTE: Latest tag is intentionally omitted. ArgoCD deployments
+        # should reference explicit semver tags for reproducibility.
+        # If a latest tag is needed for development, add a separate
+        # docker tag command here.
