@@ -25,7 +25,7 @@
 # Configuration
 # ---------------------------------------------------------------------------
 
-config.define_bool("argocd", usage="Enable ArgoCD mode (boots ArgoCD, disables docker_build)")
+config.define_bool("argocd", usage="Enable ArgoCD mode (uses Pulumi-managed ArgoCD, disables docker_build)")
 cfg = config.parse()
 argocd_mode = cfg.get("argocd", False)
 
@@ -120,7 +120,7 @@ if argocd_mode:
         "git-push",
         cmd="git push -u origin HEAD",
         labels=["build"],
-        auto_init=True,
+        auto_init=False,
         trigger_mode=TRIGGER_MODE_MANUAL,
     )
 
@@ -133,13 +133,15 @@ if argocd_mode:
         labels=["argocd"],
     )
 
+    # Write a patch file with the current branch to avoid shell injection from
+    # branch names containing special characters.
     local_resource(
         "argocd-applications",
-        cmd=(
-            "kubectl apply -f deploy/argocd/apps/schema-registry-local.yaml"
-            " && kubectl patch application schema-registry-local -n argocd"
-            " --type=merge -p '{\"spec\":{\"source\":{\"targetRevision\":\"" + _current_branch + "\"}}}'"
-        ),
+        cmd=" && ".join([
+            "kubectl apply -f deploy/argocd/apps/schema-registry-local.yaml",
+            "printf '%s' '{\"spec\":{\"source\":{\"targetRevision\":\"'\"$(git rev-parse --abbrev-ref HEAD)\"'\"}}}' > /tmp/tilt-argocd-patch.json",
+            "kubectl patch application schema-registry-local -n argocd --type=merge --patch-file /tmp/tilt-argocd-patch.json",
+        ]),
         deps=["deploy/argocd/apps/schema-registry-local.yaml"],
         resource_deps=["argocd-appproject", "schema-registry-build"],
         labels=["argocd"],

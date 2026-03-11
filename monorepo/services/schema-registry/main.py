@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.1.0"
 
 app = FastAPI(title="Schema Registry", version=APP_VERSION)
 
