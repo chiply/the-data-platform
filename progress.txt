@@ -56,6 +56,16 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json
 - Learnings: The repo has a Dockerfile.base pattern in monorepo/services/ that future services could extend. Release-please uses component field for tags in format <component>-vX.Y.Z.
 
+## US-007 - Set up Tiltfile for local development
+- What was implemented: monorepo/Tiltfile with docker_build + live_update, helm() rendering, k8s_resource port-forwarding, local_resource for tests/lint. Fixed during review: venv pip path (/opt/venv/bin/pip), added restart_container() for uvicorn reload.
+- Files changed: monorepo/Tiltfile
+- Learnings: Dockerfile venv path must match live_update pip path. restart_container() needed when image CMD doesn't include --reload.
+
+## US-008 - CI pipeline for image builds
+- What was implemented: monorepo/scripts/build-image.sh (standalone, resolves Dockerfile from release-please-config.json, supports --version/--push/--cache-from/--cache-to). Updated post-release.yml to call build-image.sh with GHA layer caching. No :latest tag.
+- Files changed: monorepo/scripts/build-image.sh, .github/workflows/post-release.yml
+- Learnings: docker buildx build with --load locally vs --push in CI. jq component lookup pattern reusable across scripts.
+
 ## US-006 - Create ArgoCD Application manifests
 - What was implemented: AppProject (sourceRepos restricted, destinations to tdp namespace, empty clusterResourceWhitelist). Dev Application with automated prune+selfHeal. Production Application with manual sync (no automated block). Both have finalizers, CreateNamespace=true, ServerSideApply=true, retry limit 5 with exponential backoff.
 - Files changed: monorepo/deploy/argocd/appproject.yaml, apps/schema-registry.yaml, apps/schema-registry-production.yaml

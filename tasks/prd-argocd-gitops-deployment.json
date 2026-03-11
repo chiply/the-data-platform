@@ -135,7 +135,7 @@
         "Tiltfile points at local k3d cluster and k3d-tdp-local-registry"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Effort: M. Depends on US-005 (Helm chart) and US-002 (FastAPI service). humanReview: true — Tiltfile is complex with many moving parts."
     },
@@ -153,7 +153,7 @@
         "Pipeline is reproducible locally via build-image.sh"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Effort: M. Depends on US-002 (FastAPI service with Dockerfile). humanReview: true — CI pipeline changes need careful review."
     },
