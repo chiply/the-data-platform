@@ -3,6 +3,7 @@ import * as k8s from "@pulumi/kubernetes";
 
 import { installCertManager } from "./charts/cert-manager";
 import { installMonitoring } from "./charts/monitoring";
+import { installArgoCD } from "./charts/argocd";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -95,6 +96,10 @@ const monitoring = installMonitoring({
   provider: k8sProvider,
 });
 
+const argocd = installArgoCD({
+  provider: k8sProvider,
+});
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -102,3 +107,4 @@ const monitoring = installMonitoring({
 export { kubeconfig, k8sProvider };
 export const certManagerStatus = certManager.status;
 export const monitoringStatus = monitoring.status;
+export const argocdStatus = argocd.status;

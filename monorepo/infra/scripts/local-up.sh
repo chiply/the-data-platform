@@ -42,6 +42,15 @@ if ! docker info &>/dev/null; then
   exit 1
 fi
 
+# Check Docker memory allocation (minimum 6 GB recommended for ArgoCD + monitoring)
+docker_mem_bytes=$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo "0")
+docker_mem_gb=$(( docker_mem_bytes / 1073741824 ))
+if [[ ${docker_mem_gb} -lt 6 ]]; then
+  echo "WARNING: Docker has ${docker_mem_gb} GB memory allocated. At least 6 GB is" >&2
+  echo "  recommended to run ArgoCD + monitoring. Increase Docker Desktop memory" >&2
+  echo "  in Settings > Resources > Memory." >&2
+fi
+
 # ---------------------------------------------------------------------------
 # Bring up the local environment
 # ---------------------------------------------------------------------------
@@ -85,6 +94,13 @@ echo "  k9s --kubeconfig ~/.kube/tdp-local.yaml"
 echo ""
 echo "Local container registry:"
 echo "  ${REGISTRY_URL}"
+echo ""
+echo "ArgoCD UI:"
+echo "  http://argocd.localhost"
+echo "  Username: admin"
+echo "  Password: kubectl --kubeconfig ~/.kube/tdp-local.yaml -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+echo ""
+echo "Note: Cluster teardown destroys all ArgoCD state (expected for ephemeral local clusters)."
 echo ""
 echo "Verify connectivity:"
 echo "  kubectl cluster-info"
