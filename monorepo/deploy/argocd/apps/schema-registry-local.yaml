@@ -24,7 +24,7 @@ spec:
   source:
     repoURL: https://github.com/chiply/the-data-platform.git
     # Set this to your working branch
-    targetRevision: ralph/argocd-gitops-deployment
+    targetRevision: HEAD
     path: monorepo/deploy/charts/schema-registry
     helm:
       valueFiles:

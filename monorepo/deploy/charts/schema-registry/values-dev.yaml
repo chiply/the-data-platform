@@ -1,7 +1,7 @@
 # Dev environment values for schema-registry.
 
 image:
-  repository: ghcr.io/charlieholland/tdp-schema-registry
+  repository: ghcr.io/chiply/the-data-platform/schema-registry
   pullPolicy: IfNotPresent
   # tag must be set to an explicit semver on each promotion.
   # Do NOT use "latest" — ArgoCD cannot detect image changes with mutable tags.

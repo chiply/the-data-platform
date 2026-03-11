@@ -117,6 +117,7 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
     "argocd",
     {
       chart: "argo-cd",
+      // Keep in sync with monorepo/Tiltfile --version flag for tilt+argocd mode
       version: "7.7.16",
       repositoryOpts: {
         repo: "https://argoproj.github.io/argo-helm",
@@ -129,8 +130,16 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
           revisionHistoryLimit: 1,
         },
 
+        // Disable default cluster-admin RBAC — custom RBAC is applied
+        // via deploy/argocd/rbac/ manifests for least-privilege access.
+        controller: {
+          clusterAdminAccess: { enabled: false },
+          resources: preset.controller,
+        },
+
         // Server configuration
         server: {
+          clusterAdminAccess: { enabled: false },
           resources: preset.server,
           ingress: {
             enabled: true,
@@ -158,11 +167,6 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
               value: "monorepo/deploy/",
             },
           ],
-        },
-
-        // Application controller
-        controller: {
-          resources: preset.controller,
         },
 
         // Redis

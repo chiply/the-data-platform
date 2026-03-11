@@ -31,7 +31,7 @@ PR merged to main
     -> post-release.yml triggers:
       -> Builds container image from the component's Dockerfile
       -> Pushes to ghcr.io/<org>/the-data-platform/<component>:<version>
-      -> Also tags as :latest
+      -> Tags as :<version>
     -> Operator promotes the version to dev, then production (see below)
 ```
 
@@ -51,7 +51,7 @@ The `post-release.yml` workflow triggers on the `release: published` event:
 2. Looks up the component path in `release-please-config.json`.
 3. If a `Dockerfile` exists at that path, builds and pushes the image:
    - `ghcr.io/<org>/the-data-platform/<component>:<version>`
-   - `ghcr.io/<org>/the-data-platform/<component>:latest`
+   Mutable `:latest` tags are intentionally not published — ArgoCD cannot detect changes to mutable tags reliably.
 
 ### Step 3: Promote to Dev
 

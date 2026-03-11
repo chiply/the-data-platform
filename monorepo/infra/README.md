@@ -192,6 +192,7 @@ The platform layer (`platform/`) installs the following on top of the cluster:
 | Service | Purpose | Namespace |
 |---------|---------|-----------|
 | Traefik | Ingress controller (bundled with k3s) | kube-system |
+| ArgoCD | GitOps continuous delivery | argocd |
 | cert-manager | Automatic TLS certificate management | cert-manager |
 | Prometheus + Grafana | Metrics, dashboards, alerting | monitoring |
 

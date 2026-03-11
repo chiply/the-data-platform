@@ -92,7 +92,7 @@ if argocd_mode:
         namespace="argocd",
         flags=[
             "--create-namespace",
-            "--version=7.7.16",
+            "--version=7.7.16",  # Keep in sync with infra/platform/charts/argocd.ts
             "--repo=https://argoproj.github.io/argo-helm",
             "--set=dex.enabled=false",
             "--set=applicationSet.enabled=false",
