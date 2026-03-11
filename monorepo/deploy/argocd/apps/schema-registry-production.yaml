@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: schema-registry-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: tdp
+  source:
+    repoURL: https://github.com/charlieholland/the-data-platform.git
+    targetRevision: main
+    path: monorepo/deploy/charts/schema-registry
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-production.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tdp
+  syncPolicy:
+    # Production uses manual sync - no automated section
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - allowEmpty=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

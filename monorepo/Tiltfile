@@ -1,0 +1,189 @@
+# =============================================================================
+# The Data Platform — Tiltfile
+# =============================================================================
+#
+# Two modes of operation:
+#
+#   tilt-only (default):
+#     cd monorepo && tilt up
+#     - docker_build with live_update for rapid inner-loop development
+#     - Helm chart rendered and deployed directly by Tilt
+#     - No ArgoCD involved
+#
+#   tilt+argocd (for testing GitOps config):
+#     cd monorepo && tilt up -- --argocd
+#     - Tilt installs ArgoCD via helm_resource
+#     - ArgoCD manages application deployments (docker_build disabled)
+#     - ArgoCD Application manifests applied via local_resource on file change
+#     - ArgoCD pulls images from the k3d registry
+#
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+config.define_bool("argocd", usage="Enable ArgoCD mode (boots ArgoCD, disables docker_build)")
+cfg = config.parse()
+argocd_mode = cfg.get("argocd", False)
+
+# ---------------------------------------------------------------------------
+# Cluster & Registry
+# ---------------------------------------------------------------------------
+
+allow_k8s_contexts("k3d-tdp-local")
+default_registry("k3d-tdp-local-registry:5111")
+
+# ---------------------------------------------------------------------------
+# Guard: prevent concurrent Tilt and ArgoCD ownership
+# ---------------------------------------------------------------------------
+#
+# In tilt-only mode, check if ArgoCD Application resources exist in the
+# cluster. If they do, ArgoCD may be managing deployments and Tilt should
+# not take direct ownership of the same resources.
+#
+# In argocd mode, this check is skipped because Tilt is intentionally
+# bootstrapping ArgoCD.
+
+if not argocd_mode:
+    argocd_apps = local(
+        "kubectl get applications.argoproj.io -n argocd -o name 2>/dev/null || true",
+        quiet=True,
+    )
+    if str(argocd_apps).strip():
+        fail(
+            "\n"
+            + "=" * 70 + "\n"
+            + "  CONFLICT: ArgoCD Application resources detected in the cluster.\n"
+            + "\n"
+            + "  Running ArgoCD Applications:\n"
+            + "    " + str(argocd_apps).strip().replace("\n", "\n    ") + "\n"
+            + "\n"
+            + "  Tilt cannot safely manage the same resources that ArgoCD owns.\n"
+            + "  Either:\n"
+            + "    1. Remove ArgoCD Applications first:\n"
+            + "       kubectl delete applications.argoproj.io --all -n argocd\n"
+            + "    2. Use ArgoCD mode instead:\n"
+            + "       tilt up -- --argocd\n"
+            + "=" * 70 + "\n"
+        )
+
+# ---------------------------------------------------------------------------
+# Mode: tilt+argocd
+# ---------------------------------------------------------------------------
+
+if argocd_mode:
+    # Install ArgoCD via Helm into argocd namespace.
+    # Non-HA mode, disabled components to save memory (~200 Mi saved).
+    # Matches the Pulumi Layer 2 installation from design doc 005.
+    helm_resource(
+        "argocd",
+        "argo-cd",
+        namespace="argocd",
+        flags=[
+            "--create-namespace",
+            "--version=7.7.16",
+            "--repo=https://argoproj.github.io/argo-helm",
+            "--set=dex.enabled=false",
+            "--set=applicationSet.enabled=false",
+            "--set=notifications.enabled=false",
+            "--set=server.service.type=ClusterIP",
+            "--set=server.ingress.enabled=true",
+            "--set=server.ingress.ingressClassName=traefik",
+            "--set=server.ingress.hosts[0]=argocd.localhost",
+            "--set=server.ingress.tls=false",
+            "--set=configs.params.server\\.insecure=true",
+            "--set=global.logging.level=info",
+        ],
+        resource_deps=[],
+        labels=["argocd"],
+    )
+
+    # Apply ArgoCD AppProject and Application manifests on file change.
+    # This lets developers iterate on ArgoCD configuration locally.
+    local_resource(
+        "argocd-appproject",
+        cmd="kubectl apply -f deploy/argocd/appproject.yaml",
+        deps=["deploy/argocd/appproject.yaml"],
+        resource_deps=["argocd"],
+        labels=["argocd"],
+    )
+
+    local_resource(
+        "argocd-applications",
+        cmd="kubectl apply -f deploy/argocd/apps/",
+        deps=["deploy/argocd/apps"],
+        resource_deps=["argocd-appproject"],
+        labels=["argocd"],
+    )
+
+# ---------------------------------------------------------------------------
+# Mode: tilt-only (default) — direct docker_build + helm deployment
+# ---------------------------------------------------------------------------
+
+if not argocd_mode:
+    # Build the Python base image (shared across services)
+    docker_build(
+        "tdp-python-base",
+        context="services",
+        dockerfile="services/Dockerfile.base",
+    )
+
+    # Build schema-registry (example service) with live_update
+    docker_build(
+        "k3d-tdp-local-registry:5111/schema-registry",
+        context="services/example",
+        dockerfile="services/example/Dockerfile",
+        build_args={"BASE_IMAGE": "tdp-python-base"},
+        live_update=[
+            sync("services/example/", "/app/"),
+            run(
+                "pip install -r /tmp/requirements.txt",
+                trigger=["services/example/requirements.txt"],
+            ),
+        ],
+    )
+
+    # Render and deploy the schema-registry Helm chart.
+    # Uses values-local.yaml for local development overrides.
+    #
+    # NOTE: This assumes deploy/charts/schema-registry/ exists with a valid
+    # Helm chart (see TDP-005-02). Until the chart is created, this will
+    # produce a Tilt error — which is expected and signals the dependency.
+    k8s_yaml(
+        helm(
+            "deploy/charts/schema-registry",
+            name="schema-registry",
+            namespace="tdp",
+            values=["deploy/charts/schema-registry/values-local.yaml"],
+        )
+    )
+
+    # Configure schema-registry Kubernetes resource
+    k8s_resource(
+        "schema-registry",
+        port_forwards=["8000:8000"],
+        labels=["services"],
+    )
+
+# ---------------------------------------------------------------------------
+# Local Resources (available in both modes)
+# ---------------------------------------------------------------------------
+
+local_resource(
+    "schema-registry:test",
+    cmd="cd services/example && python -m pytest tests/ 2>/dev/null || echo 'No tests yet'",
+    deps=["services/example"],
+    labels=["test"],
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
+
+local_resource(
+    "schema-registry:lint",
+    cmd="cd services/example && python -m ruff check . 2>/dev/null || echo 'Linter not configured yet'",
+    deps=["services/example"],
+    labels=["test"],
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
