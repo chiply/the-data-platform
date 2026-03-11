@@ -29,7 +29,7 @@ Examples:
   $(basename "$0") -v 1.2.3 --scan schema-registry
   $(basename "$0") -v 1.2.3 --cache-from type=gha --cache-to type=gha,mode=max schema-registry
 EOF
-  exit 0
+  exit "${1:-0}"
 }
 
 # Defaults
@@ -88,8 +88,7 @@ done
 
 if [ -z "${SERVICE_NAME:-}" ]; then
   echo "ERROR: Service name is required" >&2
-  usage
-  exit 1
+  usage 1
 fi
 
 # Derive org from git remote if not provided

@@ -770,6 +770,8 @@ Harden ArgoCD access controls for production:
 ** DONE [TDP-005-16] Platform UI access helper script                        :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: claude
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Add a convenience script for accessing ArgoCD and Grafana UIs across all
@@ -842,5 +844,5 @@ rather than owning the deployment lifecycle, making migration straightforward.
 * Changelog
 
 - *[2026-03-10]:* All 16 tasks completed. Design doc status → Complete
-- *[2026-03-10]:* Reconciled Ralph results — 13/15 tasks DONE, 2 remain TODO (TDP-005-08, TDP-005-10)
+- *[2026-03-10]:* Reconciled Ralph results — updated remaining tasks (TDP-005-08, TDP-005-10) to DONE
 - *[2026-03-10]:* Generated Ralph prd.json for autonomous execution (tasks/prd-argocd-gitops-deployment.json)

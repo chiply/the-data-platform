@@ -12,6 +12,7 @@ if [ ! -d "$CHARTS_DIR" ]; then
   exit 0
 fi
 
+shopt -s nullglob
 for chart_yaml in "${CHARTS_DIR}"/*/Chart.yaml; do
   chart_dir="$(dirname "$chart_yaml")"
   chart_name="$(basename "$chart_dir")"
@@ -92,6 +93,7 @@ for chart_yaml in "${CHARTS_DIR}"/*/Chart.yaml; do
   echo "  Done: ${chart_name}"
   echo ""
 done
+shopt -u nullglob
 
 if [ "$FAILED" -ne 0 ]; then
   echo "FAIL: One or more charts failed linting"
