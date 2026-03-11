@@ -56,6 +56,11 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json
 - Learnings: The repo has a Dockerfile.base pattern in monorepo/services/ that future services could extend. Release-please uses component field for tags in format <component>-vX.Y.Z.
 
+## US-006 - Create ArgoCD Application manifests
+- What was implemented: AppProject (sourceRepos restricted, destinations to tdp namespace, empty clusterResourceWhitelist). Dev Application with automated prune+selfHeal. Production Application with manual sync (no automated block). Both have finalizers, CreateNamespace=true, ServerSideApply=true, retry limit 5 with exponential backoff.
+- Files changed: monorepo/deploy/argocd/appproject.yaml, apps/schema-registry.yaml, apps/schema-registry-production.yaml
+- Learnings: Production manual sync = omit `automated` block entirely. Empty clusterResourceWhitelist denies all cluster-scoped resources.
+
 ## US-005 - Create Helm chart for schema-registry stub
 - What was implemented: Complete Helm chart at monorepo/deploy/charts/schema-registry/ with common library dependency. All templates (Deployment, Service, ServiceAccount, ConfigMap, Ingress, NOTES.txt), health probes, security context, per-environment values files, values.schema.json, test hook.
 - Files changed: 16 files in monorepo/deploy/charts/schema-registry/

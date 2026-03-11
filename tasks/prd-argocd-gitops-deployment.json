@@ -117,7 +117,7 @@
         "Production uses manual sync without auto-prune"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Depends on US-005 (schema-registry Helm chart must exist for Application to reference)."
     },
