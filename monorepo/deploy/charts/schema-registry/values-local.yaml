@@ -7,6 +7,19 @@ image:
 
 imagePullSecrets: []
 
+# Relax security context for local dev — Tilt live_update needs
+# write access to the container filesystem to sync files.
+securityContext:
+  runAsNonRoot: false
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+# Run as root locally so Tilt can write to /app
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
+  fsGroup: 0
+
 ingress:
   enabled: true
   className: traefik

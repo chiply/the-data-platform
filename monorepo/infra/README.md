@@ -35,6 +35,18 @@ infra/
 
 **Persistent volume caveat:** Both dev and production use the k3s `local-path` provisioner for persistent volumes (not Linode Block Storage CSI). Data stored in persistent volumes is lost if the node is replaced or recreated.
 
+## Port Usage (Local)
+
+| Port | Service | Notes |
+|------|---------|-------|
+| 80 | Traefik ingress (HTTP) | Host-mapped via k3d |
+| 443 | Traefik ingress (HTTPS) | Host-mapped via k3d |
+| 5111 | k3d local container registry | `localhost:5111` from host |
+| 8000 | schema-registry (port-forward) | Tilt auto-forwards in tilt-only mode |
+| 10350 | Tilt UI | `http://localhost:10350` |
+
+ArgoCD UI is accessed via Traefik ingress at `http://argocd.localhost` (local) or `kubectl port-forward` (dev/production). See `scripts/ui-access.sh`.
+
 ## Scripts
 
 | Script | Purpose |

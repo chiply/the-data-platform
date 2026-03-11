@@ -8,51 +8,6 @@ Active tasks checked out from design docs.
 ** Active
 # Queue tasks here with /task-queue or M-x backlog/task-queue
 
-*** WIP [Ralph] Design doc 005 - ArgoCD GitOps Deployment & Local Dev Workflow
-:PROPERTIES:
-:DESIGN: [[file:docs/design/005-argocd-gitops-deployment.org][005 ArgoCD GitOps Deployment]]
-:DELEGATED_TO: ralph
-:PRD_FILES: tasks/prd-argocd-gitops-deployment.json
-:END:
-
-All 13 Ralph stories complete. Post-Ralph review fixes applied:
-
-**** DONE Security hardening (post-review)
-- Pin Trivy action to v0.34.2 (was @master — supply chain risk)
-- Split post-release workflow into two jobs for scoped permissions
-- SBOM generation now runs even if Trivy scan finds vulnerabilities
-- ClusterRole stripped to namespace read-only; all writes via namespaced Role
-- Add =capabilities: drop: ["ALL"]= to common chart security context
-- Fix secrets TOCTOU: use =config.getSecret()= instead of =config.get()= + =requireSecret()=
-- Add ghcr-credentials imagePullSecret creation in app-secrets.ts
-- Fix CI expression injection (GitHub context via env vars, not inline)
-
-**** DONE Architecture fixes (post-review)
-- ArgoCD =--insecure= flag now conditional on =resourceTier= (local only)
-- Dex/ApplicationSet/Notifications enabled for non-local tiers
-- ArgoCD ingress hostname configurable via =argocd:ingressHostname=
-- Sparse checkout configured for repo-server monorepo efficiency
-- Production Application uses release tag =targetRevision= (was =main=)
-- Dev values: explicit semver tag =0.1.0= (was =latest=)
-- Production ingress: TLS with cert-manager
-- =CreateNamespace=true= removed (namespace owned by Pulumi)
-- =dependsOn= added between app-secrets and ArgoCD in Pulumi
-
-**** DONE Helm chart improvements (post-review)
-- Common deployment template: added =env=, =envFrom=, =volumeMounts=, =volumes= support
-- Fix Helm =default= on booleans (was silently overriding =false= to =true=)
-- PodDisruptionBudget template + production config (minAvailable: 1)
-- Dev values: resource requests/limits added
-- values.schema.json updated for new fields
-
-**** DONE Misc fixes (post-review)
-- Tiltfile: fix =fall_back_on= path (relative to context, not Tiltfile root)
-- Tiltfile: add RBAC and NetworkPolicy application in ArgoCD mode
-- NetworkPolicy: default-deny + DNS + Traefik ingress for tdp namespace
-- NetworkPolicy: clarified egress rules allow any destination (documented)
-- lint-charts.sh: fix Python code injection (pass path as argv, not inline)
-- ci.yml: remove redundant =if:= condition on helm-lint job
-
 
 
 

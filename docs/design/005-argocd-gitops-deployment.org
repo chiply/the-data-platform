@@ -439,9 +439,11 @@ This stub:
 
 Implementation tasks for ArgoCD + Tilt + sample service.
 
-** TODO [TDP-005-01] Install ArgoCD as Layer 2 platform service            :p1:
+** DONE [TDP-005-01] Install ArgoCD as Layer 2 platform service            :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Add ArgoCD Helm chart installation to =monorepo/infra/platform/=:
@@ -462,9 +464,11 @@ Add ArgoCD Helm chart installation to =monorepo/infra/platform/=:
 - Document that cluster teardown destroys all ArgoCD state (expected for
   ephemeral local clusters)
 
-** TODO [TDP-005-02] Create Helm chart for schema-registry stub            :p1:
+** DONE [TDP-005-02] Create Helm chart for schema-registry stub            :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/deploy/charts/schema-registry/= (depends on common library chart):
@@ -483,9 +487,11 @@ Create =monorepo/deploy/charts/schema-registry/= (depends on common library char
 - Decouple chart version from app version (=version= in Chart.yaml is independent
   of =appVersion=)
 
-** TODO [TDP-005-03] Create dummy schema-registry FastAPI service           :p1:
+** DONE [TDP-005-03] Create dummy schema-registry FastAPI service           :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/services/schema-registry/=:
@@ -494,9 +500,11 @@ Create =monorepo/services/schema-registry/=:
 - =requirements.txt= (fastapi, uvicorn)
 - Register in =release-please-config.json= and =.release-please-manifest.json=
 
-** TODO [TDP-005-04] Create ArgoCD Application manifests                    :p1:
+** DONE [TDP-005-04] Create ArgoCD Application manifests                    :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/deploy/argocd/=:
@@ -515,9 +523,11 @@ Create =monorepo/deploy/argocd/=:
   Application — not managed as Pulumi state
 - Document the promotion workflow (update image tag → commit → ArgoCD syncs)
 
-** TODO [TDP-005-05] Set up Tiltfile for local development                  :p1:
+** DONE [TDP-005-05] Set up Tiltfile for local development                  :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/Tiltfile=:
@@ -528,9 +538,11 @@ Create =monorepo/Tiltfile=:
 - =local_resource()= for running tests, linting
 - Point at local k3d cluster and registry
 
-** TODO [TDP-005-06] Add ArgoCD bootstrapping to Tiltfile                   :p2:
+** DONE [TDP-005-06] Add ArgoCD bootstrapping to Tiltfile                   :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Extend Tiltfile to optionally boot ArgoCD locally:
@@ -542,9 +554,11 @@ Extend Tiltfile to optionally boot ArgoCD locally:
 - Document the two modes: "tilt-only" (default) and "tilt+argocd" (for testing
   GitOps config)
 
-** TODO [TDP-005-07] CI pipeline for image builds                           :p1:
+** DONE [TDP-005-07] CI pipeline for image builds                           :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Update =post-release.yml= and create supporting scripts:
@@ -558,9 +572,11 @@ Update =post-release.yml= and create supporting scripts:
   local/CI parity (accepts service name, resolves Dockerfile path)
 - Use Bazel for code build/test, Docker for image build
 
-** TODO [TDP-005-08] End-to-end local validation                            :p2:
+** DONE [TDP-005-08] End-to-end local validation                            :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: manual
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Verify both local development modes end-to-end:
@@ -584,9 +600,11 @@ Verify both local development modes end-to-end:
 - Port usage documented: Traefik 80/443, ArgoCD UI 8080, Tilt UI 10350
 - Document in =monorepo/infra/README.md=
 
-** TODO [TDP-005-09] Environment promotion workflow documentation           :p2:
+** DONE [TDP-005-09] Environment promotion workflow documentation           :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Document the version promotion workflow:
@@ -623,9 +641,11 @@ Investigate ArgoCD automation features for scaling beyond a few services:
 - Adds operational complexity (registry polling, write-back strategies)
 - Only warranted when there are many services with frequent releases
 
-** TODO [TDP-005-11] Application secrets management strategy                :p1:
+** DONE [TDP-005-11] Application secrets management strategy                :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Define how application-level secrets flow into ArgoCD-managed deployments:
@@ -636,9 +656,11 @@ Define how application-level secrets flow into ArgoCD-managed deployments:
 - Document the pattern for adding new application secrets
 - Verify secrets are available before ArgoCD syncs application deployments
 
-** TODO [TDP-005-12] Create shared Helm library chart                       :p2:
+** DONE [TDP-005-12] Create shared Helm library chart                       :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Create =monorepo/deploy/charts/common/= as a Helm library chart (=type: library=):
@@ -649,9 +671,11 @@ Create =monorepo/deploy/charts/common/= as a Helm library chart (=type: library=
 - Service charts depend on the library via =Chart.yaml= dependencies
 - Eliminates duplication as more services are added
 
-** TODO [TDP-005-13] Helm chart linting and testing in CI                   :p2:
+** DONE [TDP-005-13] Helm chart linting and testing in CI                   :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Add Helm chart validation to the CI pipeline:
@@ -661,9 +685,11 @@ Add Helm chart validation to the CI pipeline:
 - Run on PRs that touch =monorepo/deploy/=
 - Script in =monorepo/scripts/lint-charts.sh= for local reproducibility
 
-** TODO [TDP-005-14] Image scanning and CycloneDX SBOM generation          :p1:
+** DONE [TDP-005-14] Image scanning and CycloneDX SBOM generation          :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Add supply chain security to the image build pipeline (per =ARCHITECTURE.md=
@@ -674,9 +700,11 @@ CycloneDX standard):
 - Optionally push SBOM as OCI artifact alongside the image
 - Add to =post-release.yml= and =monorepo/scripts/build-image.sh=
 
-** TODO [TDP-005-15] ArgoCD RBAC and AppProject hardening                   :p2:
+** DONE [TDP-005-15] ArgoCD RBAC and AppProject hardening                   :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-10]
 :END:
 
 Harden ArgoCD access controls for production:
@@ -765,4 +793,5 @@ rather than owning the deployment lifecycle, making migration straightforward.
 
 * Changelog
 
+- *[2026-03-10]:* Reconciled Ralph results — 13/15 tasks DONE, 2 remain TODO (TDP-005-08, TDP-005-10)
 - *[2026-03-10]:* Generated Ralph prd.json for autonomous execution (tasks/prd-argocd-gitops-deployment.json)

@@ -6,7 +6,7 @@
 #
 #   tilt-only (default):
 #     cd monorepo && tilt up
-#     - docker_build with live_update for rapid inner-loop development
+#     - docker_build with live_update + uvicorn --reload for rapid inner-loop dev
 #     - Helm chart rendered and deployed directly by Tilt
 #     - No ArgoCD involved
 #
@@ -29,6 +29,10 @@ config.define_bool("argocd", usage="Enable ArgoCD mode (boots ArgoCD, disables d
 cfg = config.parse()
 argocd_mode = cfg.get("argocd", False)
 
+# helm_resource is a Tilt extension for managing Helm releases as Tilt resources.
+# Must be loaded at top level (Starlark requires load() outside conditionals).
+load("ext://helm_resource", "helm_resource")
+
 # ---------------------------------------------------------------------------
 # Cluster & Registry
 # ---------------------------------------------------------------------------
@@ -36,8 +40,9 @@ argocd_mode = cfg.get("argocd", False)
 # Only allow Tilt to connect to the local k3d cluster — never production.
 allow_k8s_contexts("k3d-tdp-local")
 
-# Use the k3d local registry for image builds.
-default_registry("k3d-tdp-local-registry:5111")
+# The k3d local registry is auto-detected from the cluster environment.
+# Do not set default_registry() — it conflicts with the auto-detected registry
+# and causes image name mismatches with Helm chart values.
 
 # ---------------------------------------------------------------------------
 # Guard: prevent concurrent Tilt and ArgoCD ownership
@@ -146,34 +151,29 @@ if argocd_mode:
 
 if not argocd_mode:
     # Build schema-registry with live_update for sub-second code syncing.
-    #   - Python file changes are synced directly into the container, then
-    #     restart_container() restarts uvicorn so changes take effect.
-    #   - requirements.txt changes trigger pip install inside the container and
-    #     then restart the process so new packages are available.
+    #   - Python file changes are synced directly into the container.
+    #   - requirements.txt changes trigger pip install inside the container.
     #   - Dockerfile changes fall back to a full image rebuild.
+    #   - The entrypoint uses --reload so uvicorn auto-detects file changes
+    #     after live_update syncs them into the container.
     docker_build(
-        "schema-registry",
+        "k3d-tdp-local-registry:5111/schema-registry",
         context="services/schema-registry",
         dockerfile="services/schema-registry/Dockerfile",
+        entrypoint="/opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
         live_update=[
             # If the Dockerfile itself changes, do a full rebuild (no live update).
             # Path is relative to the docker_build context (services/schema-registry/).
-            fall_back_on(["Dockerfile"]),
+            fall_back_on(["services/schema-registry/Dockerfile"]),
 
             # Sync all files into the container's /app directory.
             sync("services/schema-registry/", "/app/"),
 
-            # When requirements.txt changes, re-install dependencies into the venv
-            # and restart the process so new packages are loaded.
+            # When requirements.txt changes, re-install dependencies into the venv.
             run(
                 "/opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt",
                 trigger=["services/schema-registry/requirements.txt"],
             ),
-
-            # Restart the container after file sync so uvicorn picks up changes.
-            # (The production CMD does not include --reload; we rely on container
-            # restart for live_update instead of baking dev-only flags into the image.)
-            restart_container(),
         ],
     )
 
