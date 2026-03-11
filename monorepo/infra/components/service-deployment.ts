@@ -1,3 +1,15 @@
+/**
+ * @deprecated For Layer 3 (application) services, use ArgoCD + Helm charts instead.
+ *
+ * New services should create a Helm chart under monorepo/deploy/charts/<service>/
+ * with per-environment values files (values-dev.yaml, values-production.yaml) and
+ * ArgoCD Application manifests under monorepo/deploy/argocd/apps/.
+ *
+ * See monorepo/deploy/README.md for the full promotion and deployment workflow.
+ *
+ * This component remains available for Layer 1/2 infrastructure services managed
+ * directly by Pulumi.
+ */
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
