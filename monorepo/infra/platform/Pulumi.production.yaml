@@ -9,3 +9,9 @@ config:
   argocd:repoUrl: ${argocd.repoUrl}
   argocd:sshPrivateKey:
     fn::secret: ${argocd.sshPrivateKey}
+  # Application secrets — values sourced from ESC environment tdp/production
+  tdp-platform:dbHost: db.production.internal
+  tdp-platform:dbPort: "5432"
+  tdp-platform:dbName: tdp
+  tdp-platform:dbUsername: tdp_app
+  # dbPassword, appApiKey, appSessionSecret are provided by ESC (fn::secret)

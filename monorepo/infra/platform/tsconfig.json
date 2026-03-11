@@ -14,7 +14,8 @@
     "skipLibCheck": true
   },
   "files": [
-    "index.ts"
+    "index.ts",
+    "app-secrets.ts"
   ],
   "include": [
     "charts/**/*.ts"

@@ -4,6 +4,7 @@ import * as k8s from "@pulumi/kubernetes";
 import { installCertManager } from "./charts/cert-manager";
 import { installMonitoring } from "./charts/monitoring";
 import { installArgoCD } from "./charts/argocd";
+import { createAppSecrets } from "./app-secrets";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -85,6 +86,19 @@ const k8sProvider = new k8s.Provider("k8s-provider", {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// Application Secrets (must run before ArgoCD syncs apps)
+// ---------------------------------------------------------------------------
+//
+// Creates the "tdp" namespace and populates it with K8s Secrets sourced from
+// Pulumi ESC. ArgoCD-managed Helm charts reference these secrets via
+// secretKeyRef — they never store secret values in Git.
+// ---------------------------------------------------------------------------
+
+const appSecrets = createAppSecrets({
+  provider: k8sProvider,
+});
+
+// ---------------------------------------------------------------------------
 // Platform Charts
 // ---------------------------------------------------------------------------
 
@@ -105,6 +119,9 @@ const argocd = installArgoCD({
 // ---------------------------------------------------------------------------
 
 export { kubeconfig, k8sProvider };
+export const tdpNamespace = appSecrets.namespace.metadata.name;
+export const dbSecretName = appSecrets.dbSecretName;
+export const appSecretName = appSecrets.appSecretName;
 export const certManagerStatus = certManager.status;
 export const monitoringStatus = monitoring.status;
 export const argocdStatus = argocd.status;
