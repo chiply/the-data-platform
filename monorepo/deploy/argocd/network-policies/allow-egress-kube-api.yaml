@@ -1,7 +1,8 @@
-# Allow ArgoCD components to reach the Kubernetes API server.
+# Allow ArgoCD components egress on ports 443 and 6443 (K8s API).
 #
-# The API server typically listens on port 443 or 6443. We allow both.
-# The destination is the kubernetes service in the default namespace.
+# WARNING: This policy allows egress to ANY destination on these ports,
+# not just the K8s API server. For tighter control, use ipBlock with the
+# API server's ClusterIP (kubectl get svc kubernetes -o jsonpath='{.spec.clusterIP}').
 #
 # NOTE: Flannel (the default CNI in k3d) does NOT enforce NetworkPolicies.
 # See default-deny.yaml for details on the local/production parity gap.

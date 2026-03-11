@@ -4,14 +4,17 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
   build-container:
     name: Build Container Image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      component: ${{ steps.parse.outputs.component }}
+      version: ${{ steps.parse.outputs.version }}
+      has-dockerfile: ${{ steps.dockerfile.outputs.exists }}
     steps:
       - uses: actions/checkout@v4
 
@@ -104,7 +107,7 @@ jobs:
 
       - name: Trivy vulnerability scan
         if: steps.dockerfile.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: image
           image-ref: ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
@@ -112,19 +115,39 @@ jobs:
           exit-code: "1"
 
       - name: Generate CycloneDX SBOM
-        if: steps.dockerfile.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@master
+        if: always() && steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: image
           image-ref: ghcr.io/${{ github.repository }}/${{ steps.parse.outputs.component }}:${{ steps.parse.outputs.version }}
           format: cyclonedx
           output: sbom-${{ steps.parse.outputs.component }}-${{ steps.parse.outputs.version }}.cdx.json
 
+      - name: Upload SBOM artifact
+        if: always() && steps.dockerfile.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom-${{ steps.parse.outputs.component }}-${{ steps.parse.outputs.version }}.cdx.json
+
+  upload-sbom:
+    name: Upload SBOM to Release
+    needs: build-container
+    if: always() && needs.build-container.outputs.has-dockerfile == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom
+
       - name: Upload SBOM to GitHub Release
-        if: steps.dockerfile.outputs.exists == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ github.event.release.tag_name }}" \
-            "sbom-${{ steps.parse.outputs.component }}-${{ steps.parse.outputs.version }}.cdx.json" \
-            --clobber
+            "sbom-${{ needs.build-container.outputs.component }}-${{ needs.build-container.outputs.version }}.cdx.json" \
+            --clobber \
+            --repo "${{ github.repository }}"

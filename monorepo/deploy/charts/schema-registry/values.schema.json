@@ -180,6 +180,30 @@
       "type": "object",
       "description": "ConfigMap data entries"
     },
+    "podDisruptionBudget": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minAvailable": { "type": ["integer", "string"] },
+        "maxUnavailable": { "type": ["integer", "string"] }
+      }
+    },
+    "env": {
+      "type": "array",
+      "description": "Environment variables for the container"
+    },
+    "envFrom": {
+      "type": "array",
+      "description": "Environment variable sources (ConfigMaps/Secrets)"
+    },
+    "volumeMounts": {
+      "type": "array",
+      "description": "Volume mounts for the container"
+    },
+    "volumes": {
+      "type": "array",
+      "description": "Volumes for the pod"
+    },
     "nodeSelector": {
       "type": "object"
     },

@@ -33,6 +33,8 @@ export interface AppSecretsResult {
   dbSecretName: pulumi.Output<string>;
   /** Name of the K8s Secret containing application credentials. */
   appSecretName: pulumi.Output<string>;
+  /** Name of the K8s Secret for GHCR image pulls (undefined if not configured). */
+  ghcrSecretName?: pulumi.Output<string>;
 }
 
 export function createAppSecrets(args: AppSecretsArgs): AppSecretsResult {
@@ -60,29 +62,29 @@ export function createAppSecrets(args: AppSecretsArgs): AppSecretsResult {
   // ---------------------------------------------------------------------------
   // Read secrets from config (with local-friendly defaults)
   // ---------------------------------------------------------------------------
+  // Uses config.getSecret() to avoid leaking secret values to plaintext state.
+  // For local development, all secrets fall back to hardcoded defaults.
 
   // Database credentials
   const dbHost = config.get("dbHost") || "localhost";
   const dbPort = config.get("dbPort") || "5432";
   const dbName = config.get("dbName") || "tdp";
   const dbUsername = config.get("dbUsername") || "tdp";
-  const dbPassword: pulumi.Output<string> | string = config.get("dbPassword")
-    ? config.requireSecret("dbPassword")
-    : "local-dev-password";
+  const dbPassword = config.getSecret("dbPassword") ?? "local-dev-password";
 
   // Application-level secrets
-  const apiKey: pulumi.Output<string> | string = config.get("appApiKey")
-    ? config.requireSecret("appApiKey")
-    : "local-dev-api-key";
-  const sessionSecret: pulumi.Output<string> | string = config.get(
-    "appSessionSecret",
-  )
-    ? config.requireSecret("appSessionSecret")
-    : "local-dev-session-secret";
+  const apiKey = config.getSecret("appApiKey") ?? "local-dev-api-key";
+  const sessionSecret =
+    config.getSecret("appSessionSecret") ?? "local-dev-session-secret";
 
   // ---------------------------------------------------------------------------
   // Kubernetes Secrets
   // ---------------------------------------------------------------------------
+
+  const managedLabels = {
+    "app.kubernetes.io/managed-by": "pulumi",
+    "app.kubernetes.io/part-of": "the-data-platform",
+  };
 
   const dbSecret = new k8s.core.v1.Secret(
     "tdp-db-credentials",
@@ -90,10 +92,7 @@ export function createAppSecrets(args: AppSecretsArgs): AppSecretsResult {
       metadata: {
         name: "tdp-db-credentials",
         namespace: tdpNamespace.metadata.name,
-        labels: {
-          "app.kubernetes.io/managed-by": "pulumi",
-          "app.kubernetes.io/part-of": "the-data-platform",
-        },
+        labels: managedLabels,
       },
       type: "Opaque",
       stringData: {
@@ -101,7 +100,7 @@ export function createAppSecrets(args: AppSecretsArgs): AppSecretsResult {
         port: dbPort,
         database: dbName,
         username: dbUsername,
-        password: pulumi.output(dbPassword).apply((v) => v),
+        password: pulumi.output(dbPassword),
       },
     },
     { provider, dependsOn: [tdpNamespace] },
@@ -113,23 +112,58 @@ export function createAppSecrets(args: AppSecretsArgs): AppSecretsResult {
       metadata: {
         name: "tdp-app-credentials",
         namespace: tdpNamespace.metadata.name,
-        labels: {
-          "app.kubernetes.io/managed-by": "pulumi",
-          "app.kubernetes.io/part-of": "the-data-platform",
-        },
+        labels: managedLabels,
       },
       type: "Opaque",
       stringData: {
-        apiKey: pulumi.output(apiKey).apply((v) => v),
-        sessionSecret: pulumi.output(sessionSecret).apply((v) => v),
+        apiKey: pulumi.output(apiKey),
+        sessionSecret: pulumi.output(sessionSecret),
       },
     },
     { provider, dependsOn: [tdpNamespace] },
   );
 
+  // GHCR image pull secret for non-local environments.
+  // In dev/production, ArgoCD-deployed pods need credentials to pull from ghcr.io.
+  const ghcrToken = config.getSecret("ghcrToken");
+  const ghcrUsername = config.get("ghcrUsername") || "";
+
+  let ghcrSecretName: pulumi.Output<string> | undefined;
+  if (ghcrUsername && ghcrToken) {
+    const dockerConfigJson = pulumi.output(ghcrToken).apply((token) =>
+      JSON.stringify({
+        auths: {
+          "ghcr.io": {
+            username: ghcrUsername,
+            password: token,
+            auth: Buffer.from(`${ghcrUsername}:${token}`).toString("base64"),
+          },
+        },
+      }),
+    );
+
+    const ghcrSecret = new k8s.core.v1.Secret(
+      "ghcr-credentials",
+      {
+        metadata: {
+          name: "ghcr-credentials",
+          namespace: tdpNamespace.metadata.name,
+          labels: managedLabels,
+        },
+        type: "kubernetes.io/dockerconfigjson",
+        stringData: {
+          ".dockerconfigjson": dockerConfigJson,
+        },
+      },
+      { provider, dependsOn: [tdpNamespace] },
+    );
+    ghcrSecretName = ghcrSecret.metadata.name;
+  }
+
   return {
     namespace: tdpNamespace,
     dbSecretName: dbSecret.metadata.name,
     appSecretName: appSecret.metadata.name,
+    ghcrSecretName,
   };
 }

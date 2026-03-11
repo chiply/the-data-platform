@@ -1,12 +1,10 @@
-# AC-4: ArgoCD ClusterRole scoped to managed namespaces only.
+# ArgoCD ClusterRole — cluster-scoped read-only permissions only.
 #
-# In production, ArgoCD should NOT have cluster-admin. This ClusterRole grants
-# only the permissions ArgoCD needs to manage resources in the 'tdp' namespace.
-# The argocd-server and argocd-application-controller service accounts are bound
-# to this role via the accompanying ClusterRoleBinding.
+# This ClusterRole grants ONLY namespace read access so ArgoCD can verify
+# destination namespaces exist. All resource management permissions are
+# handled by the namespace-scoped Role in namespace-role.yaml.
 #
-# If additional namespaces need to be managed, add rules with explicit
-# resourceNames or use per-namespace Roles instead.
+# This replaces the default cluster-admin binding that ArgoCD ships with.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -14,52 +12,10 @@ metadata:
   labels:
     app.kubernetes.io/part-of: argocd
 rules:
-  # Read access to namespaces so ArgoCD can verify destination namespaces exist
+  # Read access to namespaces so ArgoCD can verify destination namespaces exist.
+  # Note: resourceNames filtering does not apply to list/watch verbs in K8s RBAC,
+  # but we include it for documentation intent. The actual namespace restriction
+  # is enforced by the AppProject destinations configuration.
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list", "watch"]
-    resourceNames: ["tdp"]
-
-  # Full management of core resources in managed namespaces
-  # (namespace-scoping is enforced by the RoleBinding, not here, but we
-  # restrict resource types to match the AppProject whitelist)
-  - apiGroups: [""]
-    resources:
-      - configmaps
-      - secrets
-      - services
-      - serviceaccounts
-      - persistentvolumeclaims
-      - pods
-      - events
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  - apiGroups: ["apps"]
-    resources:
-      - deployments
-      - statefulsets
-      - daemonsets
-      - replicasets
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  - apiGroups: ["batch"]
-    resources:
-      - jobs
-      - cronjobs
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  - apiGroups: ["networking.k8s.io"]
-    resources:
-      - ingresses
-      - networkpolicies
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  - apiGroups: ["policy"]
-    resources:
-      - poddisruptionbudgets
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  - apiGroups: ["autoscaling"]
-    resources:
-      - horizontalpodautoscalers
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

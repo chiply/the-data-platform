@@ -122,6 +122,24 @@ if argocd_mode:
         labels=["argocd"],
     )
 
+    # Apply RBAC manifests (ClusterRole, ClusterRoleBinding, namespace Role)
+    local_resource(
+        "argocd-rbac",
+        cmd="kubectl apply -f deploy/argocd/rbac/",
+        deps=["deploy/argocd/rbac"],
+        resource_deps=["argocd"],
+        labels=["argocd"],
+    )
+
+    # Apply NetworkPolicies for argocd and tdp namespaces
+    local_resource(
+        "argocd-network-policies",
+        cmd="kubectl apply -f deploy/argocd/network-policies/",
+        deps=["deploy/argocd/network-policies"],
+        resource_deps=["argocd"],
+        labels=["argocd"],
+    )
+
 # ---------------------------------------------------------------------------
 # Mode: tilt-only (default) — direct docker_build + helm deployment
 # ---------------------------------------------------------------------------
@@ -139,7 +157,8 @@ if not argocd_mode:
         dockerfile="services/schema-registry/Dockerfile",
         live_update=[
             # If the Dockerfile itself changes, do a full rebuild (no live update).
-            fall_back_on(["services/schema-registry/Dockerfile"]),
+            # Path is relative to the docker_build context (services/schema-registry/).
+            fall_back_on(["Dockerfile"]),
 
             # Sync all files into the container's /app directory.
             sync("services/schema-registry/", "/app/"),

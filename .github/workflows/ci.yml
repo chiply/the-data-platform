@@ -170,9 +170,6 @@ jobs:
   helm-lint:
     name: Helm Chart Linting
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request'
     defaults:
       run:
         working-directory: monorepo
@@ -183,11 +180,15 @@ jobs:
 
       - name: Check for deploy changes
         id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "$EVENT_NAME" = "push" ]; then
             CHANGED=$(git diff --name-only HEAD~1 HEAD -- deploy/ || true)
           else
-            CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- deploy/ || true)
+            CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- deploy/ || true)
           fi
           if [ -n "$CHANGED" ]; then
             echo "deploy_changed=true" >> "$GITHUB_OUTPUT"

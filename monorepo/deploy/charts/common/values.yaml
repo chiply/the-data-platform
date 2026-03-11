@@ -55,6 +55,33 @@ resources: {}
 #    cpu: 100m
 #    memory: 64Mi
 
+# -- Environment variables for the container
+env: []
+#  - name: MY_VAR
+#    value: "my-value"
+#  - name: DB_PASSWORD
+#    valueFrom:
+#      secretKeyRef:
+#        name: my-secret
+#        key: password
+
+# -- Environment variable sources (ConfigMaps/Secrets mounted as env)
+envFrom: []
+#  - secretRef:
+#      name: my-secret
+#  - configMapRef:
+#      name: my-config
+
+# -- Volume mounts for the container
+volumeMounts: []
+#  - name: tmp
+#    mountPath: /tmp
+
+# -- Volumes for the pod
+volumes: []
+#  - name: tmp
+#    emptyDir: {}
+
 securityContext:
   # -- Run container as non-root
   runAsNonRoot: true

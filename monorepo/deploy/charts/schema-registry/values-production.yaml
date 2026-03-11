@@ -10,6 +10,10 @@ imagePullSecrets:
 
 replicaCount: 2
 
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
 resources:
   limits:
     cpu: 500m
@@ -21,8 +25,14 @@ resources:
 ingress:
   enabled: true
   className: ""
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: schema-registry.prod.example.com
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - secretName: schema-registry-tls
+      hosts:
+        - schema-registry.prod.example.com

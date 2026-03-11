@@ -66,7 +66,7 @@ for chart_yaml in "${CHARTS_DIR}"/*/Chart.yaml; do
   if [ -f "${chart_dir}/values.schema.json" ]; then
     echo "  Validating values.schema.json..."
     # helm lint already validates against schema, but we verify the JSON is well-formed
-    if ! python3 -c "import json; json.load(open('${chart_dir}/values.schema.json'))" 2>&1; then
+    if ! python3 -c "import json, sys; json.load(open(sys.argv[1]))" "${chart_dir}/values.schema.json" 2>&1; then
       echo "FAIL: ${chart_name} - values.schema.json is not valid JSON"
       FAILED=1
     else

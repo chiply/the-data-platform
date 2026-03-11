@@ -3,10 +3,20 @@
 image:
   repository: ghcr.io/charlieholland/tdp-schema-registry
   pullPolicy: IfNotPresent
-  tag: "latest"
+  # tag must be set to an explicit semver on each promotion.
+  # Do NOT use "latest" — ArgoCD cannot detect image changes with mutable tags.
+  tag: "0.1.0"
 
 imagePullSecrets:
   - name: ghcr-credentials
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
 
 ingress:
   enabled: true

@@ -1,8 +1,9 @@
-# Allow ArgoCD repo-server to reach GitHub for repository sync.
+# Allow ArgoCD repo-server egress on HTTPS (443) and SSH (22).
 #
-# Permits egress to GitHub on:
-# - Port 443 (HTTPS) for HTTPS-based git operations
-# - Port 22 (SSH) for SSH-based git operations
+# WARNING: This policy allows egress to ANY destination on these ports,
+# not just GitHub. Restricting to GitHub IP ranges (via ipBlock) is fragile
+# as they change frequently. For tighter control, use a CNI with FQDN-based
+# policies (e.g., Cilium).
 #
 # NOTE: Flannel (the default CNI in k3d) does NOT enforce NetworkPolicies.
 # See default-deny.yaml for details on the local/production parity gap.

@@ -9,7 +9,9 @@ spec:
   project: tdp
   source:
     repoURL: https://github.com/charlieholland/the-data-platform.git
-    targetRevision: main
+    # Use a release tag for production — never track HEAD of main.
+    # Update this to the release tag when promoting (e.g., schema-registry-v0.1.0).
+    targetRevision: schema-registry-v0.1.0
     path: monorepo/deploy/charts/schema-registry
     helm:
       valueFiles:
@@ -20,7 +22,6 @@ spec:
     namespace: tdp
   syncPolicy:
     syncOptions:
-      - CreateNamespace=true
       - ServerSideApply=true
     retry:
       limit: 5

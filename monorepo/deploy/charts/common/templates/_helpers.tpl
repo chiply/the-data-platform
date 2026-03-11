@@ -71,9 +71,24 @@ Defaults: runAsNonRoot, readOnlyRootFilesystem, no privilege escalation.
 */}}
 {{- define "common.securityContext" -}}
 securityContext:
-  runAsNonRoot: {{ default true .Values.securityContext.runAsNonRoot }}
-  readOnlyRootFilesystem: {{ default true .Values.securityContext.readOnlyRootFilesystem }}
-  allowPrivilegeEscalation: {{ default false .Values.securityContext.allowPrivilegeEscalation }}
+  {{- if hasKey .Values.securityContext "runAsNonRoot" }}
+  runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+  {{- else }}
+  runAsNonRoot: true
+  {{- end }}
+  {{- if hasKey .Values.securityContext "readOnlyRootFilesystem" }}
+  readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+  {{- else }}
+  readOnlyRootFilesystem: true
+  {{- end }}
+  {{- if hasKey .Values.securityContext "allowPrivilegeEscalation" }}
+  allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+  {{- else }}
+  allowPrivilegeEscalation: false
+  {{- end }}
+  capabilities:
+    drop:
+      - ALL
 {{- end }}
 
 {{/*

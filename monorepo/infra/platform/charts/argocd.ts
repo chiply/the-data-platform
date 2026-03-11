@@ -80,21 +80,24 @@ const resourcePresets: Record<string, ArgoCDPresets> = {
 export interface ArgoCDArgs {
   /** The Kubernetes provider to deploy into. */
   provider: k8s.Provider;
+  /** Resources that must exist before ArgoCD is installed. */
+  dependsOn?: pulumi.Resource[];
 }
 
 export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
-  const { provider } = args;
+  const { provider, dependsOn } = args;
 
   const config = new pulumi.Config();
   const resourceTier = config.get("resourceTier") || "minimal";
   const preset = resourcePresets[resourceTier] ?? resourcePresets["minimal"];
+  const isLocal = resourceTier === "minimal";
 
   // ArgoCD-specific config
   const argoCDConfig = new pulumi.Config("argocd");
   const repoUrl = argoCDConfig.get("repoUrl") || "";
-  const sshPrivateKey = argoCDConfig.get("sshPrivateKey")
-    ? argoCDConfig.requireSecret("sshPrivateKey")
-    : undefined;
+  const sshPrivateKey = argoCDConfig.getSecret("sshPrivateKey");
+  const ingressHostname =
+    argoCDConfig.get("ingressHostname") || "argocd.localhost";
 
   // Build repo credentials for non-local environments
   const repositories: Record<string, unknown>[] = [];
@@ -132,13 +135,15 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
           ingress: {
             enabled: true,
             ingressClassName: "traefik",
-            hostname: "argocd.localhost",
+            hostname: ingressHostname,
             annotations: {
               "traefik.ingress.kubernetes.io/router.entrypoints": "web",
             },
           },
-          // Run insecure (no TLS) behind Traefik for local dev
-          extraArgs: ["--insecure"],
+          // Run insecure (no TLS) behind reverse proxy for local dev only.
+          // Production should terminate TLS at the ingress or use ArgoCD's
+          // built-in TLS with a cert-manager certificate.
+          ...(isLocal ? { extraArgs: ["--insecure"] } : {}),
         },
 
         // Repo server — configured for monorepo efficiency
@@ -147,6 +152,13 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
           env: [
             // Shallow clones to save disk
             { name: "ARGOCD_GIT_SHALLOW_DEPTH", value: "1" },
+            // Sparse checkout — only clone the deploy directory to reduce
+            // disk usage and clone time for the monorepo
+            { name: "ARGOCD_GIT_SPARSE_CHECKOUT", value: "true" },
+            {
+              name: "ARGOCD_GIT_SPARSE_CHECKOUT_PATHS",
+              value: "monorepo/deploy/",
+            },
           ],
         },
 
@@ -160,19 +172,20 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
           resources: preset.redis,
         },
 
-        // Disable Dex (SSO) — not needed for local
+        // Dex (SSO) — disabled for local to save memory, enable for prod
         dex: {
-          enabled: false,
+          enabled: !isLocal,
         },
 
-        // Disable ApplicationSet controller for local — saves memory
+        // ApplicationSet controller — disabled for local to save memory
         applicationSet: {
-          enabled: false,
+          enabled: !isLocal,
         },
 
-        // Disable Notifications controller for local — saves memory
+        // Notifications controller — disabled for local to save memory,
+        // enabled for non-local to alert on sync failures
         notifications: {
-          enabled: false,
+          enabled: !isLocal,
         },
 
         // Repo credentials (empty for local; populated via ESC for dev/prod)
@@ -187,7 +200,7 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
         },
       },
     },
-    { provider },
+    { provider, dependsOn },
   );
 
   return argocd;

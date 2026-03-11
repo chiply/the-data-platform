@@ -112,6 +112,7 @@ const monitoring = installMonitoring({
 
 const argocd = installArgoCD({
   provider: k8sProvider,
+  dependsOn: [appSecrets.namespace],
 });
 
 // ---------------------------------------------------------------------------

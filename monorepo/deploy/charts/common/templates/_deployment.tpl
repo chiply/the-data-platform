@@ -41,6 +41,14 @@ spec:
               containerPort: {{ .Values.containerPort }}
               protocol: TCP
           {{- include "common.securityContext" . | nindent 10 }}
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- include "common.livenessProbe" . | nindent 10 }}
           {{- include "common.readinessProbe" . | nindent 10 }}
           {{- include "common.startupProbe" . | nindent 10 }}
@@ -48,6 +56,14 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
