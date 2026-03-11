@@ -26,8 +26,8 @@ default_registry("k3d-tdp-local-registry:5111")
 # ---------------------------------------------------------------------------
 
 # live_update enables sub-second code syncing without full image rebuilds:
-#   - Python file changes are synced directly into the container. Uvicorn's
-#     --reload flag (set in values-local.yaml) picks them up automatically.
+#   - Python file changes are synced directly into the container, then
+#     restart_container() restarts uvicorn so changes take effect.
 #   - requirements.txt changes trigger pip install inside the container and
 #     then restart the process so new packages are available.
 #   - Dockerfile changes fall back to a full image rebuild.
@@ -43,12 +43,17 @@ docker_build(
         # Sync all files into the container's /app directory.
         sync("services/schema-registry/", "/app/"),
 
-        # When requirements.txt changes, re-install dependencies and restart
-        # the process so new packages are loaded.
+        # When requirements.txt changes, re-install dependencies into the venv
+        # and restart the process so new packages are loaded.
         run(
-            "pip install --no-cache-dir -r /app/requirements.txt",
+            "/opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt",
             trigger=["services/schema-registry/requirements.txt"],
         ),
+
+        # Restart the container after file sync so uvicorn picks up changes.
+        # (The production CMD does not include --reload; we rely on container
+        # restart for live_update instead of baking dev-only flags into the image.)
+        restart_container(),
     ],
 )
 
