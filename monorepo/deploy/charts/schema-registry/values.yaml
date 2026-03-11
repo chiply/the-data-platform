@@ -1,0 +1,129 @@
+# Default values for schema-registry.
+
+# -- Number of replicas
+replicaCount: 1
+
+image:
+  # -- Container image repository
+  repository: schema-registry
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Image tag (defaults to chart appVersion)
+  tag: ""
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+
+# -- Override the release name
+nameOverride: ""
+# -- Override the full release name
+fullnameOverride: ""
+
+service:
+  # -- Service type
+  type: ClusterIP
+  # -- Service port
+  port: 80
+
+ingress:
+  # -- Enable ingress
+  enabled: false
+  # -- Ingress class name
+  className: ""
+  # -- Ingress annotations
+  annotations: {}
+  # -- Ingress hosts
+  hosts: []
+  # -- Ingress TLS configuration
+  tls: []
+
+# -- Container port (uvicorn default)
+containerPort: 8000
+
+# -- Resource requests and limits
+resources: {}
+
+securityContext:
+  # -- Run container as non-root
+  runAsNonRoot: true
+  # -- Read-only root filesystem
+  readOnlyRootFilesystem: true
+  # -- Disallow privilege escalation
+  allowPrivilegeEscalation: false
+
+podSecurityContext: {}
+
+livenessProbe:
+  # -- Enable liveness probe
+  enabled: true
+  # -- Liveness probe HTTP path
+  path: /health
+  # -- Liveness probe port
+  port: http
+  # -- Initial delay seconds
+  initialDelaySeconds: 5
+  # -- Period seconds
+  periodSeconds: 10
+  # -- Timeout seconds
+  timeoutSeconds: 3
+  # -- Failure threshold
+  failureThreshold: 3
+  # -- Success threshold
+  successThreshold: 1
+
+readinessProbe:
+  # -- Enable readiness probe
+  enabled: true
+  # -- Readiness probe HTTP path
+  path: /health
+  # -- Readiness probe port
+  port: http
+  # -- Initial delay seconds
+  initialDelaySeconds: 3
+  # -- Period seconds
+  periodSeconds: 5
+  # -- Timeout seconds
+  timeoutSeconds: 3
+  # -- Failure threshold
+  failureThreshold: 3
+  # -- Success threshold
+  successThreshold: 1
+
+startupProbe:
+  # -- Enable startup probe for slow starts
+  enabled: true
+  # -- Startup probe HTTP path
+  path: /health
+  # -- Startup probe port
+  port: http
+  # -- Initial delay seconds
+  initialDelaySeconds: 0
+  # -- Period seconds
+  periodSeconds: 10
+  # -- Timeout seconds
+  timeoutSeconds: 3
+  # -- Failure threshold (30 * 10s = 5min max startup time)
+  failureThreshold: 30
+  # -- Success threshold
+  successThreshold: 1
+
+# -- Service account configuration
+serviceAccount:
+  # -- Create a service account
+  create: true
+  # -- Service account annotations
+  annotations: {}
+  # -- Service account name (generated if not set)
+  name: ""
+
+# -- ConfigMap data
+config: {}
+
+# -- Node selector
+nodeSelector: {}
+
+# -- Tolerations
+tolerations: []
+
+# -- Affinity rules
+affinity: {}
