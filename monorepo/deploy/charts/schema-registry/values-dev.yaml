@@ -1,0 +1,18 @@
+# Dev environment values for schema-registry.
+
+image:
+  repository: ghcr.io/charlieholland/tdp-schema-registry
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets:
+  - name: ghcr-credentials
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: schema-registry.dev.example.com
+      paths:
+        - path: /
+          pathType: Prefix
