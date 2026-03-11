@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.1.5](https://github.com/chiply/the-data-platform/compare/platform-v0.1.4...platform-v0.1.5) (2026-03-11)
+
+
+### Features
+
+* add local ArgoCD Application manifest for k3d testing ([3893aa4](https://github.com/chiply/the-data-platform/commit/3893aa4b017ade0cc366d4149f049a305f2cae01))
+* **deploy:** ArgoCD GitOps deployment & local dev workflow ([575c097](https://github.com/chiply/the-data-platform/commit/575c097fae29f8c54da558972865c95d7dc9c2df))
+* **infra:** add ui-access.sh helper for ArgoCD and Grafana UI access ([a132893](https://github.com/chiply/the-data-platform/commit/a1328937393fd0bd7dd9fb0409eea6c34b20c70c))
+* US-001 - Install ArgoCD as Layer 2 platform service ([3a30fb8](https://github.com/chiply/the-data-platform/commit/3a30fb8954a34ac3af32bb79157c3c116083e175))
+* US-003 - Create shared Helm library chart ([0fbacdc](https://github.com/chiply/the-data-platform/commit/0fbacdcd8ac5d7dd30c2ee942560a52ca767d59d))
+* US-004 - Application secrets management strategy ([a60e9d2](https://github.com/chiply/the-data-platform/commit/a60e9d2a7742b8c276773e63e14a32b25e516748))
+* US-005 - Create Helm chart for schema-registry stub ([e1b8cff](https://github.com/chiply/the-data-platform/commit/e1b8cffe1ca863f422229bc095859b9d29a8ea20))
+* US-006 - Create ArgoCD Application manifests ([673b355](https://github.com/chiply/the-data-platform/commit/673b355b0b4e77ad06a86311e6efce8113c95fbb))
+* US-007 - Set up Tiltfile for local development ([b4ead61](https://github.com/chiply/the-data-platform/commit/b4ead6155105387a89816bfae8b470e3d05f1d26))
+* US-008 - CI pipeline for image builds ([8254a07](https://github.com/chiply/the-data-platform/commit/8254a07f592e4892424049fadd40d5b0e080fff8))
+* US-009 - Add ArgoCD bootstrapping to Tiltfile ([e2b7e4a](https://github.com/chiply/the-data-platform/commit/e2b7e4a8394ce00cb83731abf87903a3657a266e))
+* US-009 - Add ArgoCD bootstrapping to Tiltfile ([2613f8e](https://github.com/chiply/the-data-platform/commit/2613f8ee64e75c70a01985d42e34d58ca38a8da4))
+* US-010 - Helm chart linting and testing in CI ([91d1309](https://github.com/chiply/the-data-platform/commit/91d13098b0ebd0a257099afcc383810d40e5060e))
+* US-011 - Image scanning and CycloneDX SBOM generation ([fb6cc8b](https://github.com/chiply/the-data-platform/commit/fb6cc8bca2b027c63e12f81f15ef2ed344636478))
+* US-011 - Image scanning and CycloneDX SBOM generation ([e15a36c](https://github.com/chiply/the-data-platform/commit/e15a36c7ff6c778b51693b3033b8a34eadf3b3b8))
+* US-012 - ArgoCD RBAC and AppProject hardening ([48c37a4](https://github.com/chiply/the-data-platform/commit/48c37a46326b24fb8f2e84c81168d4c4e632a297))
+* US-013 - Environment promotion workflow documentation ([0105e3e](https://github.com/chiply/the-data-platform/commit/0105e3ec0a08becaaf90cbf402b806665f2b7ce1))
+
+
+### Bug Fixes
+
+* address coderabbit feedback ([e21d99c](https://github.com/chiply/the-data-platform/commit/e21d99c30df4b1aefacac9ca04b11f8dbd855f2f))
+* address coderabbit feedback (round 2) ([67273b9](https://github.com/chiply/the-data-platform/commit/67273b9346f118f0d95e6a116d2abf344e9ceea2))
+* address copilot review feedback ([1ba8cb9](https://github.com/chiply/the-data-platform/commit/1ba8cb912890085b865db413c3e937f5591bd92d))
+* address critical, high, and medium findings from review ([cc6cbc8](https://github.com/chiply/the-data-platform/commit/cc6cbc8199fb1002da1351464400d9d02a73ee62))
+* address review findings before PR ([8f599fc](https://github.com/chiply/the-data-platform/commit/8f599fc6ec3c4804c7dff99cea127fe1bb922c4a))
+* **argocd:** use configs.params for insecure mode instead of extraArgs ([f90a01f](https://github.com/chiply/the-data-platform/commit/f90a01faa29616213c1f05dc8c14fc07d2abbe61))
+* correct GitHub repo URL in ArgoCD manifests (chiply, not charlieholland) ([699cc16](https://github.com/chiply/the-data-platform/commit/699cc16969a166f9722153e5df741b2b858dbd48))
+* **helm:** add runAsUser/runAsGroup to podSecurityContext ([11dfd8d](https://github.com/chiply/the-data-platform/commit/11dfd8d9b1a791f4fede4256b346bfe94b1d7c51))
+* US-007 - fix venv pip path and add restart_container for live_update ([a93980d](https://github.com/chiply/the-data-platform/commit/a93980def45fd76e2448286ca2730ab256934393))
+
 ## [0.1.4](https://github.com/chiply/the-data-platform/compare/platform-v0.1.3...platform-v0.1.4) (2026-03-10)
 
 
