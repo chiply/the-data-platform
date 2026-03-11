@@ -1,0 +1,21 @@
+# Default deny all ingress and egress in the argocd namespace.
+#
+# All traffic must be explicitly allowed by other NetworkPolicy resources.
+#
+# NOTE: Flannel (the default CNI in k3d) does NOT enforce NetworkPolicies.
+# These policies are applied for documentation and production-readiness, but
+# they will have no effect in local k3d clusters. This is an accepted
+# local/production parity gap. In production, use a CNI that supports
+# NetworkPolicy enforcement (e.g., Calico, Cilium).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

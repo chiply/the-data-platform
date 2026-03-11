@@ -5,12 +5,56 @@ metadata:
   namespace: argocd
 spec:
   description: The Data Platform project
+
+  # AC-1: sourceRepos restricted to platform GitHub repo only
   sourceRepos:
-    - https://github.com/charlieholland/the-data-platform.git
+    - "https://github.com/charlieholland/the-data-platform.git"
+
+  # AC-2: destinations restricted to tdp namespace on in-cluster only
   destinations:
-    - server: https://kubernetes.default.svc
-      namespace: tdp
+    - namespace: tdp
+      server: https://kubernetes.default.svc
+
+  # AC-3: clusterResourceWhitelist denies cluster-scoped resources by default.
+  # An empty list means NO cluster-scoped resources (Namespace, ClusterRole,
+  # ClusterRoleBinding, etc.) can be created by applications in this project.
   clusterResourceWhitelist: []
+
+  # Explicit namespace-scoped resource whitelist. Only these resource types
+  # may be created by applications belonging to this project.
   namespaceResourceWhitelist:
-    - group: "*"
-      kind: "*"
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: apps
+      kind: DaemonSet
+    - group: batch
+      kind: Job
+    - group: batch
+      kind: CronJob
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+
+  # Deny all namespace-scoped resources not explicitly listed above.
+  namespaceResourceBlacklist: []
+
+  # Orphaned resource monitoring
+  orphanedResources:
+    warn: true
