@@ -223,7 +223,7 @@
         "Documentation notes Flannel does not enforce NetworkPolicies locally"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Some overlap with US-006 AppProject restrictions — this story hardens beyond the initial setup."
     },
@@ -241,7 +241,7 @@
         "Documentation lives in monorepo/deploy/README.md or monorepo/infra/README.md"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S."
     }

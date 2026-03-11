@@ -101,4 +101,14 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Files changed: monorepo/deploy/charts/common/ (Chart.yaml, values.yaml, templates/_helpers.tpl, _deployment.tpl, _service.tpl, _ingress.tpl)
 - Learnings: Library charts use `define` blocks called via `include`. Consuming charts add dependency in Chart.yaml and call templates like `{{ include "common.deployment" . }}`.
 
+## US-012 - ArgoCD RBAC and AppProject hardening
+- What was implemented: Enhanced AppProject with explicit namespaceResourceWhitelist (16 resource types), orphanedResources warning. K8s RBAC manifests: ClusterRole/ClusterRoleBinding for ArgoCD controller, namespace-scoped Role for tdp namespace. NetworkPolicies: default-deny ingress/egress, allow-traefik-ingress, allow-inter-component, allow-egress-kube-api, allow-egress-github. README documenting RBAC and NetworkPolicy setup.
+- Files changed: monorepo/deploy/argocd/appproject.yaml (enhanced), rbac/clusterrole.yaml, rbac/clusterrolebinding.yaml, rbac/namespace-role.yaml, network-policies/default-deny.yaml, network-policies/allow-traefik-ingress.yaml, network-policies/allow-inter-component.yaml, network-policies/allow-egress-kube-api.yaml, network-policies/allow-egress-github.yaml, README.md
+- Learnings: Empty clusterResourceWhitelist denies all cluster-scoped resources. Flannel (k3d default CNI) does not enforce NetworkPolicies — documented for local dev awareness. Merge conflict resolved: kept US-012's detailed resource whitelist with US-006's `tdp` project name.
+
+## US-013 - Environment promotion workflow documentation
+- What was implemented: Comprehensive monorepo/deploy/README.md documenting the full promotion workflow: release-please creates releases → post-release CI builds + pushes images → update values-<env>.yaml image tag → ArgoCD syncs. Includes rollback procedures, local development notes, and ArgoCD dashboard usage. Deprecated service-deployment.ts with @deprecated JSDoc.
+- Files changed: monorepo/deploy/README.md, monorepo/infra/components/service-deployment.ts
+- Learnings: ArgoCD rollback via `argocd app history` + `argocd app rollback`. Promotion is git-based: update image tag in values file, commit, push.
+
 ---
