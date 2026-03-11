@@ -1,18 +1,36 @@
-# Tiltfile for The Data Platform — local development with k3d
+# =============================================================================
+# The Data Platform — Tiltfile
+# =============================================================================
 #
-# Prerequisites:
-#   - k3d cluster "tdp-local" running (see infra/ for setup)
-#   - Registry at k3d-tdp-local-registry:5111
+# Two modes of operation:
 #
-# Usage:
-#   cd monorepo/
-#   tilt up
+#   tilt-only (default):
+#     cd monorepo && tilt up
+#     - docker_build with live_update for rapid inner-loop development
+#     - Helm chart rendered and deployed directly by Tilt
+#     - No ArgoCD involved
+#
+#   tilt+argocd (for testing GitOps config):
+#     cd monorepo && tilt up -- --argocd
+#     - Tilt installs ArgoCD via helm_resource
+#     - ArgoCD manages application deployments (docker_build disabled)
+#     - ArgoCD Application manifests applied via local_resource on file change
+#     - ArgoCD pulls images from the k3d registry
 #
 # IMPORTANT: Tilt and ArgoCD must never manage the same resources simultaneously.
-# ArgoCD should be disabled or paused for any namespace Tilt is managing.
+#
+# =============================================================================
 
 # ---------------------------------------------------------------------------
-# Cluster configuration
+# Configuration
+# ---------------------------------------------------------------------------
+
+config.define_bool("argocd", usage="Enable ArgoCD mode (boots ArgoCD, disables docker_build)")
+cfg = config.parse()
+argocd_mode = cfg.get("argocd", False)
+
+# ---------------------------------------------------------------------------
+# Cluster & Registry
 # ---------------------------------------------------------------------------
 
 # Only allow Tilt to connect to the local k3d cluster — never production.
@@ -22,75 +40,152 @@ allow_k8s_contexts("k3d-tdp-local")
 default_registry("k3d-tdp-local-registry:5111")
 
 # ---------------------------------------------------------------------------
-# Schema Registry — docker_build with live_update
+# Guard: prevent concurrent Tilt and ArgoCD ownership
 # ---------------------------------------------------------------------------
+#
+# In tilt-only mode, check if ArgoCD Application resources exist in the
+# cluster. If they do, ArgoCD may be managing deployments and Tilt should
+# not take direct ownership of the same resources.
+#
+# In argocd mode, this check is skipped because Tilt is intentionally
+# bootstrapping ArgoCD.
 
-# live_update enables sub-second code syncing without full image rebuilds:
-#   - Python file changes are synced directly into the container, then
-#     restart_container() restarts uvicorn so changes take effect.
-#   - requirements.txt changes trigger pip install inside the container and
-#     then restart the process so new packages are available.
-#   - Dockerfile changes fall back to a full image rebuild.
-
-docker_build(
-    "schema-registry",
-    context="services/schema-registry",
-    dockerfile="services/schema-registry/Dockerfile",
-    live_update=[
-        # If the Dockerfile itself changes, do a full rebuild (no live update).
-        fall_back_on(["services/schema-registry/Dockerfile"]),
-
-        # Sync all files into the container's /app directory.
-        sync("services/schema-registry/", "/app/"),
-
-        # When requirements.txt changes, re-install dependencies into the venv
-        # and restart the process so new packages are loaded.
-        run(
-            "/opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt",
-            trigger=["services/schema-registry/requirements.txt"],
-        ),
-
-        # Restart the container after file sync so uvicorn picks up changes.
-        # (The production CMD does not include --reload; we rely on container
-        # restart for live_update instead of baking dev-only flags into the image.)
-        restart_container(),
-    ],
-)
-
-# ---------------------------------------------------------------------------
-# Schema Registry — Helm chart
-# ---------------------------------------------------------------------------
-
-# Ensure Helm dependencies (common library chart) are up to date before
-# rendering the chart. This runs once at Tiltfile load time.
-local_resource(
-    "schema-registry-helm-deps",
-    cmd="helm dependency update deploy/charts/schema-registry",
-    deps=["deploy/charts/schema-registry/Chart.yaml"],
-    labels=["setup"],
-)
-
-k8s_yaml(
-    helm(
-        "deploy/charts/schema-registry",
-        name="schema-registry",
-        values=["deploy/charts/schema-registry/values-local.yaml"],
+if not argocd_mode:
+    argocd_apps = local(
+        "kubectl get applications.argoproj.io -n argocd -o name 2>/dev/null || true",
+        quiet=True,
     )
-)
+    if str(argocd_apps).strip():
+        fail(
+            "\n"
+            + "=" * 70 + "\n"
+            + "  CONFLICT: ArgoCD Application resources detected in the cluster.\n"
+            + "\n"
+            + "  Running ArgoCD Applications:\n"
+            + "    " + str(argocd_apps).strip().replace("\n", "\n    ") + "\n"
+            + "\n"
+            + "  Tilt cannot safely manage the same resources that ArgoCD owns.\n"
+            + "  Either:\n"
+            + "    1. Remove ArgoCD Applications first:\n"
+            + "       kubectl delete applications.argoproj.io --all -n argocd\n"
+            + "    2. Use ArgoCD mode instead:\n"
+            + "       tilt up -- --argocd\n"
+            + "=" * 70 + "\n"
+        )
 
 # ---------------------------------------------------------------------------
-# Schema Registry — k8s_resource configuration
+# Mode: tilt+argocd
 # ---------------------------------------------------------------------------
 
-k8s_resource(
-    "schema-registry",
-    port_forwards=["8000:8000"],
-    labels=["services"],
-    resource_deps=["schema-registry-helm-deps"],
-)
+if argocd_mode:
+    # Install ArgoCD via Helm into argocd namespace.
+    # Non-HA mode, disabled components to save memory (~200 Mi saved).
+    # Matches the Pulumi Layer 2 installation from design doc 005.
+    helm_resource(
+        "argocd",
+        "argo-cd",
+        namespace="argocd",
+        flags=[
+            "--create-namespace",
+            "--version=7.7.16",
+            "--repo=https://argoproj.github.io/argo-helm",
+            "--set=dex.enabled=false",
+            "--set=applicationSet.enabled=false",
+            "--set=notifications.enabled=false",
+            "--set=server.service.type=ClusterIP",
+            "--set=server.ingress.enabled=true",
+            "--set=server.ingress.ingressClassName=traefik",
+            "--set=server.ingress.hosts[0]=argocd.localhost",
+            "--set=server.ingress.tls=false",
+            "--set=configs.params.server\\.insecure=true",
+            "--set=global.logging.level=info",
+        ],
+        resource_deps=[],
+        labels=["argocd"],
+    )
+
+    # Apply ArgoCD AppProject and Application manifests on file change.
+    # This lets developers iterate on ArgoCD configuration locally.
+    local_resource(
+        "argocd-appproject",
+        cmd="kubectl apply -f deploy/argocd/appproject.yaml",
+        deps=["deploy/argocd/appproject.yaml"],
+        resource_deps=["argocd"],
+        labels=["argocd"],
+    )
+
+    local_resource(
+        "argocd-applications",
+        cmd="kubectl apply -f deploy/argocd/apps/",
+        deps=["deploy/argocd/apps"],
+        resource_deps=["argocd-appproject"],
+        labels=["argocd"],
+    )
 
 # ---------------------------------------------------------------------------
-# Local resources — tests and linting
+# Mode: tilt-only (default) — direct docker_build + helm deployment
+# ---------------------------------------------------------------------------
+
+if not argocd_mode:
+    # Build schema-registry with live_update for sub-second code syncing.
+    #   - Python file changes are synced directly into the container, then
+    #     restart_container() restarts uvicorn so changes take effect.
+    #   - requirements.txt changes trigger pip install inside the container and
+    #     then restart the process so new packages are available.
+    #   - Dockerfile changes fall back to a full image rebuild.
+    docker_build(
+        "schema-registry",
+        context="services/schema-registry",
+        dockerfile="services/schema-registry/Dockerfile",
+        live_update=[
+            # If the Dockerfile itself changes, do a full rebuild (no live update).
+            fall_back_on(["services/schema-registry/Dockerfile"]),
+
+            # Sync all files into the container's /app directory.
+            sync("services/schema-registry/", "/app/"),
+
+            # When requirements.txt changes, re-install dependencies into the venv
+            # and restart the process so new packages are loaded.
+            run(
+                "/opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt",
+                trigger=["services/schema-registry/requirements.txt"],
+            ),
+
+            # Restart the container after file sync so uvicorn picks up changes.
+            # (The production CMD does not include --reload; we rely on container
+            # restart for live_update instead of baking dev-only flags into the image.)
+            restart_container(),
+        ],
+    )
+
+    # Ensure Helm dependencies (common library chart) are up to date before
+    # rendering the chart. This runs once at Tiltfile load time.
+    local_resource(
+        "schema-registry-helm-deps",
+        cmd="helm dependency update deploy/charts/schema-registry",
+        deps=["deploy/charts/schema-registry/Chart.yaml"],
+        labels=["setup"],
+    )
+
+    # Render and deploy the schema-registry Helm chart with local values.
+    k8s_yaml(
+        helm(
+            "deploy/charts/schema-registry",
+            name="schema-registry",
+            values=["deploy/charts/schema-registry/values-local.yaml"],
+        )
+    )
+
+    # Configure schema-registry Kubernetes resource
+    k8s_resource(
+        "schema-registry",
+        port_forwards=["8000:8000"],
+        labels=["services"],
+        resource_deps=["schema-registry-helm-deps"],
+    )
+
+# ---------------------------------------------------------------------------
+# Local resources — tests and linting (available in both modes)
 # ---------------------------------------------------------------------------
 
 local_resource(
