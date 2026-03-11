@@ -57,7 +57,7 @@
         "helm lint passes on the library chart"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: M. Elevated from p2 to priority 1 because TDP-005-02 (schema-registry Helm chart) depends on it."
     },
