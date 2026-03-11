@@ -134,7 +134,7 @@ jobs:
 
       - name: Verify scripts are executable
         run: |
-          for script in scripts/build.sh scripts/test.sh scripts/render-diagrams.sh scripts/affected.sh; do
+          for script in scripts/build.sh scripts/test.sh scripts/render-diagrams.sh scripts/affected.sh scripts/lint-charts.sh; do
             if [ ! -x "$script" ]; then
               echo "FAIL: $script is not executable"
               exit 1
@@ -166,6 +166,48 @@ jobs:
             exit 1
           fi
           echo "OK: affected.sh completed successfully"
+
+  helm-lint:
+    name: Helm Chart Linting
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: monorepo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for deploy changes
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            CHANGED=$(git diff --name-only HEAD~1 HEAD -- deploy/ || true)
+          else
+            CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- deploy/ || true)
+          fi
+          if [ -n "$CHANGED" ]; then
+            echo "deploy_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Helm
+        if: steps.filter.outputs.deploy_changed == 'true'
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.0'
+
+      - name: Run lint-charts.sh
+        if: steps.filter.outputs.deploy_changed == 'true'
+        run: ./scripts/lint-charts.sh
+
+      - name: Skip (no deploy changes)
+        if: steps.filter.outputs.deploy_changed != 'true'
+        run: echo "No changes in monorepo/deploy/, skipping helm lint"
 
   monorepo-structure:
     name: Monorepo Structure Validation
