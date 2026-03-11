@@ -165,6 +165,37 @@ kubectl port-forward svc/example-service 8080:80
 # Then: http://localhost:8080
 ```
 
+### Accessing platform UIs
+
+A convenience script prints port-forward commands and retrieves credentials for ArgoCD
+and Grafana:
+
+```bash
+# All UIs for the current environment
+./monorepo/infra/scripts/ui-access.sh local          # or: dev, production
+./monorepo/infra/scripts/ui-access.sh production argocd   # single service
+./monorepo/infra/scripts/ui-access.sh dev grafana         # single service
+```
+
+**ArgoCD UI:**
+
+| Environment | Access method | URL |
+|-------------|--------------|-----|
+| Local | Ingress (automatic) | http://argocd.localhost |
+| Dev | `kubectl port-forward -n argocd svc/argocd-server 8080:80` | http://localhost:8080 |
+| Production | `kubectl port-forward -n argocd svc/argocd-server 8080:80` | http://localhost:8080 |
+
+Credentials: `admin` / password from `argocd-initial-admin-secret` (the script retrieves it automatically).
+
+**Grafana:**
+
+| Environment | Access method | URL |
+|-------------|--------------|-----|
+| All | `kubectl port-forward -n monitoring svc/<grafana-svc> 3001:80` | http://localhost:3001 |
+
+Credentials: `admin` / password from the Grafana secret (the script retrieves it automatically).
+For local, the default password is `admin`.
+
 ### Creating a new service
 
 1. Create a directory under `monorepo/services/my-service/`
@@ -214,6 +245,9 @@ scratch at any time.
 ```bash
 kubectl --kubeconfig ~/.kube/tdp-dev.yaml get nodes
 k9s --kubeconfig ~/.kube/tdp-dev.yaml
+
+# Open platform UIs (ArgoCD, Grafana)
+./monorepo/infra/scripts/ui-access.sh dev
 
 # Smoke test against dev
 ./monorepo/infra/scripts/smoke-test.sh dev
@@ -271,9 +305,8 @@ kubectl --kubeconfig ~/.kube/tdp-production.yaml get nodes
 # Browse with k9s
 k9s --kubeconfig ~/.kube/tdp-production.yaml
 
-# View Grafana dashboards (port-forward to localhost:3001)
-kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n monitoring svc/<grafana-svc-name> 3001:80
-# Then open: http://localhost:3001 — login: admin / $GRAFANA_ADMIN_PASSWORD
+# Open platform UIs (ArgoCD, Grafana) — see "Accessing Platform UIs" below
+./monorepo/infra/scripts/ui-access.sh production
 ```
 
 ### 5. Tear down production

@@ -691,6 +691,20 @@ Harden ArgoCD access controls for production:
 - Document that Flannel (k3d default) does not enforce NetworkPolicies
   locally — this is an accepted local/production parity gap
 
+** DONE [TDP-005-16] Platform UI access helper script                        :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add a convenience script for accessing ArgoCD and Grafana UIs across all
+environments:
+- =monorepo/infra/scripts/ui-access.sh= — port-forwards and retrieves credentials
+- Local ArgoCD accessible via Traefik ingress (=argocd.localhost=); dev/production
+  use =kubectl port-forward= (same pattern as Grafana)
+- Update =CONTRIBUTING.md= with "Accessing Platform UIs" section
+- Update =_helpers.sh= =print_access_info= to reference the script and differentiate
+  local vs remote access patterns
+
 * Questions
 :PROPERTIES:
 :CATEGORY: questions

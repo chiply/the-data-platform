@@ -46,6 +46,7 @@ infra/
 | `scripts/production-up.sh` | Provision production Linode + k3s cluster + platform services |
 | `scripts/production-down.sh` | Destroy production platform + cluster + Linode instance |
 | `scripts/smoke-test.sh` | Deploy nginx, test ingress, clean up (environment-aware) |
+| `scripts/ui-access.sh` | Port-forward platform UIs (ArgoCD, Grafana) and print credentials |
 
 ### Usage
 
