@@ -7,18 +7,18 @@ image:
 
 imagePullSecrets: []
 
-# Relax security context for local dev — Tilt live_update needs
-# write access to the container filesystem to sync files.
+# Security context for local dev — readOnlyRootFilesystem is disabled
+# so Tilt live_update can sync files into the container.
 securityContext:
-  runAsNonRoot: false
+  runAsNonRoot: true
   readOnlyRootFilesystem: false
   allowPrivilegeEscalation: false
 
-# Run as root locally so Tilt can write to /app
+# Run as the app user (matches Dockerfile USER app)
 podSecurityContext:
-  runAsUser: 0
-  runAsGroup: 0
-  fsGroup: 0
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
 
 ingress:
   enabled: true

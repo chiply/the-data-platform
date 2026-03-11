@@ -101,10 +101,12 @@ print_access_info() {
   echo "  kubectl --kubeconfig ${kubeconfig_path} get nodes"
   echo "  k9s --kubeconfig ${kubeconfig_path}"
   echo ""
+  local env_lower
+  env_lower="$(echo "${env_name}" | tr '[:upper:]' '[:lower:]')"
   echo "Platform UIs (port-forward + credentials):"
-  echo "  ./monorepo/infra/scripts/ui-access.sh ${env_name,,}"
+  echo "  ./monorepo/infra/scripts/ui-access.sh ${env_lower}"
   echo ""
-  if [[ "${env_name,,}" == "local" ]]; then
+  if [[ "${env_lower}" == "local" ]]; then
     echo "ArgoCD UI: http://argocd.localhost"
     echo "Grafana:   kubectl --kubeconfig ${kubeconfig_path} port-forward -n monitoring svc/\$(kubectl --kubeconfig ${kubeconfig_path} get svc -n monitoring -l app.kubernetes.io/name=grafana -o name | head -1 | sed 's|service/||') 3001:80"
   else
