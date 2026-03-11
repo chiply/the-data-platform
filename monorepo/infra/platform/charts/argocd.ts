@@ -153,20 +153,9 @@ export function installArgoCD(args: ArgoCDArgs): k8s.helm.v3.Release {
           // so the Helm chart also configures the ingress backend correctly.
         },
 
-        // Repo server — configured for monorepo efficiency
+        // Repo server
         repoServer: {
           resources: preset.repoServer,
-          env: [
-            // Shallow clones to save disk
-            { name: "ARGOCD_GIT_SHALLOW_DEPTH", value: "1" },
-            // Sparse checkout — only clone the deploy directory to reduce
-            // disk usage and clone time for the monorepo
-            { name: "ARGOCD_GIT_SPARSE_CHECKOUT", value: "true" },
-            {
-              name: "ARGOCD_GIT_SPARSE_CHECKOUT_PATHS",
-              value: "monorepo/deploy/",
-            },
-          ],
         },
 
         // Redis

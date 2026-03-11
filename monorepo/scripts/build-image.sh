@@ -89,6 +89,7 @@ done
 if [ -z "${SERVICE_NAME:-}" ]; then
   echo "ERROR: Service name is required" >&2
   usage
+  exit 1
 fi
 
 # Derive org from git remote if not provided
