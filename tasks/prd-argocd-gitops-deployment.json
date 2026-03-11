@@ -74,7 +74,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: M. Builds on existing Pulumi ESC infrastructure from commit ba99cf1."
     },

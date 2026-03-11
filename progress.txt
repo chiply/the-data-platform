@@ -56,6 +56,11 @@ PRD: tasks/prd-argocd-gitops-deployment.json
 - Files changed: monorepo/services/schema-registry/main.py, requirements.txt, Dockerfile, release-please-config.json, .release-please-manifest.json
 - Learnings: The repo has a Dockerfile.base pattern in monorepo/services/ that future services could extend. Release-please uses component field for tags in format <component>-vX.Y.Z.
 
+## US-004 - Application secrets management strategy
+- What was implemented: Created monorepo/infra/platform/app-secrets.ts creating tdp namespace and K8s Secrets (tdp-db-credentials, tdp-app-credentials) from Pulumi config/ESC. Wired into index.ts before platform charts. Updated Pulumi.dev.yaml and Pulumi.production.yaml. Created monorepo/infra/docs/app-secrets.md.
+- Files changed: app-secrets.ts, index.ts, tsconfig.json, Pulumi.dev.yaml, Pulumi.production.yaml, docs/app-secrets.md
+- Learnings: config.get()/config.requireSecret() pattern for optional-in-local, required-in-prod secrets. tsconfig.json uses explicit `files` array so new .ts files must be added.
+
 ## US-003 - Create shared Helm library chart
 - What was implemented: Helm library chart at monorepo/deploy/charts/common/ with _helpers.tpl, _deployment.tpl, _service.tpl, _ingress.tpl. Consistent app.kubernetes.io/* labels, security context defaults (runAsNonRoot, readOnlyRootFilesystem), configurable health probes.
 - Files changed: monorepo/deploy/charts/common/ (Chart.yaml, values.yaml, templates/_helpers.tpl, _deployment.tpl, _service.tpl, _ingress.tpl)
