@@ -1,0 +1,42 @@
+[project]
+name = "{{ service_name }}"
+version = "{{ service_version }}"
+description = "{{ service_description }}"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.27,<1",
+    "pydantic-settings>=2,<3",
+    "python-json-logger>=2,<3",
+    "icontract>=2.7,<3",
+    # Observability
+    "opentelemetry-api>=1.20,<2",
+    "opentelemetry-sdk>=1.20,<2",
+    "opentelemetry-exporter-otlp>=1.20,<2",
+    "opentelemetry-instrumentation-fastapi>=0.41b0",
+    "opentelemetry-instrumentation-httpx>=0.41b0",
+{% if use_database %}
+    "opentelemetry-instrumentation-sqlalchemy>=0.41b0",
+    # Database
+    "sqlalchemy[asyncio]>=2,<3",
+    "asyncpg>=0.29,<1",
+    "alembic>=1.13,<2",
+{% endif %}
+{% if use_gunicorn %}
+    # Production server
+    "gunicorn>=21,<23",
+{% endif %}
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.23,<1",
+    "httpx>=0.27,<1",
+    "hypothesis>=6.98,<7",
+    "polyfactory>=2.14,<3",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

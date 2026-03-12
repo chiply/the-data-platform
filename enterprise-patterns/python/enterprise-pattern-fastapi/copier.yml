@@ -4,6 +4,7 @@ _min_copier_version: "9.1.0"
 _skip_if_exists:
   - "alembic/versions/*.py"
   - "CHANGELOG.md"
+  - "uv.lock"
 _envops:
   trim_blocks: true
   lstrip_blocks: true

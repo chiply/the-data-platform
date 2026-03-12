@@ -1,9 +1,8 @@
-FROM tdp-python-base AS base
+FROM tdp-python-base
 
-# Install service-specific dependencies
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
-    rm /tmp/requirements.txt
+# Install service-specific dependencies using uv
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 # Copy application source and supporting files
 COPY src/ /app/src/
