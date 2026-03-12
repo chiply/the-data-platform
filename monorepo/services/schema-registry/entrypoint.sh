@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
-# Use exec to replace the shell process so that signals (e.g. SIGTERM from
-# Kubernetes) reach the application directly.
-exec uvicorn src.schema_registry.main:app --host 0.0.0.0 --port 8000
+# Use Gunicorn with Uvicorn workers for production deployments.
+# exec replaces the shell process so SIGTERM reaches Gunicorn directly,
+# enabling graceful shutdown in Kubernetes rolling deployments.
+exec gunicorn schema_registry.main:app \
+    --config gunicorn_conf.py \
+    --bind "0.0.0.0:8000"

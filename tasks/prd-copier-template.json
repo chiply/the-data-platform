@@ -155,7 +155,7 @@
         "All template-generated files are present and syntactically valid Python"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
@@ -171,7 +171,7 @@
         "copier update --trust --vcs-ref HEAD --pretend runs without errors on the generated service"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "End of main dependency chain \u2014 natural verification checkpoint. Full k3d deploy verification requires manual testing."
     },
@@ -186,7 +186,7 @@
         "CHANGELOG.md is preserved (covered by _skip_if_exists in copier.yml)"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "End of main chain verification. Release-please config may need manual inspection."
     }
