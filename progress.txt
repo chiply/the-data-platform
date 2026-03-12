@@ -10,6 +10,12 @@ PRD: tasks/prd-copier-template.json
 - routers/__init__.py has no .jinja suffix since it has no template variables
 - logging_config.py uses try/except for OTel import to gracefully degrade
 - OTelJsonFormatter inherits from pythonjsonlogger.jsonlogger.JsonFormatter and overrides add_fields
+- Conditional file/dir names with {% if %} in filename are literal on disk — Copier interprets them
+- script.py.mako must NOT have .jinja suffix (Mako conflicts with Jinja2)
+- database.py exports `engine` and `async_session_factory` matching imports in main.py and dependencies.py
+- ExampleSchema has icontract @invariant requiring non-empty name — Polyfactory factory needs custom name() override
+- Test settings override uses FastAPI dependency_overrides (not patching @lru_cache)
+- pytest.ini at project root configures asyncio_mode = auto
 ---
 
 ## US-001 - Create Copier template configuration

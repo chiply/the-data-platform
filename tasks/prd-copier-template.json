@@ -29,7 +29,7 @@
     {
       "id": "US-002",
       "sourceTaskId": "TDP-006-02",
-      "title": "Create template project files — core modules",
+      "title": "Create template project files \u2014 core modules",
       "description": "As a developer, I want the core template files so that generated services have a complete FastAPI project structure. Create the project/ subdirectory with Jinja2-templated files: main.py (app factory with lifespan, exception handlers, router includes), config.py (pydantic-settings with Environment enum), exceptions.py (AppException hierarchy with handlers), schemas.py (base model with icontract example), dependencies.py (get_settings with lru_cache, get_db_session conditional), routers/health.py (health and version endpoints), __init__.py, py.typed, Dockerfile (FROM tdp-python-base), .dockerignore, requirements.in, requirements.txt, README.md with post-generation checklist, entrypoint.sh with exec for signal propagation, and logging_config.py with dictConfig JSON formatter and OTel trace/span injection.",
       "acceptanceCriteria": [
         "project/src/{{ module_name }}/main.py.jinja exists with FastAPI app factory, lifespan context manager, exception handler registration, and router includes",
@@ -52,7 +52,7 @@
     {
       "id": "US-003",
       "sourceTaskId": "TDP-006-03",
-      "title": "Create template project files — OTel instrumentation",
+      "title": "Create template project files \u2014 OTel instrumentation",
       "description": "As a developer, I want OpenTelemetry instrumentation included in generated services so that every service starts compliant with platform observability standards. Create src/{{ module_name }}/telemetry.py.jinja with TracerProvider, OTLPSpanExporter, Resource configuration, FastAPIInstrumentor, conditional SQLAlchemyInstrumentor, HTTPXClientInstrumentor, and exported tracer example. Add OTel dependencies to requirements.in.jinja.",
       "acceptanceCriteria": [
         "project/src/{{ module_name }}/telemetry.py.jinja exists",
@@ -65,14 +65,14 @@
         "OTel dependencies added to requirements.in.jinja: opentelemetry-api, opentelemetry-sdk, opentelemetry-exporter-otlp, opentelemetry-instrumentation-fastapi, opentelemetry-instrumentation-sqlalchemy (conditional), opentelemetry-instrumentation-httpx"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
     {
       "id": "US-004",
       "sourceTaskId": "TDP-006-04",
-      "title": "Create template project files — database (conditional)",
+      "title": "Create template project files \u2014 database (conditional)",
       "description": "As a developer, I want conditional database support so that services that need a database get async SQLAlchemy and Alembic setup automatically. Create database.py.jinja with create_async_engine (pool config), async_sessionmaker, expire_on_commit=False. Create models/__init__.py, alembic/env.py.jinja with async migration pattern, alembic/script.py.mako (verbatim, no .jinja), alembic/versions/.gitkeep, alembic.ini.jinja. Add database dependencies to requirements.in.jinja. Ensure lifespan in main.py disposes engine on shutdown.",
       "acceptanceCriteria": [
         "project/src/{{ module_name }}/{% if use_database %}database{% endif %}.py.jinja exists with create_async_engine, pool_size, max_overflow, pool_pre_ping=True, async_sessionmaker, expire_on_commit=False",
@@ -85,14 +85,14 @@
         "main.py lifespan context manager disposes database engine on shutdown when use_database is true"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "alembic/script.py.mako must NOT have .jinja suffix due to Mako syntax conflicts with Jinja2"
     },
     {
       "id": "US-005",
       "sourceTaskId": "TDP-006-05",
-      "title": "Create template project files — testing skeleton",
+      "title": "Create template project files \u2014 testing skeleton",
       "description": "As a developer, I want a testing skeleton so that generated services include examples of all mandated testing patterns. Create tests/conftest.py.jinja with AsyncClient fixture, test database fixture (conditional), settings_override fixture, asyncio_mode=auto. Create test_health.py.jinja, test_schemas.py.jinja (Polyfactory example), test_properties.py.jinja (Hypothesis + icontract example). Add test dependencies to requirements.in.jinja.",
       "acceptanceCriteria": [
         "project/tests/__init__.py exists",
@@ -103,7 +103,7 @@
         "Test dependencies added to requirements.in.jinja: pytest, pytest-asyncio, httpx, hypothesis, polyfactory, icontract"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
@@ -173,7 +173,7 @@
       "priority": 9,
       "passes": false,
       "humanReview": true,
-      "notes": "End of main dependency chain — natural verification checkpoint. Full k3d deploy verification requires manual testing."
+      "notes": "End of main dependency chain \u2014 natural verification checkpoint. Full k3d deploy verification requires manual testing."
     },
     {
       "id": "US-010",
