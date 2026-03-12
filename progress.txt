@@ -18,6 +18,16 @@ PRD: tasks/prd-copier-template.json
 - pytest.ini at project root configures asyncio_mode = auto
 ---
 
+## [Shared Libs] US-001 - Create tdp-fastapi-core shared library
+- What was implemented: Created the tdp-fastapi-core shared library at monorepo/libs/tdp-fastapi-core/ with src/ layout and hatchling build system. Extracted and parameterized four modules: logging (JSON formatter with OTel trace injection), telemetry (configurable TracerProvider with optional instrumentors), exceptions (AppException hierarchy with FastAPI handlers), and request ID middleware. All 15 tests pass.
+- Files changed: monorepo/libs/tdp-fastapi-core/ (12 files)
+- Learnings:
+  - python-json-logger v4 moved pythonjsonlogger.jsonlogger to pythonjsonlogger.json
+  - Formatter class path in dict-config must be fully qualified (tdp_fastapi_core.logging.OTelJsonFormatter)
+  - Optional instrumentors (httpx, sqlalchemy) should use lazy imports with try/except
+  - type: ignore[arg-type] needed on add_exception_handler for Starlette types
+---
+
 ## US-001 - Create Copier template configuration
 - What was implemented: copier.yml with all metadata and 7 parameterized questions with validators; answers file template
 - Files changed: enterprise-patterns/python/enterprise-pattern-fastapi/copier.yml, project/{{ _copier_conf.answers_file }}.jinja

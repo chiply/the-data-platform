@@ -1,0 +1,82 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/copier-shared-libs",
+  "description": "Extract cross-cutting concerns (logging, telemetry, exceptions) into a shared platform library (tdp-fastapi-core) under monorepo/libs/, wire it into the Copier template with uv editable path dependencies, regenerate schema-registry, and add CI validation for version pins.",
+  "sourceDesignDoc": "docs/design/006-copier-service-templates.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-006-18",
+      "title": "Create tdp-fastapi-core shared library",
+      "description": "Create the shared platform library at monorepo/libs/tdp-fastapi-core/ with src/ layout and hatchling build system. Extract structured logging (JSON formatter with OTel trace/span injection, environment-aware formatting), telemetry setup (TracerProvider, OTLP exporter, FastAPI/SQLAlchemy/httpx auto-instrumentation), exception hierarchy (AppException base with subclasses and FastAPI handlers), and request ID middleware from the existing template files. The library must have its own pyproject.toml, test suite, and uv.lock. Use the existing template-generated code in monorepo/services/schema-registry/ as the reference implementation to extract from. The library's modules should be configurable (e.g., telemetry.setup_telemetry takes service_name, service_version as parameters rather than hardcoding them).",
+      "acceptanceCriteria": [
+        "monorepo/libs/tdp-fastapi-core/pyproject.toml exists with name='tdp-fastapi-core', version='0.1.0', hatchling build system",
+        "src/tdp_fastapi_core/__init__.py exports key functions",
+        "src/tdp_fastapi_core/logging.py provides configure_logging() with JSON formatter and OTel trace injection",
+        "src/tdp_fastapi_core/telemetry.py provides setup_telemetry() with TracerProvider, OTLP exporter, and auto-instrumentation for FastAPI, SQLAlchemy, httpx",
+        "src/tdp_fastapi_core/exceptions.py provides AppException hierarchy and register_exception_handlers()",
+        "src/tdp_fastapi_core/middleware.py provides request ID middleware",
+        "uv lock succeeds in the library directory",
+        "uv sync --extra dev succeeds",
+        "uv run pytest passes all library tests"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Large effort task. Extract from existing template code at enterprise-patterns/python/enterprise-pattern-fastapi/project/ and the generated schema-registry at monorepo/services/schema-registry/. Make functions parameterizable rather than hardcoded."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-006-19",
+      "title": "Wire shared library into Copier template",
+      "description": "Update the Copier template to depend on tdp-fastapi-core instead of inlining the cross-cutting concern implementations. Add tdp-fastapi-core to [project] dependencies in pyproject.toml.jinja with a version constraint (>=0.1.0). Add a [tool.uv.sources] section with editable path dependency pointing to ../../libs/tdp-fastapi-core. Update main.py.jinja to import from tdp_fastapi_core (setup_telemetry, register_exception_handlers, configure_logging). Simplify or remove telemetry.py.jinja, logging_config.py.jinja, and exceptions.py.jinja — they should become thin wrappers that re-export from the library (for services that need to extend them) or be removed entirely. Update Dockerfile.jinja to copy platform libs into the build context before running uv sync.",
+      "acceptanceCriteria": [
+        "pyproject.toml.jinja includes tdp-fastapi-core>=0.1.0 in [project] dependencies",
+        "pyproject.toml.jinja includes [tool.uv.sources] with tdp-fastapi-core path dependency and editable=true",
+        "main.py.jinja imports setup_telemetry, register_exception_handlers, configure_logging from tdp_fastapi_core",
+        "telemetry.py.jinja, logging_config.py.jinja, exceptions.py.jinja are simplified to thin wrappers or removed",
+        "Dockerfile.jinja copies ../../libs/tdp-fastapi-core into the build context",
+        "copier copy with --defaults generates valid Python files (py_compile passes)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Depends on US-001. Keep thin wrapper files for services that need to extend library behavior (e.g., add service-specific exception subclasses). The wrapper pattern is: import from lib, optionally extend."
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-006-20",
+      "title": "Regenerate schema-registry with shared library",
+      "description": "Regenerate monorepo/services/schema-registry/ from the updated template that uses tdp-fastapi-core. Preserve the service-specific customizations (routers/schemas.py with /schemas and /schemas/{name} endpoints, the schemas router include in main.py). After regeneration, run uv sync to verify the editable install resolves correctly, run uv run pytest to verify all tests pass, and verify the service starts correctly.",
+      "acceptanceCriteria": [
+        "schema-registry pyproject.toml includes tdp-fastapi-core in dependencies and [tool.uv.sources]",
+        "uv sync succeeds and installs tdp-fastapi-core as editable from monorepo/libs/",
+        "uv run pytest passes all tests (10 tests expected)",
+        "Service-specific routers/schemas.py is preserved with /schemas and /schemas/{name} endpoints",
+        "main.py includes both health and schemas routers"
+      ],
+      "priority": 3,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Depends on US-002. After regeneration, manually re-add the schemas router import and include in main.py if copier overwrites it. Verify editable install works by checking that changes to tdp-fastapi-core source reflect immediately."
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-006-21",
+      "title": "Add version pin CI validation",
+      "description": "Add a CI check script (scripts/check-lib-versions.sh or a Python script) that verifies each service's tdp-fastapi-core version constraint in [project] dependencies is satisfied by the actual version in the lib's pyproject.toml. Use Python's packaging.specifiers to validate. Add this as a CI job in .github/workflows/ci.yml.",
+      "acceptanceCriteria": [
+        "scripts/check-lib-versions.py exists and validates version constraints",
+        "Script parses [project] dependencies from each service's pyproject.toml to extract tdp-fastapi-core version specifier",
+        "Script parses version from monorepo/libs/tdp-fastapi-core/pyproject.toml",
+        "Script exits non-zero when a version constraint is not satisfied",
+        "CI job added to .github/workflows/ci.yml that runs the version check",
+        "Script passes when run against current state of the repo"
+      ],
+      "priority": 4,
+      "passes": false,
+      "humanReview": false,
+      "notes": "Independent of US-003 but should run after all other stories. Uses packaging.specifiers.SpecifierSet to validate version constraints."
+    }
+  ]
+}
