@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.11](https://github.com/chiply/the-data-platform/compare/platform-v0.1.10...platform-v0.1.11) (2026-03-12)
+
+
+### Features
+
+* bootstrap ArgoCD applications in dev and production scripts ([#24](https://github.com/chiply/the-data-platform/issues/24)) ([5a72c5e](https://github.com/chiply/the-data-platform/commit/5a72c5e18c5d426d0822c56431f6774439a2d7d9))
+
+
+### Bug Fixes
+
+* correct ArgoCD application name in production-up.sh wait command ([#26](https://github.com/chiply/the-data-platform/issues/26)) ([7456419](https://github.com/chiply/the-data-platform/commit/74564197ed7363ca0a7f0c6676a8cb7673b79eff))
+
 ## [0.1.10](https://github.com/chiply/the-data-platform/compare/platform-v0.1.9...platform-v0.1.10) (2026-03-12)
 
 
