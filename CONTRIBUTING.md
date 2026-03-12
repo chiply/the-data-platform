@@ -42,6 +42,13 @@ brew install k3d pulumi kubectl derailed/k9s/k9s node
 | [Node.js](https://nodejs.org/) | Runs Pulumi TypeScript programs | `node --version` (v20+) |
 | [kubectl](https://kubernetes.io/docs/tasks/tools/) | Kubernetes CLI | `kubectl version --client` |
 | [k9s](https://k9scli.io/) | Terminal UI for Kubernetes cluster management | `k9s version` |
+| [Copier](https://copier.readthedocs.io/) | Service scaffolding from templates | `copier --version` |
+
+Install Copier with pip or Homebrew:
+
+```bash
+pip install copier    # or: brew install copier
+```
 
 > The `local-up.sh` script checks for docker, k3d, pulumi, node, and npm at startup and
 > exits with a clear error if any are missing.
@@ -198,11 +205,56 @@ For local, the default password is `admin`.
 
 ### Creating a new service
 
-1. Create a directory under `monorepo/services/my-service/`
-2. Add a `Dockerfile` starting with `FROM tdp-python-base AS base`
-3. Add `requirements.txt` and application code
-4. Build and push as shown above
-5. Deploy with `kubectl apply` or using the `ServiceDeployment` Pulumi component
+New services are scaffolded from a Copier template using `scripts/new-service.sh`.
+
+```bash
+./scripts/new-service.sh
+```
+
+The script runs Copier against the service template in `monorepo/templates/service/`
+and generates a fully-configured service directory under `monorepo/services/`.
+
+#### Template questions and defaults
+
+| Question | Default | Notes |
+|----------|---------|-------|
+| `service_name` | — | Kebab-case name (e.g. `feed-ingest`) |
+| `module_name` | derived from `service_name` | Snake_case Python module (e.g. `feed_ingest`) |
+| `service_description` | `"A FastAPI service"` | One-line description |
+| `service_port` | `8000` | Port the service listens on |
+| `service_version` | `"0.1.0"` | Initial version |
+| `use_database` | `true` | Include SQLAlchemy + Alembic support |
+| `use_gunicorn` | `true` | Use Gunicorn as the process manager |
+
+#### Post-generation steps
+
+After the template generates your service directory you should:
+
+1. Review the generated files under `monorepo/services/<service_name>/`
+2. Add a Helm chart for the service (or extend the generated one) if custom deployment
+   configuration is needed
+3. Register the service in `release-please-config.json` so releases are tracked
+4. Build and push the image as described in [Building and deploying a service](#building-and-deploying-a-service)
+
+#### Updating an existing service from template changes
+
+When the service template evolves (new best practices, dependency updates, structural
+changes), you can pull those changes into an existing service:
+
+```bash
+cd monorepo/services/<service_name>
+copier update --trust --vcs-ref HEAD
+```
+
+This replays the template against your service, preserving your answers from the
+original generation. Where the template change and your local edits overlap, Copier
+writes standard conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) into the affected
+files. Resolve these markers the same way you would resolve a Git merge conflict, then
+commit the result.
+
+> **Note:** Run `copier update` intentionally when you know template changes exist that
+> you want to adopt. It is not something that should be run automatically or as part of
+> routine development.
 
 See `monorepo/services/README.md` for image build details and
 `monorepo/infra/README.md` for Pulumi deployment patterns.
