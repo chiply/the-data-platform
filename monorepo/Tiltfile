@@ -197,14 +197,19 @@ if not argocd_mode:
         ],
     )
 
-    # Ensure Helm dependencies (common library chart) are up to date before
-    # rendering the chart. This runs once at Tiltfile load time.
-    local_resource(
-        "schema-registry-helm-deps",
-        cmd="helm dependency update deploy/charts/schema-registry",
-        deps=["deploy/charts/schema-registry/Chart.yaml"],
-        labels=["setup"],
-    )
+    # Ensure Helm dependencies (common library chart) are present before
+    # rendering the chart. This must run synchronously at Tiltfile load time
+    # because helm() executes during loading — a local_resource would run too
+    # late and the helm() call would fail with missing dependencies.
+    #
+    # Only run if the charts/ directory is missing to avoid an infinite reload
+    # loop: helm dependency build writes files that Tilt watches, which would
+    # trigger another Tiltfile reload, running the build again, etc.
+    if not os.path.exists("deploy/charts/schema-registry/charts"):
+        local(
+            "helm dependency build deploy/charts/schema-registry",
+            quiet=True,
+        )
 
     # Render and deploy the schema-registry Helm chart with local values.
     k8s_yaml(
@@ -220,7 +225,6 @@ if not argocd_mode:
         "schema-registry",
         port_forwards=["8000:8000"],
         labels=["services"],
-        resource_deps=["schema-registry-helm-deps"],
     )
 
 # ---------------------------------------------------------------------------
