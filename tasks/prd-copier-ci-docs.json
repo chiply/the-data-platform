@@ -17,7 +17,7 @@
         "Job includes docker build step on the generated Dockerfile"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
@@ -34,7 +34,7 @@
         "CI workflow includes a template-drift job that runs the script"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
@@ -51,7 +51,7 @@
         "Section notes scope is FastAPI HTTP services only"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
@@ -68,9 +68,9 @@
         "copier update workflow and conflict resolution expectations documented"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
-      "notes": "Last task in workstream — natural review checkpoint for documentation accuracy."
+      "notes": "Last task in workstream \u2014 natural review checkpoint for documentation accuracy."
     }
   ]
 }
