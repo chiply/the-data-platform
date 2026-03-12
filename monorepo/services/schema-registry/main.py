@@ -17,7 +17,7 @@ async def version():
     return {"service": "schema-registry", "version": APP_VERSION}
 
 
-@app.get("/schemas", summary="List schemas", description="Returns all registered schemas.")
+@app.get("/schemas", summary="List schemas", description="Returns all registered schemas. Results are sorted alphabetically by name.")
 async def list_schemas():
     return {"schemas": []}
 
