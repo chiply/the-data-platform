@@ -1,0 +1,4 @@
+# file: /Users/charlieholland/source_code/the-data-platform/.claude/worktrees/copier/monorepo/services/schema-registry/src/schema_registry/config.py
+# hypothesis_version: 6.141.1
+
+[8000, '.env', '0.1.0', 'INFO', 'LOCAL', 'PRODUCTION', 'STAGING', 'schema-registry', 'utf-8']

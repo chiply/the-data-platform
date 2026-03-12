@@ -1,0 +1,4 @@
+# file: /Users/charlieholland/source_code/the-data-platform/.claude/worktrees/copier/monorepo/services/schema-registry/src/schema_registry/routers/health.py
+# hypothesis_version: 6.141.1
+
+['/health', '/version', 'health', 'healthy', 'service', 'status', 'version']

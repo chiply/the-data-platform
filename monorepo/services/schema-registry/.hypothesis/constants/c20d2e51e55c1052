@@ -1,0 +1,4 @@
+# file: /Users/charlieholland/source_code/the-data-platform/.claude/worktrees/copier/monorepo/services/schema-registry/src/schema_registry/routers/schemas.py
+# hypothesis_version: 6.141.1
+
+['/', '/schemas', '/{name}', '1.0.0', 'amount', 'currency', 'datetime', 'event_type', 'fields', 'name', 'number', 'order-created', 'order_id', 'schemas', 'string', 'timestamp', 'user-event', 'user_id', 'version']

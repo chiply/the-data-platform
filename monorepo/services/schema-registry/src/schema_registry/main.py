@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from schema_registry.database import engine
 from schema_registry.exceptions import register_exception_handlers
-from schema_registry.routers import health
+from schema_registry.routers import health, schemas
 
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(health.router)
+    app.include_router(schemas.router)
 
     return app
 

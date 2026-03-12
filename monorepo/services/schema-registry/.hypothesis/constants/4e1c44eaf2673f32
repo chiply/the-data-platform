@@ -1,0 +1,4 @@
+# file: /Users/charlieholland/source_code/the-data-platform/.claude/worktrees/copier/monorepo/services/schema-registry/src/schema_registry/exceptions.py
+# hypothesis_version: 6.141.1
+
+[400, 401, 403, 404, 500, 'Bad request', 'Not authenticated', 'Not found', 'Permission denied', 'detail', 'error_code']
