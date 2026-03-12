@@ -39,7 +39,7 @@
         "copier copy with --defaults generates valid Python files (py_compile passes)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Depends on US-001. Keep thin wrapper files for services that need to extend library behavior (e.g., add service-specific exception subclasses). The wrapper pattern is: import from lib, optionally extend."
     },

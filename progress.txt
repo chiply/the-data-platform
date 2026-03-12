@@ -18,6 +18,15 @@ PRD: tasks/prd-copier-template.json
 - pytest.ini at project root configures asyncio_mode = auto
 ---
 
+## [Shared Libs] US-002 - Wire shared library into Copier template
+- What was implemented: Updated Copier template to depend on tdp-fastapi-core. Added [tool.uv.sources] with editable path dep. main.py.jinja now imports from tdp_fastapi_core. telemetry.py.jinja, exceptions.py.jinja, logging_config.py.jinja converted to thin wrappers. Dockerfile.jinja restructured for monorepo build context with libs copied in.
+- Files changed: pyproject.toml.jinja, main.py.jinja, telemetry.py.jinja, exceptions.py.jinja, logging_config.py.jinja, Dockerfile.jinja
+- Learnings:
+  - Dockerfile must use monorepo/ as build context, preserving directory layout for relative path resolution
+  - uv sync --no-editable prevents editable installs in production Docker builds
+  - configure_logging() and setup_telemetry() called in lifespan (not module level) so settings are available
+---
+
 ## [Shared Libs] US-001 - Create tdp-fastapi-core shared library
 - What was implemented: Created the tdp-fastapi-core shared library at monorepo/libs/tdp-fastapi-core/ with src/ layout and hatchling build system. Extracted and parameterized four modules: logging (JSON formatter with OTel trace injection), telemetry (configurable TracerProvider with optional instrumentors), exceptions (AppException hierarchy with FastAPI handlers), and request ID middleware. All 15 tests pass.
 - Files changed: monorepo/libs/tdp-fastapi-core/ (12 files)
