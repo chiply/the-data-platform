@@ -52,8 +52,7 @@ enterprise-patterns/
         {{ _copier_conf.answers_file }}.jinja # Answers file (required for copier update)
         Dockerfile.jinja
         .dockerignore
-        requirements.in.jinja
-        requirements.txt.jinja
+        pyproject.toml.jinja
         BUILD.bazel.jinja
         README.md.jinja
         src/
@@ -195,7 +194,7 @@ conventions. It is NOT a fork — we cherry-pick patterns and rewrite them to fi
 | Exceptions             | Typed HTTP exception hierarchy with registered handlers        |
 | Testing                | pytest + icontract + Hypothesis + Polyfactory examples         |
 | Build                  | Bazel =BUILD.bazel= — initial targets, maintained by Gazelle post-generation |
-| Package management     | =requirements.in= (human-edited ranges) + =requirements.txt= (pinned via =pip-compile=) |
+| Package management     | =pyproject.toml= (dependencies) + =uv.lock= (pinned via =uv lock=) |
 
 ** Key Module Specifications
 
@@ -297,6 +296,105 @@ exec uvicorn src.{{ module_name }}.main:app --host 0.0.0.0 --port {{ service_por
 
 The template also includes a =.dockerignore= excluding =tests/=, =__pycache__/=,
 =.copier-answers.yml=, =BUILD.bazel=, =README.md=, and =*.pyc=.
+
+** Package Management with uv
+
+The template uses [[https://docs.astral.sh/uv/][uv]] for Python package management instead of pip/pip-tools. uv handles
+virtual environment creation, dependency resolution, and lockfile generation in a single tool
+that is orders of magnitude faster than pip.
+
+*** =pyproject.toml= as Single Source of Truth
+
+Each service declares dependencies in =pyproject.toml= (PEP 621) instead of =requirements.in=.
+This is the standard Python packaging metadata format and works with uv, pip, and build tools.
+
+#+begin_src toml
+[project]
+name = "{{ service_name }}"
+version = "{{ service_version }}"
+description = "{{ service_description }}"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.27,<1",
+    "pydantic-settings>=2,<3",
+    # ... etc
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.23,<1",
+    "httpx>=0.27,<1",
+    "hypothesis>=6.98,<7",
+    "polyfactory>=2.14,<3",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+#+end_src
+
+*** =uv.lock= Replaces =requirements.txt=
+
+=uv lock= generates a cross-platform lockfile (=uv.lock=) that pins every transitive dependency.
+This replaces the =pip-compile= workflow:
+
+#+begin_src bash
+# Lock dependencies (generates/updates uv.lock)
+uv lock
+
+# Install into virtual environment (creates .venv if needed)
+uv sync
+
+# Install with dev dependencies
+uv sync --dev
+
+# Run commands inside the virtual environment
+uv run pytest
+uv run uvicorn schema_registry.main:app --reload
+#+end_src
+
+*** Virtual Environment Strategy
+
+=uv sync= automatically creates a =.venv= in the service directory. This keeps each service's
+dependencies isolated:
+
+#+begin_src
+monorepo/services/schema-registry/
+  .venv/                    # Created by uv sync, gitignored
+  pyproject.toml            # Dependency declaration
+  uv.lock                  # Pinned lockfile (committed)
+#+end_src
+
+*** Dockerfile Integration
+
+The =Dockerfile.base= installs uv. Service Dockerfiles use =uv sync --frozen --no-dev= for
+reproducible production installs without re-resolving dependencies:
+
+#+begin_src dockerfile
+FROM tdp-python-base
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+
+COPY src/ ./src/
+# ...
+#+end_src
+
+=--frozen= ensures the lockfile is used exactly as committed (fails if lockfile is stale).
+=--no-dev= excludes test dependencies from the production image.
+
+*** =scripts/new-service.sh= Post-Generation
+
+After Copier generates the service, the wrapper script runs:
+
+#+begin_src bash
+cd "${DEST}"
+uv lock    # Generate initial lockfile
+uv sync    # Create .venv and install dependencies
+#+end_src
+
+This ensures a working development environment immediately after generation.
 
 ** Bazel BUILD Strategy
 
@@ -713,6 +811,37 @@ in the Design section. Remove references to the "layered fork model". Add note t
 template approach applies to FastAPI HTTP services only; non-HTTP service types should get
 separate templates.
 
+** TODO [TDP-006-15] Switch template to uv and pyproject.toml                :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Replace =requirements.in.jinja= and =requirements.txt.jinja= with =pyproject.toml.jinja=.
+Replace =pytest.ini= configuration with =[tool.pytest.ini_options]= in =pyproject.toml=.
+Add =uv.lock= to =_skip_if_exists= in =copier.yml= (lockfile is service-specific, should
+not be overwritten by template updates). Add =.venv/= to =.dockerignore= and =.gitignore=.
+Update =Dockerfile.jinja= to use =uv sync --frozen --no-dev= instead of
+=pip install -r requirements.txt=. Update =Dockerfile.base= to install uv.
+
+** TODO [TDP-006-16] Regenerate schema-registry with uv                      :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Regenerate =monorepo/services/schema-registry/= from the updated template. Run =uv lock=
+and =uv sync= to create the lockfile and virtual environment. Verify all tests pass with
+=uv run pytest=.
+
+** TODO [TDP-006-17] Update scripts and docs for uv                          :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update =scripts/new-service.sh= to run =uv lock && uv sync= after generation.
+Update =CONTRIBUTING.md= to document uv workflow (=uv sync=, =uv run=, =uv lock=).
+Update =README.md.jinja= post-generation checklist. Update CI template validation
+job to use =uv sync= instead of =pip install=.
+
 ** TODO [TDP-006-14] Update CONTRIBUTING.md                                  :p2:
 :PROPERTIES:
 :EFFORT: S
@@ -759,6 +888,18 @@ infrequent operation.
 OpenTelemetry is a mandatory platform standard. The template includes a dedicated
 =telemetry.py= module with =TracerProvider=, OTLP exporter, and auto-instrumentation for
 FastAPI, SQLAlchemy, and httpx. Every generated service starts compliant from day one.
+
+** DECIDED Use uv with pyproject.toml instead of pip/pip-tools with requirements files
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+uv replaces pip, pip-compile, and virtualenv with a single tool that is significantly faster.
+=pyproject.toml= (PEP 621) replaces =requirements.in= as the dependency declaration format —
+it is the Python packaging standard and consolidates project metadata, dependencies, and tool
+configuration (pytest, etc.) in one file. =uv.lock= replaces =requirements.txt= as the pinned
+lockfile. =uv sync= handles both virtual environment creation and dependency installation.
+Docker builds use =uv sync --frozen --no-dev= for reproducible production installs.
 
 ** DECIDED Single template with boolean toggles, not separate templates
 :PROPERTIES:
