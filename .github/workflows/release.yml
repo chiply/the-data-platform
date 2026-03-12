@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  packages: write
 
 jobs:
   release-please:
@@ -15,9 +16,137 @@ jobs:
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       paths_released: ${{ steps.release.outputs.paths_released }}
+      # Per-component outputs for schema-registry
+      schema-registry--release_created: ${{ steps.release.outputs['monorepo/services/schema-registry--release_created'] }}
+      schema-registry--tag_name: ${{ steps.release.outputs['monorepo/services/schema-registry--tag_name'] }}
+      # Per-component outputs for platform
+      platform--release_created: ${{ steps.release.outputs['monorepo--release_created'] }}
+      platform--tag_name: ${{ steps.release.outputs['monorepo--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
         with:
           manifest-file: .release-please-manifest.json
           config-file: release-please-config.json
+
+  build-container:
+    name: "Build Container: ${{ matrix.component }}"
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: schema-registry
+            release_created: ${{ needs.release-please.outputs['schema-registry--release_created'] }}
+            tag_name: ${{ needs.release-please.outputs['schema-registry--tag_name'] }}
+          - component: platform
+            release_created: ${{ needs.release-please.outputs['platform--release_created'] }}
+            tag_name: ${{ needs.release-please.outputs['platform--tag_name'] }}
+    steps:
+      - name: Skip if not released
+        if: matrix.release_created != 'true'
+        run: echo "No release for ${{ matrix.component }}, skipping."
+
+      - uses: actions/checkout@v4
+        if: matrix.release_created == 'true'
+
+      - name: Parse release tag
+        if: matrix.release_created == 'true'
+        id: parse
+        env:
+          TAG_NAME: ${{ matrix.tag_name }}
+        run: |
+          echo "Release tag: $TAG_NAME"
+          if echo "$TAG_NAME" | grep -qE '^.+-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            version=$(echo "$TAG_NAME" | sed -E 's/^.+-v//')
+          else
+            echo "ERROR: Tag '$TAG_NAME' does not match expected pattern"
+            exit 1
+          fi
+          echo "Version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve component path
+        if: matrix.release_created == 'true'
+        id: resolve
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          path=$(jq -r --arg comp "$COMPONENT" \
+            '.packages | to_entries[] | select(.value.component == $comp) | .key' \
+            release-please-config.json)
+          if [ -z "$path" ] || [ "$path" = "null" ]; then
+            echo "ERROR: No package found with component '$COMPONENT'"
+            exit 1
+          fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Check for Dockerfile
+        if: matrix.release_created == 'true'
+        id: dockerfile
+        env:
+          COMPONENT_PATH: ${{ steps.resolve.outputs.path }}
+        run: |
+          if [ -f "$COMPONENT_PATH/Dockerfile" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile at $COMPONENT_PATH/Dockerfile — skipping."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to GitHub Container Registry
+        if: matrix.release_created == 'true' && steps.dockerfile.outputs.exists == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        if: matrix.release_created == 'true' && steps.dockerfile.outputs.exists == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push container image
+        if: matrix.release_created == 'true' && steps.dockerfile.outputs.exists == 'true'
+        run: |
+          ./monorepo/scripts/build-image.sh \
+            --version "${{ steps.parse.outputs.version }}" \
+            --registry ghcr.io \
+            --org "${{ github.repository }}" \
+            --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            "${{ matrix.component }}"
+
+      - name: Trivy vulnerability scan
+        if: matrix.release_created == 'true' && steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository }}/${{ matrix.component }}:${{ steps.parse.outputs.version }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Generate CycloneDX SBOM
+        if: always() && matrix.release_created == 'true' && steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository }}/${{ matrix.component }}:${{ steps.parse.outputs.version }}
+          format: cyclonedx
+          output: sbom-${{ matrix.component }}-${{ steps.parse.outputs.version }}.cdx.json
+
+      - name: Upload SBOM to GitHub Release
+        if: always() && matrix.release_created == 'true' && steps.dockerfile.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ matrix.tag_name }}" \
+            "sbom-${{ matrix.component }}-${{ steps.parse.outputs.version }}.cdx.json" \
+            --clobber \
+            --repo "${{ github.repository }}"
