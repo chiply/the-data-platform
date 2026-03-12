@@ -45,7 +45,7 @@
         "project/logging_config.py.jinja uses dictConfig with JSON formatter injecting OTel trace_id and span_id"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Large effort task (EFFORT: L). All template files must use Jinja2 syntax compatible with Copier's _envops settings."
     },
