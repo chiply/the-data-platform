@@ -1,0 +1,66 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "{{ module_name }}",
+    srcs = glob(["src/{{ module_name }}/**/*.py"]),
+    imports = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@pip//fastapi",
+        "@pip//pydantic",
+        "@pip//pydantic_settings",
+        "@pip//uvicorn",
+        "@pip//opentelemetry_api",
+        "@pip//opentelemetry_sdk",
+{% if use_database %}
+        "@pip//sqlalchemy",
+        "@pip//alembic",
+{% endif %}
+    ],
+)
+
+py_binary(
+    name = "{{ service_name }}",
+    srcs = ["src/{{ module_name }}/main.py"],
+    main = "src/{{ module_name }}/main.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":{{ module_name }}",
+    ],
+)
+
+py_test(
+    name = "test_health",
+    srcs = ["tests/test_health.py"],
+    imports = ["."],
+    deps = [
+        ":{{ module_name }}",
+        "@pip//pytest",
+        "@pip//pytest_asyncio",
+        "@pip//httpx",
+    ],
+)
+
+py_test(
+    name = "test_schemas",
+    srcs = ["tests/test_schemas.py"],
+    imports = ["."],
+    deps = [
+        ":{{ module_name }}",
+        "@pip//pytest",
+        "@pip//polyfactory",
+    ],
+)
+
+py_test(
+    name = "test_properties",
+    srcs = ["tests/test_properties.py"],
+    imports = ["."],
+    deps = [
+        ":{{ module_name }}",
+        "@pip//pytest",
+        "@pip//hypothesis",
+        "@pip//icontract",
+    ],
+)
