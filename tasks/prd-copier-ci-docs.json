@@ -1,0 +1,76 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/copier-ci-docs",
+  "description": "Add CI validation and drift detection for the Copier template, and update ARCHITECTURE.md and CONTRIBUTING.md to document the new Copier-based workflow.",
+  "sourceDesignDoc": "docs/design/006-copier-service-templates.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-006-11",
+      "title": "Add template validation CI job",
+      "description": "As a developer, I want CI to validate the Copier template itself so that template regressions are caught before affecting downstream services. Add a CI job with a matrix of all toggle combinations (use_database x use_gunicorn), running copier copy with --defaults, py_compile on generated files, and docker build on the Dockerfile.",
+      "acceptanceCriteria": [
+        "CI workflow includes a template-validate job",
+        "Job uses matrix strategy for use_database: [true, false] and use_gunicorn: [true, false]",
+        "Job runs copier copy with --trust --vcs-ref HEAD --defaults into temp directory",
+        "Job runs python -m py_compile on all generated Python files",
+        "Job includes docker build step on the generated Dockerfile"
+      ],
+      "priority": 1,
+      "passes": false,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-006-12",
+      "title": "Add template drift detection CI check",
+      "description": "As a developer, I want CI to warn when generated services are behind the template so that drift is visible. Create scripts/check-template-drift.sh that runs copier update --pretend on each service with a .copier-answers.yml file, and add a CI job that runs it.",
+      "acceptanceCriteria": [
+        "scripts/check-template-drift.sh exists and is executable",
+        "Script iterates over monorepo/services/*/ directories with .copier-answers.yml",
+        "Script runs copier update --trust --vcs-ref HEAD --pretend --skip-answered on each",
+        "Script outputs warnings for services with template drift",
+        "CI workflow includes a template-drift job that runs the script"
+      ],
+      "priority": 2,
+      "passes": false,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-006-13",
+      "title": "Update ARCHITECTURE.md",
+      "description": "As a developer, I want ARCHITECTURE.md to document the Copier-based pattern inheritance approach. Replace the Pattern Inheritance section with Copier documentation as specified in the design doc. Remove references to the layered fork model. Add note about scope (FastAPI HTTP services only).",
+      "acceptanceCriteria": [
+        "ARCHITECTURE.md Pattern Inheritance section documents Copier workflow",
+        "References to layered fork model are removed",
+        "Section documents scripts/new-service.sh as entry point",
+        "Section documents copier update --trust --vcs-ref HEAD for updates",
+        "Section notes scope is FastAPI HTTP services only"
+      ],
+      "priority": 3,
+      "passes": false,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-006-14",
+      "title": "Update CONTRIBUTING.md",
+      "description": "As a developer, I want CONTRIBUTING.md to document the Copier-based workflow for creating new services. Replace the Creating a new service section with Copier instructions: add Copier to prerequisites, document scripts/new-service.sh, list template questions and defaults, add copier update section with conflict resolution expectations.",
+      "acceptanceCriteria": [
+        "CONTRIBUTING.md Creating a new service section uses Copier workflow",
+        "Copier is listed in prerequisites (pip install copier or brew install copier)",
+        "scripts/new-service.sh documented as entry point",
+        "Template questions and defaults are listed",
+        "copier update workflow and conflict resolution expectations documented"
+      ],
+      "priority": 4,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Last task in workstream — natural review checkpoint for documentation accuracy."
+    }
+  ]
+}

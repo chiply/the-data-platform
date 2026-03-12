@@ -1,0 +1,96 @@
+"""Shared test fixtures and configuration."""
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from {{ module_name }}.config import Settings
+from {{ module_name }}.dependencies import get_settings
+from {{ module_name }}.main import app
+{% if use_database %}
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
+from {{ module_name }}.dependencies import get_db_session
+{% endif %}
+
+pytest_plugins: list[str] = []
+
+
+@pytest.fixture()
+def settings_override() -> Settings:
+    """Return a Settings instance suitable for testing.
+
+    Override this fixture in individual test modules when you need
+    non-default configuration values.
+    """
+    return Settings(
+        service_name="{{ service_name }}",
+        service_version="{{ service_version }}",
+        environment="LOCAL",
+        service_port={{ service_port }},
+        log_level="DEBUG",
+{% if use_database %}
+        database_url="postgresql+asyncpg://localhost:5432/{{ module_name }}_test",
+{% endif %}
+    )
+
+
+@pytest.fixture()
+async def client(settings_override: Settings) -> AsyncClient:
+    """Yield an async HTTP test client wired to the FastAPI app.
+
+    The client uses httpx.AsyncClient with ASGITransport so that requests
+    are dispatched in-process without a live server.
+    """
+
+    def _override_settings() -> Settings:
+        return settings_override
+
+    app.dependency_overrides[get_settings] = _override_settings
+
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+{% if use_database %}
+
+@pytest.fixture()
+async def db_session(settings_override: Settings) -> AsyncSession:
+    """Yield an async database session connected to the test database.
+
+    Each test gets its own session that is rolled back after the test
+    completes, ensuring test isolation.
+    """
+    engine = create_async_engine(settings_override.database_url, echo=True)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        yield session
+
+    await engine.dispose()
+
+
+@pytest.fixture()
+async def client_with_db(
+    settings_override: Settings,
+    db_session: AsyncSession,
+) -> AsyncClient:
+    """Yield a test client with the database session overridden."""
+
+    def _override_settings() -> Settings:
+        return settings_override
+
+    async def _override_db_session() -> AsyncSession:
+        return db_session
+
+    app.dependency_overrides[get_settings] = _override_settings
+    app.dependency_overrides[get_db_session] = _override_db_session
+
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+{% endif %}
