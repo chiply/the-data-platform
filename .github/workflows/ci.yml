@@ -210,6 +210,42 @@ jobs:
         if: steps.filter.outputs.deploy_changed != 'true'
         run: echo "No changes in monorepo/deploy/, skipping helm lint"
 
+  template-validate:
+    name: Template Validation (db=${{ matrix.use_database }}, gunicorn=${{ matrix.use_gunicorn }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        use_database: [true, false]
+        use_gunicorn: [true, false]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Copier
+        run: pip install copier
+
+      - name: Generate service from template
+        run: |
+          copier copy --trust --vcs-ref HEAD \
+            --defaults \
+            --data service_name=test-service \
+            --data use_database=${{ matrix.use_database }} \
+            --data use_gunicorn=${{ matrix.use_gunicorn }} \
+            enterprise-patterns/python/enterprise-pattern-fastapi \
+            /tmp/test-service
+
+      - name: Compile all generated Python files
+        run: |
+          find /tmp/test-service -name '*.py' -exec python -m py_compile {} +
+
+      - name: Build Docker image
+        run: docker build -f /tmp/test-service/Dockerfile /tmp/test-service
+
   monorepo-structure:
     name: Monorepo Structure Validation
     runs-on: ubuntu-latest
