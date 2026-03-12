@@ -1,6 +1,6 @@
 #+TITLE: 006 - Copier-Based Service Templates & Pattern Inheritance
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Active
 #+CATEGORY: architecture
 #+CREATED: [2026-03-12]
 #+LAST_MODIFIED: [2026-03-12]
