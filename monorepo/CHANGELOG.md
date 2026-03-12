@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/chiply/the-data-platform/compare/platform-v0.1.9...platform-v0.1.10) (2026-03-12)
+
+
+### Bug Fixes
+
+* ignore unfixed vulnerabilities in Trivy scan ([#22](https://github.com/chiply/the-data-platform/issues/22)) ([716a366](https://github.com/chiply/the-data-platform/commit/716a366b891d952e27d5d0338717118ae9118724))
+
 ## [0.1.9](https://github.com/chiply/the-data-platform/compare/platform-v0.1.8...platform-v0.1.9) (2026-03-12)
 
 
