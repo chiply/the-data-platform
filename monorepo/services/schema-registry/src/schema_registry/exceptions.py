@@ -4,6 +4,10 @@ Raising these exceptions produces proper HTTP status codes (not 500s) because
 main.py registers an exception handler that catches AppException.
 """
 
+from __future__ import annotations
+
+from typing import Optional
+
 
 class AppException(Exception):
     """Base application exception."""
@@ -11,7 +15,7 @@ class AppException(Exception):
     status_code: int = 500
     detail: str = "Internal server error"
 
-    def __init__(self, detail: str | None = None, status_code: int | None = None) -> None:
+    def __init__(self, detail: Optional[str] = None, status_code: Optional[int] = None) -> None:
         self.detail = detail or self.__class__.detail
         self.status_code = status_code or self.__class__.status_code
         super().__init__(self.detail)
