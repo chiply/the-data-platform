@@ -1,0 +1,32 @@
+# {{ service_name }}
+
+{{ service_description }}
+
+## Running Locally
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the service
+uvicorn {{ module_name }}.main:app --host 0.0.0.0 --port {{ service_port }} --reload
+```
+
+## Endpoints
+
+- `GET /health` — Health check
+- `GET /version` — Service version info
+
+## Post-Generation Checklist
+
+After generating this service from the template:
+
+- [ ] Set up Helm chart in `deploy/charts/{{ service_name }}/`
+- [ ] Register component in `release-please-config.json`
+- [ ] Run `pip-compile requirements.in -o requirements.txt` to lock dependencies
+- [ ] Update `deploy/charts/{{ service_name }}/values.yaml` with correct port and image
+- [ ] Add service-specific routers in `src/{{ module_name }}/routers/`
+{% if use_database %}
+- [ ] Configure `DATABASE_URL` environment variable
+- [ ] Run initial Alembic migration: `alembic revision --autogenerate -m "initial"`
+{% endif %}

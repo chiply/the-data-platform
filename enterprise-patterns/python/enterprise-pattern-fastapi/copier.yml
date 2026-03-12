@@ -1,65 +1,56 @@
-# Copier template configuration for FastAPI enterprise pattern
-# https://copier.readthedocs.io/
-
 _subdirectory: project
+_answers_file: .copier-answers.yml
 _min_copier_version: "9.1.0"
-
-_envops:
-  trim_blocks: true
-  lstrip_blocks: true
-
 _skip_if_exists:
   - "alembic/versions/*.py"
   - "CHANGELOG.md"
-
+_envops:
+  trim_blocks: true
+  lstrip_blocks: true
 _tasks:
-  - >-
-    {% if _copier_conf.os in ('linux', 'macos') %}
-    chmod +x entrypoint.sh
-    {% endif %}
+  - command: "chmod +x entrypoint.sh"
+    when: "{{ _copier_conf.os != 'windows' }}"
 
-# ---------------------------------------------------------------------------
-# Questions
-# ---------------------------------------------------------------------------
+# --- Questions ---
 
 service_name:
   type: str
-  help: "Name of the service (kebab-case, e.g. 'feed-reader')"
+  help: "Service name (kebab-case, e.g. schema-registry)"
   validator: >-
     {% if not service_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
-    Service name must be kebab-case (lowercase letters, digits, and hyphens; must start with a letter).
-    {% endif %}
-
-module_name:
-  type: str
-  help: "Python module name (valid Python identifier)"
-  default: "{{ service_name | replace('-', '_') }}"
-  validator: >-
-    {% if not module_name | regex_search('^[a-zA-Z_][a-zA-Z0-9_]*$') %}
-    Module name must be a valid Python identifier (letters, digits, and underscores; must not start with a digit).
+    Must be lowercase kebab-case (letters, digits, single hyphens, no leading/trailing hyphens)
     {% endif %}
 
 service_description:
   type: str
-  help: "Short description of the service"
+  help: "One-line description of the service"
   default: "A FastAPI service"
+
+module_name:
+  type: str
+  help: "Python module name (snake_case)"
+  default: "{{ service_name | replace('-', '_') }}"
+  validator: >-
+    {% if not module_name | regex_search('^[a-z][a-z0-9_]*$') %}
+    Must be a valid Python identifier (lowercase snake_case)
+    {% endif %}
 
 service_port:
   type: int
-  help: "Port the service listens on"
+  help: "Port the service listens on (must be unique across services for local dev)"
   default: 8000
 
 service_version:
   type: str
-  help: "Initial version of the service"
+  help: "Initial version"
   default: "0.1.0"
 
 use_database:
   type: bool
-  help: "Include SQLAlchemy + Alembic database support?"
+  help: "Include async SQLAlchemy + Alembic database setup?"
   default: true
 
 use_gunicorn:
   type: bool
-  help: "Include Gunicorn as the production WSGI/ASGI server?"
+  help: "Include Gunicorn multi-worker config (for production)?"
   default: true

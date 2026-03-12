@@ -1,0 +1,8 @@
+tests/
+__pycache__/
+.copier-answers.yml
+BUILD.bazel
+README.md
+*.pyc
+.env
+.git
