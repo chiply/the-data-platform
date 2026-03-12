@@ -1,23 +1,23 @@
-"""Health and version endpoints.
+"""Health and version endpoints."""
 
-Establishes the convention that main.py is the app factory only, not a route
-dump. All routes belong in routers/*.py modules.
-"""
+from fastapi import APIRouter, Depends
 
-from fastapi import APIRouter
+from schema_registry.config import Settings
+from schema_registry.dependencies import get_settings
 
-from schema_registry.config import settings
-
-router = APIRouter()
+router = APIRouter(tags=["health"])
 
 
-@router.get("/health", summary="Health check", description="Returns the current health status of the service.")
-async def health() -> dict:
+@router.get("/health")
+async def health() -> dict[str, str]:
     """Return service health status."""
     return {"status": "healthy"}
 
 
-@router.get("/version", summary="Service version", description="Returns the service name and current version.")
-async def version() -> dict:
+@router.get("/version")
+async def version(settings: Settings = Depends(get_settings)) -> dict[str, str]:
     """Return service name and version."""
-    return {"service": settings.SERVICE_NAME, "version": settings.SERVICE_VERSION}
+    return {
+        "service": settings.service_name,
+        "version": settings.service_version,
+    }

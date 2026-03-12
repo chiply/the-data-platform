@@ -1,8 +1,8 @@
 tests/
 __pycache__/
-*.pyc
 .copier-answers.yml
 BUILD.bazel
 README.md
+*.pyc
 .env
-.git/
+.git

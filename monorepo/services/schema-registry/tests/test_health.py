@@ -1,21 +1,22 @@
-"""Endpoint smoke tests for /health and /version."""
+"""Smoke tests for health and version endpoints."""
 
-import pytest
 from httpx import AsyncClient
 
 
-@pytest.mark.anyio
-async def test_health_returns_healthy(client: AsyncClient) -> None:
+async def test_health_returns_200(client: AsyncClient) -> None:
+    """GET /health returns 200 with status healthy."""
     response = await client.get("/health")
     assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "healthy"
+    assert response.json() == {"status": "healthy"}
 
 
-@pytest.mark.anyio
-async def test_version_returns_service_info(client: AsyncClient) -> None:
+async def test_version_returns_200(client: AsyncClient) -> None:
+    """GET /version returns 200 with service name and version."""
     response = await client.get("/version")
     assert response.status_code == 200
+
     data = response.json()
-    assert data["service"] == "schema-registry"
+    assert "service" in data
     assert "version" in data
+    assert data["service"] == "schema-registry"
+    assert data["version"] == "0.1.0"

@@ -1,33 +1,26 @@
-"""Pydantic models (schemas) for the schema-registry service.
+"""Pydantic schemas with Design by Contract support."""
 
-Demonstrates base model patterns including icontract @invariant usage.
-"""
-
-from pydantic import BaseModel, Field
+import icontract
+from pydantic import BaseModel, ConfigDict
 
 
-class HealthResponse(BaseModel):
-    """Health check response."""
+class BaseSchema(BaseModel):
+    """Base schema for all Pydantic models in this service.
 
-    status: str = "healthy"
+    Provides shared configuration and can be extended with common
+    serialization logic.
+    """
 
-
-class VersionResponse(BaseModel):
-    """Version endpoint response."""
-
-    service: str
-    version: str
+    model_config = ConfigDict(from_attributes=True)
 
 
-class SchemaItem(BaseModel):
-    """A registered schema entry."""
+@icontract.invariant(lambda self: len(self.name) > 0, "Name must not be empty")
+class ExampleSchema(BaseSchema):
+    """Example schema demonstrating icontract @invariant usage.
 
-    name: str = Field(..., description="Schema name")
-    version: str = Field(default="0.0.0", description="Schema version")
-    schema_definition: dict = Field(default_factory=dict, description="Schema definition")
+    The @invariant decorator enforces that the constraint holds whenever
+    an instance is created or modified. Replace this with your domain models.
+    """
 
-
-class SchemaListResponse(BaseModel):
-    """Response for listing schemas."""
-
-    schemas: list[SchemaItem] = Field(default_factory=list)
+    name: str
+    description: str = ""

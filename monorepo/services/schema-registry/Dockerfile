@@ -1,21 +1,16 @@
-# Schema Registry Dockerfile
-# Extends the platform base image — do not duplicate the multi-stage build here.
-# Build the base first:
-#   docker build -f monorepo/services/Dockerfile.base -t tdp-python-base monorepo/services/
+FROM tdp-python-base AS base
 
-FROM tdp-python-base
-
-WORKDIR /app
-
+# Install service-specific dependencies
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
 
-COPY src/ ./src/
-COPY logging_config.py .
-COPY gunicorn_conf.py .
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
+# Copy application source and supporting files
+COPY src/ /app/src/
+COPY logging_config.py /app/logging_config.py
+COPY entrypoint.sh /app/entrypoint.sh
+COPY gunicorn_conf.py /app/gunicorn_conf.py
 
 EXPOSE 8000
 
-ENTRYPOINT ["./entrypoint.sh"]
+CMD ["/app/entrypoint.sh"]

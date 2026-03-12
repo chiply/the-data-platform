@@ -1,10 +1,6 @@
-"""Application configuration using pydantic-settings.
-
-Settings are loaded from environment variables with .env file support.
-"""
+"""Application configuration via pydantic-settings."""
 
 from enum import Enum
-from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,51 +8,30 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Environment(str, Enum):
     """Deployment environment."""
 
-    LOCAL = "local"
-    DEVELOPMENT = "development"
-    STAGING = "staging"
-    PRODUCTION = "production"
+    LOCAL = "LOCAL"
+    STAGING = "STAGING"
+    PRODUCTION = "PRODUCTION"
 
     @property
     def is_deployed(self) -> bool:
-        return self in (self.DEVELOPMENT, self.STAGING, self.PRODUCTION)
+        """Return True if this is a deployed (non-local) environment."""
+        return self in {Environment.STAGING, Environment.PRODUCTION}
 
 
 class Settings(BaseSettings):
-    """Application settings with environment variable precedence.
+    """Application settings loaded from environment variables and .env file.
 
-    Env var names match field names (case-insensitive). Use a .env file for
-    local development.
+    Environment variables take precedence over .env file values.
     """
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False,
     )
 
-    # Service identity
-    SERVICE_NAME: str = "schema-registry"
-    SERVICE_VERSION: str = "0.1.0"
-    SERVICE_PORT: int = 8000
-
-    # Environment
-    ENVIRONMENT: Environment = Environment.LOCAL
-
-    # Database
-    DATABASE_URL: str = "postgresql+asyncpg://localhost:5432/schema_registry"
-
-    # Logging
-    LOG_LEVEL: str = "INFO"
-
-    # OpenTelemetry
-    OTLP_ENDPOINT: str = "http://localhost:4317"
-
-
-@lru_cache
-def get_settings() -> Settings:
-    """Cached settings instance."""
-    return Settings()
-
-
-settings = get_settings()
+    service_name: str = "schema-registry"
+    service_version: str = "0.1.0"
+    environment: Environment = Environment.LOCAL
+    service_port: int = 8000
+    log_level: str = "INFO"
+    database_url: str = "postgresql+asyncpg://localhost:5432/schema_registry"
