@@ -1,0 +1,42 @@
+"""{{ service_description }} — application factory."""
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+{% if use_database %}
+from {{ module_name }}.database import engine
+{% endif %}
+from {{ module_name }}.exceptions import register_exception_handlers
+from {{ module_name }}.routers import health
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage application startup and shutdown lifecycle."""
+    # Startup
+    yield
+    # Shutdown
+{% if use_database %}
+    await engine.dispose()
+{% endif %}
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="{{ service_name }}",
+        description="{{ service_description }}",
+        version="{{ service_version }}",
+        lifespan=lifespan,
+    )
+
+    register_exception_handlers(app)
+
+    app.include_router(health.router)
+
+    return app
+
+
+app = create_app()
