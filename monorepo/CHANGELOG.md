@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/chiply/the-data-platform/compare/platform-v0.1.8...platform-v0.1.9) (2026-03-12)
+
+
+### Bug Fixes
+
+* resolve Tiltfile helm dependency loop and add API endpoint docs ([#19](https://github.com/chiply/the-data-platform/issues/19)) ([07e14de](https://github.com/chiply/the-data-platform/commit/07e14de056965a02aa5f2e43943cf4d2bb02a7ca))
+
 ## [0.1.8](https://github.com/chiply/the-data-platform/compare/platform-v0.1.7...platform-v0.1.8) (2026-03-12)
 
 
