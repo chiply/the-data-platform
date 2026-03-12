@@ -5,7 +5,7 @@ image:
   pullPolicy: IfNotPresent
   # tag must be set to an explicit semver on each promotion.
   # Do NOT use "latest" — ArgoCD cannot detect image changes with mutable tags.
-  tag: "0.1.0"
+  tag: "0.1.5"
 
 imagePullSecrets:
   - name: ghcr-credentials
