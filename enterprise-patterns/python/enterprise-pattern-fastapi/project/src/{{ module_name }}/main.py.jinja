@@ -1,0 +1,69 @@
+"""{{ service_description }} — application factory."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from tdp_fastapi_core import configure_logging, register_exception_handlers, setup_telemetry
+from tdp_fastapi_core.middleware import RequestIDMiddleware
+
+{% if use_database %}
+from {{ module_name }}.database import engine
+{% endif %}
+from {{ module_name }}.config import Settings
+from {{ module_name }}.dependencies import get_settings
+from {{ module_name }}.routers import health
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage application startup and shutdown lifecycle."""
+    settings: Settings = get_settings()
+
+    # Configure structured logging (JSON in deployed environments)
+    configure_logging(
+        log_level=settings.log_level,
+        environment=settings.environment.value,
+    )
+
+    # Initialise OpenTelemetry tracing and auto-instrumentation
+    setup_telemetry(
+        app,
+        service_name=settings.service_name,
+        service_version=settings.service_version,
+        environment=settings.environment.value,
+{% if use_database %}
+        instrument_sqlalchemy=True,
+{% else %}
+        instrument_sqlalchemy=False,
+{% endif %}
+    )
+
+    yield
+
+    # Shutdown
+{% if use_database %}
+    await engine.dispose()
+{% endif %}
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="{{ service_name }}",
+        description="{{ service_description }}",
+        version="{{ service_version }}",
+        lifespan=lifespan,
+    )
+
+    register_exception_handlers(app)
+    app.add_middleware(RequestIDMiddleware)
+
+    app.include_router(health.router)
+
+    return app
+
+
+app = create_app()

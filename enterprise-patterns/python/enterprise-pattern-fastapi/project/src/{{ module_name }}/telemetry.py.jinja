@@ -1,0 +1,23 @@
+"""OpenTelemetry instrumentation for {{ service_name }}.
+
+Thin wrapper around :mod:`tdp_fastapi_core.telemetry`.  Services that need
+custom span creation can import ``tracer`` from this module.  The heavy
+lifting (provider setup, auto-instrumentation) is handled by the library's
+:func:`~tdp_fastapi_core.telemetry.setup_telemetry`.
+"""
+
+from __future__ import annotations
+
+from opentelemetry import trace
+
+# Re-export library setup for convenience
+from tdp_fastapi_core.telemetry import setup_telemetry
+
+__all__ = ["setup_telemetry", "tracer"]
+
+# Exported tracer for creating custom spans throughout the application.
+# Usage:
+#   from {{ module_name }}.telemetry import tracer
+#   with tracer.start_as_current_span("my-operation"):
+#       ...
+tracer = trace.get_tracer(__name__)

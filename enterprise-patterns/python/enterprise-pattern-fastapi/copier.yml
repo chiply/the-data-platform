@@ -1,0 +1,57 @@
+_subdirectory: project
+_answers_file: .copier-answers.yml
+_min_copier_version: "9.1.0"
+_skip_if_exists:
+  - "alembic/versions/*.py"
+  - "CHANGELOG.md"
+  - "uv.lock"
+_envops:
+  trim_blocks: true
+  lstrip_blocks: true
+_tasks:
+  - command: "chmod +x entrypoint.sh"
+    when: "{{ _copier_conf.os != 'windows' }}"
+
+# --- Questions ---
+
+service_name:
+  type: str
+  help: "Service name (kebab-case, e.g. schema-registry)"
+  validator: >-
+    {% if not service_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Must be lowercase kebab-case (letters, digits, single hyphens, no leading/trailing hyphens)
+    {% endif %}
+
+service_description:
+  type: str
+  help: "One-line description of the service"
+  default: "A FastAPI service"
+
+module_name:
+  type: str
+  help: "Python module name (snake_case)"
+  default: "{{ service_name | replace('-', '_') }}"
+  validator: >-
+    {% if not module_name | regex_search('^[a-z][a-z0-9_]*$') %}
+    Must be a valid Python identifier (lowercase snake_case)
+    {% endif %}
+
+service_port:
+  type: int
+  help: "Port the service listens on (must be unique across services for local dev)"
+  default: 8000
+
+service_version:
+  type: str
+  help: "Initial version"
+  default: "0.1.0"
+
+use_database:
+  type: bool
+  help: "Include async SQLAlchemy + Alembic database setup?"
+  default: true
+
+use_gunicorn:
+  type: bool
+  help: "Include Gunicorn multi-worker config (for production)?"
+  default: true

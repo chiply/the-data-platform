@@ -1,0 +1,37 @@
+"""Application exception hierarchy for {{ service_name }}.
+
+Thin wrapper around :mod:`tdp_fastapi_core.exceptions`.  All platform
+exception classes and the handler registration function are re-exported here
+so that services can add their own exception subclasses in this file while
+keeping a single import location.
+"""
+
+from __future__ import annotations
+
+from tdp_fastapi_core.exceptions import (
+    AppException,
+    BadRequest,
+    NotAuthenticated,
+    NotFound,
+    PermissionDenied,
+    app_exception_handler,
+    register_exception_handlers,
+)
+
+__all__ = [
+    "AppException",
+    "BadRequest",
+    "NotAuthenticated",
+    "NotFound",
+    "PermissionDenied",
+    "app_exception_handler",
+    "register_exception_handlers",
+]
+
+# Add service-specific exception subclasses below.
+# Example:
+#
+# class SchemaConflict(AppException):
+#     """Schema version conflict (409)."""
+#     def __init__(self, detail: str = "Schema conflict", error_code: str | None = None) -> None:
+#         super().__init__(status_code=409, detail=detail, error_code=error_code)
