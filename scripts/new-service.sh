@@ -18,6 +18,14 @@ copier copy --trust --vcs-ref HEAD \
   "${TEMPLATE_PATH}" "${DEST}" \
   --data service_name="${SERVICE_NAME}"
 
+# Generate lockfile and create virtual environment
+echo ""
+echo "Setting up development environment..."
+cd "${DEST}"
+uv lock
+uv sync --extra dev
+echo "Done — virtual environment created at ${DEST}/.venv"
+
 echo ""
 echo "=== Post-generation checklist ==="
 echo ""
@@ -25,4 +33,9 @@ echo "  [ ] Set up Helm chart at deploy/charts/${SERVICE_NAME}/"
 echo "  [ ] Register in release-please-config.json and .release-please-manifest.json"
 echo "  [ ] Run 'bazel run //:gazelle' to generate BUILD files"
 echo "  [ ] Review and customize generated files"
+echo ""
+echo "Quick start:"
+echo "  cd monorepo/services/${SERVICE_NAME}"
+echo "  uv run pytest              # run tests"
+echo "  uv run uvicorn ${SERVICE_NAME//-/_}.main:app --reload  # start dev server"
 echo ""

@@ -7,13 +7,21 @@ Centralized schema registry for the data platform
 ### Prerequisites
 
 - Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (`brew install uv` or `pip install uv`)
 - Bazel (see `MODULE.bazel` at the monorepo root)
 - PostgreSQL (for local development)
 
-### Running Locally
+### Setup
 
 ```bash
-uvicorn src.schema_registry.main:app --host 0.0.0.0 --port 8000 --reload
+# Install dependencies and create virtual environment
+uv sync --dev
+
+# Run the service
+uv run uvicorn schema_registry.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Run tests
+uv run pytest
 ```
 
 ### Building with Bazel
@@ -56,6 +64,26 @@ tests/
   test_health.py       # Health endpoint tests
   test_schemas.py      # Schema round-trip tests
   test_properties.py   # Property-based tests
+pyproject.toml         # Dependencies and project metadata
+uv.lock                # Pinned lockfile (committed)
+```
+
+## Dependency Management
+
+This project uses [uv](https://docs.astral.sh/uv/) for package management.
+
+```bash
+# Add a dependency
+uv add somepackage
+
+# Add a dev dependency
+uv add --dev somepackage
+
+# Update lockfile after editing pyproject.toml
+uv lock
+
+# Install/sync to match lockfile
+uv sync --dev
 ```
 
 ## Maintaining BUILD Files
