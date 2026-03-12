@@ -1,0 +1,11 @@
+# Do not edit manually — managed by Copier
+_src_path: "../../enterprise-patterns/python/enterprise-pattern-fastapi"
+_commit: "HEAD"
+_answers_file: ".copier-answers.yml"
+service_name: "schema-registry"
+service_description: "Centralized schema registry for the data platform"
+module_name: "schema_registry"
+service_port: 8000
+service_version: "0.1.0"
+use_database: true
+use_gunicorn: true

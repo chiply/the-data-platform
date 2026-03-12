@@ -1,0 +1,31 @@
+"""Gunicorn configuration with Pydantic-based settings and CPU-scaled workers.
+
+Inspired by zhanymkanov/fastapi_production_template, adapted for platform conventions.
+"""
+
+import multiprocessing
+import os
+
+# Bind
+bind = f"0.0.0.0:{os.getenv('SERVICE_PORT', '8000')}"
+
+# Workers — scale with available CPUs
+workers_per_core = float(os.getenv("WORKERS_PER_CORE", "1"))
+web_concurrency = os.getenv("WEB_CONCURRENCY")
+if web_concurrency:
+    workers = int(web_concurrency)
+else:
+    workers = max(int(multiprocessing.cpu_count() * workers_per_core), 2)
+
+# Worker class — use uvicorn for ASGI
+worker_class = "uvicorn.workers.UvicornWorker"
+
+# Timeouts
+graceful_timeout = int(os.getenv("GRACEFUL_TIMEOUT", "120"))
+timeout = int(os.getenv("TIMEOUT", "120"))
+keepalive = int(os.getenv("KEEP_ALIVE", "5"))
+
+# Logging
+accesslog = "-"
+errorlog = "-"
+loglevel = os.getenv("LOG_LEVEL", "info").lower()

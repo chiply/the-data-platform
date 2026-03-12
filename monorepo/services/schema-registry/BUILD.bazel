@@ -1,0 +1,33 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "schema_registry_lib",
+    srcs = glob(["src/schema_registry/**/*.py"]),
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "schema_registry",
+    srcs = ["src/schema_registry/main.py"],
+    main = "src/schema_registry/main.py",
+    deps = [":schema_registry_lib"],
+)
+
+py_test(
+    name = "test_health",
+    srcs = ["tests/test_health.py"],
+    deps = [":schema_registry_lib"],
+)
+
+py_test(
+    name = "test_schemas",
+    srcs = ["tests/test_schemas.py"],
+    deps = [":schema_registry_lib"],
+)
+
+py_test(
+    name = "test_properties",
+    srcs = ["tests/test_properties.py"],
+    deps = [":schema_registry_lib"],
+)
