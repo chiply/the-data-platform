@@ -1,0 +1,65 @@
+# Copier template configuration for FastAPI enterprise pattern
+# https://copier.readthedocs.io/
+
+_subdirectory: project
+_min_copier_version: "9.1.0"
+
+_envops:
+  trim_blocks: true
+  lstrip_blocks: true
+
+_skip_if_exists:
+  - "alembic/versions/*.py"
+  - "CHANGELOG.md"
+
+_tasks:
+  - >-
+    {% if _copier_conf.os in ('linux', 'macos') %}
+    chmod +x entrypoint.sh
+    {% endif %}
+
+# ---------------------------------------------------------------------------
+# Questions
+# ---------------------------------------------------------------------------
+
+service_name:
+  type: str
+  help: "Name of the service (kebab-case, e.g. 'feed-reader')"
+  validator: >-
+    {% if not service_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Service name must be kebab-case (lowercase letters, digits, and hyphens; must start with a letter).
+    {% endif %}
+
+module_name:
+  type: str
+  help: "Python module name (valid Python identifier)"
+  default: "{{ service_name | replace('-', '_') }}"
+  validator: >-
+    {% if not module_name | regex_search('^[a-zA-Z_][a-zA-Z0-9_]*$') %}
+    Module name must be a valid Python identifier (letters, digits, and underscores; must not start with a digit).
+    {% endif %}
+
+service_description:
+  type: str
+  help: "Short description of the service"
+  default: "A FastAPI service"
+
+service_port:
+  type: int
+  help: "Port the service listens on"
+  default: 8000
+
+service_version:
+  type: str
+  help: "Initial version of the service"
+  default: "0.1.0"
+
+use_database:
+  type: bool
+  help: "Include SQLAlchemy + Alembic database support?"
+  default: true
+
+use_gunicorn:
+  type: bool
+  help: "Include Gunicorn as the production WSGI/ASGI server?"
+  default: true
