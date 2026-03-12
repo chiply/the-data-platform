@@ -1,17 +1,24 @@
+# Build context: monorepo/ (run with docker build -f services/{{ service_name }}/Dockerfile .)
 FROM tdp-python-base
 
-# Install service-specific dependencies using uv
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+WORKDIR /build
+
+# Copy platform libraries (path must match relative reference in pyproject.toml)
+COPY libs/tdp-fastapi-core ./libs/tdp-fastapi-core
+
+# Copy service dependency manifests and install
+COPY services/{{ service_name }}/pyproject.toml services/{{ service_name }}/uv.lock ./services/{{ service_name }}/
+WORKDIR /build/services/{{ service_name }}
+RUN uv sync --frozen --no-dev --no-editable
 
 # Copy application source and supporting files
-COPY src/ /app/src/
-COPY logging_config.py /app/logging_config.py
-COPY entrypoint.sh /app/entrypoint.sh
+COPY services/{{ service_name }}/src/ ./src/
+COPY services/{{ service_name }}/logging_config.py ./logging_config.py
+COPY services/{{ service_name }}/entrypoint.sh ./entrypoint.sh
 {% if use_gunicorn %}
-COPY gunicorn_conf.py /app/gunicorn_conf.py
+COPY services/{{ service_name }}/gunicorn_conf.py ./gunicorn_conf.py
 {% endif %}
 
 EXPOSE {{ service_port }}
 
-CMD ["/app/entrypoint.sh"]
+CMD ["./entrypoint.sh"]
