@@ -120,7 +120,7 @@
         "README.md.jinja mentions Gazelle for BUILD file maintenance"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
@@ -138,7 +138,7 @@
         "Script prints post-generation checklist mentioning Helm chart and release-please registration"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": ""
     },
