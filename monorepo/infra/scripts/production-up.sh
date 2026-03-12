@@ -63,7 +63,7 @@ kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/apps/sc
 
 echo "==> Waiting for ArgoCD to sync schema-registry..."
 kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=jsonpath='{.status.sync.status}'=Synced \
-  application/schema-registry -n argocd --timeout=120s 2>/dev/null || \
+  application/schema-registry-production -n argocd --timeout=120s 2>/dev/null || \
   echo "  (sync not yet complete — ArgoCD will continue reconciling)"
 
 # ---------------------------------------------------------------------------
