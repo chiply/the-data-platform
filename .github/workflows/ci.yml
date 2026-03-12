@@ -279,3 +279,20 @@ jobs:
             fi
             echo "OK: ${base}/${f} exists"
           done
+
+  template-drift:
+    name: Template Drift Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install copier
+        run: pip install copier
+
+      - name: Check for template drift
+        run: ./scripts/check-template-drift.sh
