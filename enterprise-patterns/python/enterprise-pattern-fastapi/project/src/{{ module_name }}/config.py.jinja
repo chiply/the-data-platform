@@ -1,0 +1,39 @@
+"""Application configuration via pydantic-settings."""
+
+from enum import Enum
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Environment(str, Enum):
+    """Deployment environment."""
+
+    LOCAL = "LOCAL"
+    STAGING = "STAGING"
+    PRODUCTION = "PRODUCTION"
+
+    @property
+    def is_deployed(self) -> bool:
+        """Return True if this is a deployed (non-local) environment."""
+        return self in {Environment.STAGING, Environment.PRODUCTION}
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables and .env file.
+
+    Environment variables take precedence over .env file values.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
+
+    service_name: str = "{{ service_name }}"
+    service_version: str = "{{ service_version }}"
+    environment: Environment = Environment.LOCAL
+    service_port: int = {{ service_port }}
+    log_level: str = "INFO"
+{% if use_database %}
+    database_url: str = "postgresql+asyncpg://localhost:5432/{{ module_name }}"
+{% endif %}

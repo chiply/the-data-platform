@@ -1,0 +1,40 @@
+"""Schema tests using Polyfactory for model factories."""
+
+from polyfactory.factories.pydantic_factory import ModelFactory
+
+from {{ module_name }}.schemas import ExampleSchema
+
+
+class ExampleSchemaFactory(ModelFactory[ExampleSchema]):
+    """Factory for generating ExampleSchema instances with random valid data."""
+
+    __model__ = ExampleSchema
+
+    # Override name to ensure the icontract invariant (non-empty) is satisfied.
+    @classmethod
+    def name(cls) -> str:
+        """Generate a non-empty name."""
+        return cls.__faker__.name()
+
+
+def test_factory_produces_valid_instance() -> None:
+    """Polyfactory should produce a valid ExampleSchema instance."""
+    instance = ExampleSchemaFactory.build()
+    assert isinstance(instance, ExampleSchema)
+    assert len(instance.name) > 0
+
+
+def test_serialization_round_trip() -> None:
+    """An ExampleSchema should survive a serialize/deserialize round-trip."""
+    original = ExampleSchemaFactory.build()
+    dumped = original.model_dump()
+    restored = ExampleSchema.model_validate(dumped)
+    assert restored == original
+
+
+def test_json_round_trip() -> None:
+    """An ExampleSchema should survive a JSON serialize/deserialize round-trip."""
+    original = ExampleSchemaFactory.build()
+    json_str = original.model_dump_json()
+    restored = ExampleSchema.model_validate_json(json_str)
+    assert restored == original
