@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.3...schema-registry-v0.1.4) (2026-03-12)
+
+
+### Bug Fixes
+
+* Tiltfile Starlark string concatenation ([#17](https://github.com/chiply/the-data-platform/issues/17)) ([5919e5d](https://github.com/chiply/the-data-platform/commit/5919e5dc309bacb53bd1e8cd6aa8409e34a918b0))
+
 ## [0.1.3](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.2...schema-registry-v0.1.3) (2026-03-11)
 
 
