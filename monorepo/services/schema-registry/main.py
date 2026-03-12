@@ -9,7 +9,7 @@ app = FastAPI(title="Schema Registry", version=APP_VERSION)
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "message": "hot reload works!"}
 
 
 @app.get("/version")
