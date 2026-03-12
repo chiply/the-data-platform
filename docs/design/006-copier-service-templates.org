@@ -1,0 +1,772 @@
+#+TITLE: 006 - Copier-Based Service Templates & Pattern Inheritance
+#+AUTHOR: Charlie Holland
+#+STATUS: Accepted
+#+CATEGORY: architecture
+#+CREATED: [2026-03-12]
+#+LAST_MODIFIED: [2026-03-12]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Replace the "layered fork model" for pattern inheritance (documented in ARCHITECTURE.md) with
+[[https://copier.readthedocs.io/][Copier]], a template engine that supports updating generated projects when the template evolves.
+The first concrete deliverable is a FastAPI service template living at
+=enterprise-patterns/python/enterprise-pattern-fastapi/= and a replacement of the current
+=schema-registry= stub with a service generated from that template.
+
+* Motivation
+
+The platform needs a repeatable way to bootstrap new FastAPI services that conform to platform
+standards (OTel, icontract, Dockerfile.base, Helm charts, health/version endpoints, testing
+strategy). The current =schema-registry= is a hand-written stub with no shared structure.
+
+ARCHITECTURE.md currently describes a "layered fork model" where templates follow a git fork chain:
+publicly maintained repo → org-wide fork → project-specific fork. This model has practical problems:
+
+- *Merge conflict accumulation:* Each fork diverges; upstream merges become increasingly painful.
+- *No multi-level fork support:* GitHub only supports a single upstream per fork.
+- *Full history inheritance:* Forks carry the entire git history of the upstream, including irrelevant commits.
+- *No parameterization:* Forks cannot substitute service names, module paths, or config values at generation time.
+
+Copier solves these problems by maintaining a one-way template → project relationship with a
+3-way merge algorithm for updates. When the template changes, =copier update= computes a diff
+and applies it to generated projects, preserving local customizations. Note that when template
+and service changes overlap in the same file region, =copier update= produces conflict markers
+(=<<<<<<<= / =>>>>>>>=) that the developer resolves manually — this is expected behavior.
+
+* Design
+
+** Template Location and Structure
+
+The template lives in the existing =enterprise-patterns/= directory tree, which ARCHITECTURE.md
+already designates for "reusable, opinionated project templates":
+
+#+begin_src
+enterprise-patterns/
+  python/
+    enterprise-pattern-fastapi/
+      copier.yml                              # Template config + questions
+      tests/                                  # Template self-tests (not copied)
+        test_generate.py                      # Validates all toggle combinations
+      project/                                # Template files (_subdirectory target)
+        {{ _copier_conf.answers_file }}.jinja # Answers file (required for copier update)
+        Dockerfile.jinja
+        .dockerignore
+        requirements.in.jinja
+        requirements.txt.jinja
+        BUILD.bazel.jinja
+        README.md.jinja
+        src/
+          {{ module_name }}/
+            __init__.py.jinja
+            main.py.jinja
+            config.py.jinja
+            exceptions.py.jinja
+            schemas.py.jinja
+            telemetry.py.jinja
+            dependencies.py.jinja
+            py.typed
+            routers/
+              __init__.py
+              health.py.jinja
+            {% if use_database %}database.py{% endif %}.jinja
+            {% if use_database %}models{% endif %}/
+              __init__.py
+        tests/
+          __init__.py
+          conftest.py.jinja
+          test_health.py.jinja
+          test_schemas.py.jinja
+          test_properties.py.jinja
+        {% if use_database %}alembic{% endif %}/
+          env.py.jinja
+          script.py.mako
+          versions/
+            .gitkeep
+        {% if use_database %}alembic.ini{% endif %}.jinja
+        logging_config.py.jinja
+        {% if use_gunicorn %}gunicorn_conf.py{% endif %}.jinja
+        entrypoint.sh.jinja
+#+end_src
+
+The =copier.yml= uses =_subdirectory: project= so that template metadata (copier.yml itself,
+template README, tests-for-the-template) stays separate from the rendered output.
+
+** Copier Configuration (=copier.yml=)
+
+#+begin_src yaml
+_subdirectory: project
+_answers_file: .copier-answers.yml
+_min_copier_version: "9.1.0"
+_skip_if_exists:
+  - "alembic/versions/*.py"
+  - "CHANGELOG.md"
+_envops:
+  trim_blocks: true
+  lstrip_blocks: true
+_tasks:
+  - command: "chmod +x entrypoint.sh"
+    when: "{{ _copier_conf.os != 'windows' }}"
+
+# --- Questions ---
+
+service_name:
+  type: str
+  help: "Service name (kebab-case, e.g. schema-registry)"
+  validator: >-
+    {% if not service_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Must be lowercase kebab-case (letters, digits, single hyphens, no leading/trailing hyphens)
+    {% endif %}
+
+service_description:
+  type: str
+  help: "One-line description of the service"
+  default: "A FastAPI service"
+
+module_name:
+  type: str
+  help: "Python module name (snake_case)"
+  default: "{{ service_name | replace('-', '_') }}"
+  validator: >-
+    {% if not module_name | regex_search('^[a-z][a-z0-9_]*$') %}
+    Must be a valid Python identifier (lowercase snake_case)
+    {% endif %}
+
+service_port:
+  type: int
+  help: "Port the service listens on (must be unique across services for local dev)"
+  default: 8000
+
+service_version:
+  type: str
+  help: "Initial version"
+  default: "0.1.0"
+
+use_database:
+  type: bool
+  help: "Include async SQLAlchemy + Alembic database setup?"
+  default: true
+
+use_gunicorn:
+  type: bool
+  help: "Include Gunicorn multi-worker config (for production)?"
+  default: true
+
+# Planned future toggles (not yet implemented):
+# use_temporal_worker — for Temporal activity/workflow services
+# use_dagster_assets — for Dagster pipeline services
+#+end_src
+
+** Answers File Template
+
+The =project/{{ _copier_conf.answers_file }}.jinja= file is critical for =copier update= to
+work. It must record the template source, commit, and all answer values:
+
+#+begin_src yaml
+# Do not edit manually — managed by Copier
+_src_path: "{{ _copier_conf.src_path }}"
+_commit: "{{ _copier_conf.vcs_ref_hash }}"
+_answers_file: "{{ _copier_conf.answers_file }}"
+service_name: "{{ service_name }}"
+service_description: "{{ service_description }}"
+module_name: "{{ module_name }}"
+service_port: {{ service_port }}
+service_version: "{{ service_version }}"
+use_database: {{ use_database }}
+use_gunicorn: {{ use_gunicorn }}
+#+end_src
+
+** Template Content — What Comes from Where
+
+The template is *inspired by* =zhanymkanov/fastapi_production_template= but adapted to platform
+conventions. It is NOT a fork — we cherry-pick patterns and rewrite them to fit.
+
+| Concern                | Source / Pattern                                               |
+|------------------------+----------------------------------------------------------------|
+| Project layout         | =src/{{ module_name }}/= with =routers/= package (zhanymkanov + FastAPI best practices) |
+| Settings / config      | =pydantic-settings= with =.env= support (zhanymkanov)         |
+| Dockerfile             | =FROM tdp-python-base= — extends platform =Dockerfile.base=   |
+| Health endpoints       | Platform convention: =/health=, =/version= via =APIRouter=     |
+| Gunicorn               | Pydantic-based config with CPU-scaled workers (zhanymkanov)    |
+| Logging                | =logging_config.py= with =dictConfig= — JSON structured logs with OTel trace/span IDs |
+| Telemetry              | =telemetry.py= — =TracerProvider=, OTLP exporter, FastAPI + SQLAlchemy auto-instrumentation |
+| Database               | Async SQLAlchemy + Alembic, conditional on =use_database=      |
+| Dependencies           | =dependencies.py= — =get_settings=, =get_db_session= (FastAPI DI) |
+| Exceptions             | Typed HTTP exception hierarchy with registered handlers        |
+| Testing                | pytest + icontract + Hypothesis + Polyfactory examples         |
+| Build                  | Bazel =BUILD.bazel= — initial targets, maintained by Gazelle post-generation |
+| Package management     | =requirements.in= (human-edited ranges) + =requirements.txt= (pinned via =pip-compile=) |
+
+** Key Module Specifications
+
+*** =telemetry.py= — OpenTelemetry Setup
+
+Dedicated module for all observability configuration (not buried in =main.py=):
+
+- Configure =TracerProvider= with =OTLPSpanExporter=
+- Set =Resource= with =service.name=, =service.version=, =deployment.environment= from settings
+- Auto-instrument FastAPI via =opentelemetry-instrumentation-fastapi=
+- Auto-instrument SQLAlchemy via =opentelemetry-instrumentation-sqlalchemy= (when =use_database=)
+- Auto-instrument httpx via =opentelemetry-instrumentation-httpx= for outgoing calls
+- Export a =tracer = trace.get_tracer(__name__)= example for custom spans
+
+*** =logging_config.py= — Structured Logging
+
+Replaces =logging.ini= (INI format cannot express custom JSON formatters with OTel trace
+injection). Uses =logging.config.dictConfig= with =python-json-logger=:
+
+- JSON formatter that injects =trace_id= and =span_id= from OTel context
+- Configures =root=, =uvicorn=, =uvicorn.access= loggers
+- Production mode (=ENVIRONMENT.is_deployed=): JSON to stderr
+- Local mode: human-readable text format to stderr
+
+*** =routers/health.py= — Router Pattern
+
+Moves =/health= and =/version= routes into an =APIRouter= to establish the convention that
+=main.py= is the app factory only, not a route dump. Developers add new routers as
+=routers/feeds.py=, =routers/schemas.py=, etc.
+
+*** =dependencies.py= — FastAPI Dependency Injection
+
+Central location for =Depends()= callables:
+
+- =get_settings()= with =@lru_cache= for cached config access
+- =get_db_session()= yielding =AsyncSession= from session factory (when =use_database=)
+- Prevents DI patterns from scattering across routers and main.py
+
+*** =database.py= — Async SQLAlchemy (conditional)
+
+When =use_database= is true:
+
+- =create_async_engine= with explicit pool config (=pool_size=, =max_overflow=, =pool_pre_ping=True=)
+- =async_sessionmaker= (not deprecated =sessionmaker(class_=AsyncSession)=)
+- =expire_on_commit=False= as default
+- =lifespan= context manager in =main.py= disposes engine on shutdown
+- =alembic/env.py= uses =run_async= with =async with connectable.connect()= pattern
+
+*** =exceptions.py= — Exception Hierarchy with Handlers
+
+Base =AppException= carrying =status_code=, =detail=, and optional error code. Subclasses:
+=NotFound=, =BadRequest=, =PermissionDenied=, =NotAuthenticated=.
+
+=main.py= registers exception handlers that catch =AppException= and return structured JSON
+responses (without this, raising =NotFound= would produce a 500, not a 404).
+
+*** =tests/= — Testing Skeleton
+
+Establishes all mandated testing patterns:
+
+- =conftest.py= — =AsyncClient= fixture (=httpx.AsyncClient= + =ASGITransport=), test database
+  fixture (if =use_database=), =settings_override= fixture, =asyncio_mode = auto=
+- =test_health.py= — endpoint smoke tests
+- =test_schemas.py= — Polyfactory example generating a model instance and round-tripping
+  through serialization
+- =test_properties.py= — Hypothesis =@given(st.from_type(SomeSchema))= example for
+  property-based testing, plus an icontract =@invariant= decorated model showing how
+  =ViolationError= integrates with pytest
+
+** Dockerfile Strategy
+
+The template's =Dockerfile.jinja= MUST extend =Dockerfile.base= via =FROM tdp-python-base=,
+not duplicate the multi-stage build. This ensures:
+
+- Python version, system libraries, and non-root user convention are managed in one place
+- Updating the base image (e.g., Python 3.13) only requires rebuilding =Dockerfile.base=
+- Generated services only add service-specific layers (=pip install -r requirements.txt=, =COPY=)
+
+The =Dockerfile.base= must be built before any service image. Build ordering:
+
+#+begin_src bash
+# Build base image (one-time or when Dockerfile.base changes)
+docker build -f monorepo/services/Dockerfile.base -t tdp-python-base monorepo/services/
+
+# Build service image (references tdp-python-base)
+docker build -f monorepo/services/schema-registry/Dockerfile \
+  -t schema-registry monorepo/services/schema-registry/
+#+end_src
+
+The =entrypoint.sh= MUST use =exec= to replace the shell process so that Kubernetes SIGTERM
+reaches the application directly (prevents hard kills during rolling deployments):
+
+#+begin_src bash
+#!/bin/sh
+set -e
+# ... any setup ...
+exec uvicorn src.{{ module_name }}.main:app --host 0.0.0.0 --port {{ service_port }}
+#+end_src
+
+The template also includes a =.dockerignore= excluding =tests/=, =__pycache__/=,
+=.copier-answers.yml=, =BUILD.bazel=, =README.md=, and =*.pyc=.
+
+** Bazel BUILD Strategy
+
+The template generates an initial =BUILD.bazel= with minimal targets:
+
+- =py_library= for =src/{{ module_name }}= source files
+- =py_binary= for the service entrypoint
+- =py_test= for each test file
+
+Post-generation, =BUILD.bazel= is maintained by [[https://github.com/bazelbuild/rules_python/tree/main/gazelle][Gazelle]] (=rules_python= Gazelle extension),
+not by Copier. To prevent =copier update= from overwriting manual or Gazelle-managed changes,
+=BUILD.bazel= is added to =_skip_if_exists= after initial generation.
+
+Developers run =bazel run //:gazelle= to regenerate BUILD files when dependencies change.
+The initial template provides a working starting point; Gazelle keeps it current.
+
+** Monorepo Considerations
+
+*** Versioning
+
+Git tags are repo-wide. The platform already uses release-please with component-prefixed tags
+(=schema-registry-v0.1.5=, =platform-v0.1.10=). Copier defaults to the latest PEP 440 tag
+for updates, which would pick up unrelated component releases.
+
+*Solution:* Always use =--vcs-ref HEAD= when generating or updating services. This treats the
+latest commit on =main= as the current template version. Template changes are tracked through
+conventional commits like any other component:
+
+#+begin_src
+feat(enterprise-pattern-fastapi): add OpenTelemetry instrumentation to template
+#+end_src
+
+*** Source Path Portability
+
+When generating from a local path, =.copier-answers.yml= records =_src_path=. Copier
+resolves this through the git history of the enclosing repository.
+
+*Solution:* All generation and updates MUST go through =scripts/new-service.sh= (for
+generation) or =copier update --trust --vcs-ref HEAD= (for updates, run from within the
+service directory). The wrapper script ensures the correct source path and flags are used:
+
+#+begin_src bash
+#!/bin/bash
+# scripts/new-service.sh — wraps copier copy with correct defaults
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+TEMPLATE_PATH="${REPO_ROOT}/enterprise-patterns/python/enterprise-pattern-fastapi"
+
+# Verify working tree is clean (required for copier update to work correctly later)
+if ! git diff --quiet HEAD -- enterprise-patterns/; then
+  echo "ERROR: Uncommitted changes in enterprise-patterns/. Commit first." >&2
+  exit 1
+fi
+
+SERVICE_NAME="${1:?Usage: scripts/new-service.sh <service-name>}"
+DEST="${REPO_ROOT}/monorepo/services/${SERVICE_NAME}"
+
+copier copy --trust --vcs-ref HEAD \
+  "${TEMPLATE_PATH}" "${DEST}" \
+  --data service_name="${SERVICE_NAME}"
+#+end_src
+
+This script is mandatory, not optional, because it:
+1. Ensures the working tree is clean (dirty template state corrupts =copier update= baselines)
+2. Uses the correct =--vcs-ref HEAD= flag
+3. Resolves the template path consistently regardless of where the developer runs it
+
+*** Helm Chart Generation
+
+Helm charts live at =monorepo/deploy/charts/<service>/= which is *outside* the service directory.
+Two options:
+
+- *Option A:* Template generates a Helm chart alongside the service, and a post-generation task
+  moves it to =deploy/charts/=.
+- *Option B:* Template only generates the service directory. Helm chart creation is a separate
+  step documented in CONTRIBUTING.md (copy from =deploy/charts/common/= and customize values).
+
+*Recommendation:* Option B. Helm charts depend on the common library chart and have their own
+lifecycle. Coupling them into the Copier template adds complexity (=_tasks= requiring =--trust=,
+path manipulation outside the destination directory) for marginal benefit. Document the Helm
+setup as a follow-up step. The generated =README.md= includes a post-generation checklist
+pointing developers to the Helm chart setup.
+
+** Schema Registry Replacement
+
+The current =schema-registry= is a 40-line =main.py= stub. The replacement will be generated
+from the template:
+
+#+begin_src bash
+# Remove old stub
+rm -rf monorepo/services/schema-registry
+
+# Generate from template
+./scripts/new-service.sh schema-registry
+
+# Copier will prompt for remaining answers interactively, or pass --data flags:
+# --data service_description="Centralized schema registry for the data platform"
+# --data use_database=true
+# --data use_gunicorn=true
+#+end_src
+
+After generation, the schema-specific endpoints (=/schemas=, =/schemas/{name}=) are added as
+service-specific customizations on top of the template scaffolding. These customizations are
+preserved across future =copier update= runs via the 3-way merge algorithm.
+
+** Documentation Updates
+
+*** ARCHITECTURE.md
+
+Replace the "Pattern Inheritance" section:
+
+#+begin_src markdown
+### Pattern Inheritance
+
+Templates use [Copier](https://copier.readthedocs.io/) for parameterized project generation
+with update support. Templates live in `enterprise-patterns/`:
+
+```
+enterprise-patterns/
+  python/
+    enterprise-pattern-fastapi/    # FastAPI service template
+```
+
+To create a new service from a template:
+
+```bash
+./scripts/new-service.sh my-service
+```
+
+To pull template updates into an existing service:
+
+```bash
+cd monorepo/services/my-service
+copier update --trust --vcs-ref HEAD
+```
+
+Copier's 3-way merge preserves service-specific customizations while applying template
+changes. When template and service changes overlap, conflict markers are produced for
+manual resolution. The `.copier-answers.yml` file in each generated service tracks the
+template source and generation parameters — do not edit it manually.
+
+**Scope:** This template approach applies to FastAPI HTTP services. Non-HTTP service types
+(gRPC, Temporal workers, Dagster pipelines) should get their own templates under
+`enterprise-patterns/python/` when the time comes.
+```
+
+*** CONTRIBUTING.md
+
+Update the "Creating a new service" section to use Copier instead of the manual
+mkdir/Dockerfile/requirements.txt steps.
+
+** CI Integration
+
+*** Template Validation Job
+
+A CI job validates the template itself by generating projects with all toggle combinations
+and verifying the output:
+
+#+begin_src yaml
+# .github/workflows/ci.yml (new job)
+template-validate:
+  runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      use_database: [true, false]
+      use_gunicorn: [true, false]
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with: { python-version: "3.12" }
+    - run: pip install copier
+    - run: |
+        copier copy --trust --vcs-ref HEAD \
+          --defaults \
+          --data service_name=test-service \
+          --data use_database=${{ matrix.use_database }} \
+          --data use_gunicorn=${{ matrix.use_gunicorn }} \
+          enterprise-patterns/python/enterprise-pattern-fastapi \
+          /tmp/test-service
+    - run: python -m py_compile /tmp/test-service/src/test_service/*.py
+    - run: docker build -f /tmp/test-service/Dockerfile /tmp/test-service
+#+end_src
+
+*** Template Drift Detection
+
+A CI check runs =copier update --pretend= on each generated service and warns when a service
+is behind the template. This ensures drift is visible before it accumulates:
+
+#+begin_src bash
+# scripts/check-template-drift.sh
+for service_dir in monorepo/services/*/; do
+  if [ -f "${service_dir}/.copier-answers.yml" ]; then
+    echo "Checking ${service_dir}..."
+    cd "${service_dir}"
+    if ! copier update --trust --vcs-ref HEAD --pretend --skip-answered 2>/dev/null | grep -q "No changes"; then
+      echo "WARNING: ${service_dir} has template drift"
+    fi
+    cd -
+  fi
+done
+#+end_src
+
+* Decision
+
+Use Copier with a monorepo-local template at =enterprise-patterns/python/enterprise-pattern-fastapi/=.
+Use =--vcs-ref HEAD= for all generation and updates (no independent template versioning). Base
+template patterns on =zhanymkanov/fastapi_production_template= adapted to platform conventions
+(requirements.txt, Dockerfile.base, OTel, icontract, Bazel). Helm chart creation remains a
+separate manual step. All service generation goes through =scripts/new-service.sh= for
+consistency and safety.
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+Implementation tasks with IDs in format =[TDP-006-XX]=.
+
+** TODO [TDP-006-01] Create Copier template configuration                   :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =enterprise-patterns/python/enterprise-pattern-fastapi/copier.yml= with:
+- =_subdirectory: project=, =_min_copier_version: "9.1.0"=
+- =_envops: {trim_blocks: true, lstrip_blocks: true}= for clean output
+- =_skip_if_exists= for =alembic/versions/*.py= and =CHANGELOG.md=
+- =_tasks= for =chmod +x entrypoint.sh=
+- Questions with validators: =service_name= (kebab-case, no consecutive/trailing hyphens),
+  =module_name= (valid Python identifier), =service_description=, =service_port=,
+  =service_version=, =use_database=, =use_gunicorn=
+- Conditional file exclusion via Jinja expressions in file/directory names
+
+Create the =.copier-answers.yml.jinja= answers file template recording =_src_path=,
+=_commit=, and all answer values.
+
+** TODO [TDP-006-02] Create template project files — core modules            :p1:
+:PROPERTIES:
+:EFFORT: L
+:END:
+
+Create the =project/= subdirectory with Jinja2-templated files for core service structure:
+- =src/{{ module_name }}/main.py.jinja= — FastAPI app factory with =lifespan=, exception
+  handler registration, router includes. NOT a route dump.
+- =src/{{ module_name }}/config.py.jinja= — =pydantic-settings= with =Environment= enum,
+  =SettingsConfigDict=, env var precedence documented
+- =src/{{ module_name }}/exceptions.py.jinja= — =AppException= base with =status_code= /
+  =detail=, subclasses (=NotFound=, =BadRequest=, =PermissionDenied=, =NotAuthenticated=),
+  registered exception handlers
+- =src/{{ module_name }}/schemas.py.jinja= — Base Pydantic model with icontract =@invariant=
+  example
+- =src/{{ module_name }}/dependencies.py.jinja= — =get_settings()= with =@lru_cache=,
+  =get_db_session()= (conditional)
+- =src/{{ module_name }}/routers/__init__.py= and =routers/health.py.jinja= — =/health= and
+  =/version= endpoints via =APIRouter=
+- =src/{{ module_name }}/__init__.py.jinja= — exports =app= and key types
+- =src/{{ module_name }}/py.typed= — PEP 561 marker
+- =Dockerfile.jinja= — =FROM tdp-python-base=, service-specific layers only
+- =.dockerignore= — exclude tests, pycache, copier answers, BUILD files
+- =requirements.in.jinja= — human-edited dependency ranges
+- =requirements.txt.jinja= — pinned deps (=pip-compile= output)
+- =README.md.jinja= — includes post-generation checklist (Helm chart, release-please)
+- =entrypoint.sh.jinja= — uses =exec= for signal propagation
+- =logging_config.py.jinja= — =dictConfig= with JSON formatter + OTel trace/span injection
+
+** TODO [TDP-006-03] Create template project files — OTel instrumentation    :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =src/{{ module_name }}/telemetry.py.jinja= — dedicated OTel module:
+- =TracerProvider= with =OTLPSpanExporter= configuration
+- =Resource= with =service.name=, =service.version=, =deployment.environment=
+- =FastAPIInstrumentor= auto-instrumentation
+- =SQLAlchemyInstrumentor= (conditional on =use_database=)
+- =HTTPXClientInstrumentor= for outgoing HTTP calls
+- Exported =tracer = trace.get_tracer(__name__)= for custom span creation
+- Integration with =logging_config.py= for trace/span ID injection into logs
+- Add OTel dependencies to =requirements.in.jinja=: =opentelemetry-api=,
+  =opentelemetry-sdk=, =opentelemetry-exporter-otlp=,
+  =opentelemetry-instrumentation-fastapi=,
+  =opentelemetry-instrumentation-sqlalchemy= (conditional),
+  =opentelemetry-instrumentation-httpx=
+
+** TODO [TDP-006-04] Create template project files — database (conditional)  :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create conditional database files (only included when =use_database=True=):
+- =src/{{ module_name }}/database.py.jinja= — =create_async_engine= with pool config
+  (=pool_size=, =max_overflow=, =pool_pre_ping=True=), =async_sessionmaker= (not deprecated
+  =sessionmaker=), =expire_on_commit=False=
+- =src/{{ module_name }}/models/__init__.py= — empty, establishes the models package
+- =alembic/env.py.jinja= — async migration pattern with =run_async=,
+  =async with connectable.connect()=, =NullPool= for migrations
+- =alembic/script.py.mako= — copied verbatim (no =.jinja= suffix, Mako syntax conflicts)
+- =alembic/versions/.gitkeep=
+- =alembic.ini.jinja= — Alembic config referencing settings
+- Database dependencies in =requirements.in.jinja=: =sqlalchemy[asyncio]=, =asyncpg=,
+  =alembic=, =psycopg2-binary=
+- =lifespan= context manager in =main.py= disposes engine on shutdown
+
+** TODO [TDP-006-05] Create template project files — testing skeleton        :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create test files that establish all mandated testing patterns:
+- =tests/conftest.py.jinja= — =AsyncClient= fixture (=httpx.AsyncClient= + =ASGITransport=),
+  test database fixture (conditional on =use_database=), =settings_override= fixture,
+  configure =asyncio_mode = auto= for =pytest-asyncio=
+- =tests/test_health.py.jinja= — endpoint smoke tests for =/health= and =/version=
+- =tests/test_schemas.py.jinja= — Polyfactory example generating a model instance,
+  round-tripping through serialization, demonstrating model factory fixtures
+- =tests/test_properties.py.jinja= — Hypothesis =@given(st.from_type(SomeSchema))= example,
+  plus icontract =@invariant= decorated model showing =ViolationError= integration with pytest
+- Test dependencies in =requirements.in.jinja=: =pytest=, =pytest-asyncio=, =httpx=,
+  =hypothesis=, =polyfactory=, =icontract=
+
+** TODO [TDP-006-06] Create Bazel BUILD template                             :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create =BUILD.bazel.jinja= with initial targets:
+- =py_library= for =src/{{ module_name }}= source files
+- =py_binary= for the service entrypoint
+- =py_test= for each test file
+- Document in generated =README.md= that BUILD files are maintained by Gazelle
+  post-generation (=bazel run //:gazelle=)
+
+Note: After initial generation, =BUILD.bazel= should be added to =_skip_if_exists= to
+prevent =copier update= from overwriting Gazelle-managed changes. This is handled in the
+=copier.yml= after the first successful generation across all services.
+
+** TODO [TDP-006-07] Create =scripts/new-service.sh= wrapper                 :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create mandatory wrapper script that:
+- Verifies working tree is clean in =enterprise-patterns/= (dirty state corrupts update baselines)
+- Resolves template path from repo root
+- Passes =--trust --vcs-ref HEAD= automatically
+- Accepts service name as first argument
+- Prints post-generation checklist (Helm chart, release-please registration)
+
+** TODO [TDP-006-08] Generate schema-registry from template                  :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Remove the existing =monorepo/services/schema-registry/= stub and generate a replacement
+using =scripts/new-service.sh=. Add schema-specific endpoints (=/schemas=, =/schemas/{name}=)
+as service-level customizations in =routers/schemas.py=.
+
+** TODO [TDP-006-09] Verify build and deploy cycle                           :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Verify the generated schema-registry:
+- =docker build= succeeds with the =FROM tdp-python-base= pattern
+- =bazel build //services/schema-registry/...= works
+- Helm chart values still align (port, health endpoints, image name)
+- Service deploys to local k3d cluster and responds on =/health= and =/version=
+- =copier update --trust --vcs-ref HEAD= works on the generated service
+- =copier update= works from a fresh clone at a different filesystem path
+
+** TODO [TDP-006-10] Verify release-please compatibility                     :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Verify =release-please-config.json= and =.release-please-manifest.json= still correctly
+track the schema-registry component after the file structure change:
+- Path (=monorepo/services/schema-registry=) remains the same
+- =CHANGELOG.md= is preserved (in =_skip_if_exists=)
+- The restructured layout does not break changelog detection
+- Conventional commits still map correctly to the component
+
+** TODO [TDP-006-11] Add template validation CI job                          :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Add a CI job that validates the template itself:
+- Matrix of all toggle combinations (=use_database= x =use_gunicorn=)
+- =copier copy= with =--defaults= into a temp directory
+- =python -m py_compile= on all generated Python files
+- =docker build= on the generated Dockerfile
+- =pytest= on the generated test suite
+- Catches template regressions before they affect downstream services
+
+** TODO [TDP-006-12] Add template drift detection CI check                   :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add =scripts/check-template-drift.sh= and a CI job that runs =copier update --pretend= on
+each generated service (identified by presence of =.copier-answers.yml=). Warns when a
+service is behind the template. Ensures drift is visible before it accumulates across
+multiple services.
+
+** TODO [TDP-006-13] Update ARCHITECTURE.md                                  :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Replace the "Pattern Inheritance" section with Copier-based documentation as specified
+in the Design section. Remove references to the "layered fork model". Add note that this
+template approach applies to FastAPI HTTP services only; non-HTTP service types should get
+separate templates.
+
+** TODO [TDP-006-14] Update CONTRIBUTING.md                                  :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Replace the "Creating a new service" section with Copier-based workflow:
+- Add Copier to prerequisites table (=pip install copier= or =brew install copier=)
+- Document =scripts/new-service.sh= as the entry point
+- List available template questions and their defaults
+- Add section on updating services with =copier update=
+- Document =copier update= conflict resolution expectations
+- Note that =copier update= should only be run intentionally when template changes are
+  known to exist, not as a routine step
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Use =--vcs-ref HEAD= instead of independent template versioning
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+In a monorepo, git tags are repo-wide. Independent template versioning would require tag
+prefixes that Copier doesn't natively support. Using =--vcs-ref HEAD= is simpler and
+aligns with the platform's trunk-based development model.
+
+** DECIDED Keep Helm charts as a separate manual step
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+Helm charts live at =deploy/charts/<service>/= which is outside the Copier destination
+directory. Generating them via Copier =_tasks= would require =--trust=, path manipulation,
+and coupling to the common library chart. The added complexity isn't worth it for an
+infrequent operation.
+
+** DECIDED Include OTel instrumentation out of the box
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+OpenTelemetry is a mandatory platform standard. The template includes a dedicated
+=telemetry.py= module with =TracerProvider=, OTLP exporter, and auto-instrumentation for
+FastAPI, SQLAlchemy, and httpx. Every generated service starts compliant from day one.
+
+** DECIDED Single template with boolean toggles, not separate templates
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+Use a single template with =use_database= (and similar) boolean toggles to conditionally
+include files. Only one toggle exists today — splitting into separate templates would mean
+duplicating shared code for a problem that doesn't exist yet. Revisit if toggles exceed 3-4
+and create combinatorial complexity. This applies to FastAPI HTTP services only — non-HTTP
+service types (gRPC, Temporal workers, Dagster pipelines) should get their own templates.
