@@ -50,6 +50,22 @@ deploy_stack "${PLATFORM_DIR}" "platform infrastructure (tdp-platform / ${STACK_
 export_kubeconfig "${STACK_NAME}" "${KUBECONFIG_PATH}"
 
 # ---------------------------------------------------------------------------
+# Bootstrap ArgoCD applications
+# ---------------------------------------------------------------------------
+DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../../deploy" && pwd)"
+
+echo "==> Applying ArgoCD AppProject and applications..."
+kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/appproject.yaml"
+kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/rbac/"
+kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/network-policies/"
+kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/apps/schema-registry.yaml"
+
+echo "==> Waiting for ArgoCD to sync schema-registry..."
+kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=jsonpath='{.status.sync.status}'=Synced \
+  application/schema-registry -n argocd --timeout=120s 2>/dev/null || \
+  echo "  (sync not yet complete — ArgoCD will continue reconciling)"
+
+# ---------------------------------------------------------------------------
 # Print cluster access info
 # ---------------------------------------------------------------------------
 print_access_info "Dev" "${KUBECONFIG_PATH}"
