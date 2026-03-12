@@ -36,6 +36,15 @@ fi
 # Bring up the local environment
 # ---------------------------------------------------------------------------
 deploy_stack "${CLUSTER_DIR}" "tdp-cluster" "${STACK_NAME}"
+
+# Ensure the k3d registry hostname is resolvable from the host.
+# Docker needs to resolve the registry name to push images to it.
+REGISTRY_HOST="k3d-tdp-local-registry"
+if ! grep -q "${REGISTRY_HOST}" /etc/hosts 2>/dev/null; then
+  echo "==> Adding ${REGISTRY_HOST} to /etc/hosts (requires sudo)..."
+  sudo sh -c "echo '127.0.0.1 ${REGISTRY_HOST}' >> /etc/hosts"
+fi
+
 deploy_stack "${PLATFORM_DIR}" "tdp-platform" "${STACK_NAME}"
 
 # ---------------------------------------------------------------------------

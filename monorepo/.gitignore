@@ -1,1 +1,4 @@
 .claude/worktrees/
+
+# Helm dependency artifacts (downloaded by helm dependency update)
+**/charts/*.tgz

@@ -107,8 +107,8 @@ if argocd_mode:
     local_resource(
         "schema-registry-build",
         cmd=(
-            "docker build -t k3d-tdp-local-registry:5111/schema-registry:latest"
-            " services/schema-registry"
+            "docker build -t k3d-tdp-local-registry:5111/schema-registry:latest" +
+            " services/schema-registry" +
             " && docker push k3d-tdp-local-registry:5111/schema-registry:latest"
         ),
         deps=["services/schema-registry/"],
