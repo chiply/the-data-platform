@@ -1,7 +1,10 @@
 # Schema Registry service Dockerfile
 #
-# Multi-stage build extending the platform base pattern.
-# Produces a minimal runtime image with only the service code and deps.
+# Build context: monorepo/ (parent directory)
+# This allows the Dockerfile to access libs/ for editable installs.
+#
+# Build:   docker build -f services/schema-registry/Dockerfile .
+# (from monorepo/ directory)
 
 # ---------------------------------------------------------------------------
 # Stage 1 — builder
@@ -11,16 +14,19 @@ FROM python:3.12-slim AS builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
-    rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+WORKDIR /app
 
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /tmp/requirements.txt
+# Copy the shared library first (needed for dependency resolution)
+COPY libs/tdp-fastapi-core/ /app/libs/tdp-fastapi-core/
+
+# Copy service dependency files
+COPY services/schema-registry/pyproject.toml services/schema-registry/uv.lock /app/services/schema-registry/
+
+# Install dependencies (non-editable for production)
+WORKDIR /app/services/schema-registry
+RUN uv sync --frozen --no-dev --no-editable
 
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime
@@ -28,23 +34,28 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PYTHONUNBUFFERED=1
 
-COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app/services/schema-registry/.venv /app/services/schema-registry/.venv
+ENV PATH="/app/services/schema-registry/.venv/bin:$PATH"
 
 RUN groupadd --gid 1000 app && \
     useradd --uid 1000 --gid app --create-home app
 
-WORKDIR /app
+WORKDIR /app/services/schema-registry
 
-RUN chown app:app /app
+RUN chown app:app /app/services/schema-registry
 
-COPY --chown=app:app main.py .
-RUN chmod u+w /app/main.py
+# Copy application source and supporting files
+COPY services/schema-registry/src/ /app/services/schema-registry/src/
+COPY services/schema-registry/logging_config.py /app/services/schema-registry/logging_config.py
+COPY services/schema-registry/entrypoint.sh /app/services/schema-registry/entrypoint.sh
+COPY services/schema-registry/gunicorn_conf.py /app/services/schema-registry/gunicorn_conf.py
+
+RUN chmod +x /app/services/schema-registry/entrypoint.sh
 
 USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/services/schema-registry/entrypoint.sh"]
