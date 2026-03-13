@@ -74,7 +74,7 @@
         "Script passes when run against current state of the repo"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Independent of US-003 but should run after all other stories. Uses packaging.specifiers.SpecifierSet to validate version constraints."
     }

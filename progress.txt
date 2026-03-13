@@ -18,6 +18,11 @@ PRD: tasks/prd-copier-template.json
 - pytest.ini at project root configures asyncio_mode = auto
 ---
 
+## [Shared Libs] US-004 - Add version pin CI validation
+- What was implemented: Created monorepo/scripts/check-lib-versions.py that discovers all libs and services, validates version constraints using packaging.specifiers. Added lib-version-check CI job to .github/workflows/ci.yml. Script passes on current repo state.
+- Files changed: monorepo/scripts/check-lib-versions.py, .github/workflows/ci.yml
+---
+
 ## [Shared Libs] US-003 - Regenerate schema-registry with shared library
 - What was implemented: Updated schema-registry to use tdp-fastapi-core. pyproject.toml includes tdp-fastapi-core dep with [tool.uv.sources]. main.py imports from tdp_fastapi_core. telemetry/exceptions/logging_config are thin wrappers. Dockerfile uses monorepo build context. All 10 tests pass. uv sync installs tdp-fastapi-core as editable.
 - Files changed: pyproject.toml, main.py, telemetry.py, exceptions.py, logging_config.py, Dockerfile, uv.lock
