@@ -24,7 +24,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast, reproducible dependency management
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+ARG UV_VERSION=0.7
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
 
 # Create a virtualenv so we can copy it cleanly into the runtime stage
 RUN uv venv /opt/venv

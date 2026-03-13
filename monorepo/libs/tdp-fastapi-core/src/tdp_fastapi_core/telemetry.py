@@ -44,6 +44,12 @@ def setup_telemetry(
     instrument_sqlalchemy:
         Whether to enable SQLAlchemy auto-instrumentation.
     """
+    # Guard against repeated calls (e.g. in tests)
+    current_provider = trace.get_tracer_provider()
+    if isinstance(current_provider, TracerProvider):
+        logger.debug("TracerProvider already configured, skipping setup_telemetry")
+        return
+
     resource = Resource.create(
         {
             "service.name": service_name,

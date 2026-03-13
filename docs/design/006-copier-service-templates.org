@@ -464,16 +464,22 @@ compatibility contract even when =[tool.uv.sources]= overrides the install sourc
 For this monorepo, Option A is the default. The Dockerfile copies libs explicitly:
 
 #+begin_src dockerfile
-FROM tdp-python-base
+# Build context: monorepo/ (run with docker build -f services/<name>/Dockerfile .)
+FROM tdp-python-base AS builder
 
-# Copy platform libraries first (they change less frequently → better layer caching)
-COPY ../../libs/tdp-fastapi-core /build/libs/tdp-fastapi-core
+WORKDIR /build
 
-COPY pyproject.toml uv.lock ./
-# Use --no-sources + explicit path to avoid editable installs in production
+# Copy platform libraries (context-relative path)
+COPY libs/tdp-fastapi-core ./libs/tdp-fastapi-core
+
+COPY services/<name>/pyproject.toml services/<name>/uv.lock ./services/<name>/
+WORKDIR /build/services/<name>
 RUN uv sync --frozen --no-dev --no-editable
 
-COPY src/ ./src/
+FROM tdp-python-base AS runtime
+COPY --from=builder /opt/venv /opt/venv
+WORKDIR /app
+COPY services/<name>/src/ ./src/
 #+end_src
 
 *** Template Integration

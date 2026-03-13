@@ -14,6 +14,11 @@ fi
 SERVICE_NAME="${1:?Usage: scripts/new-service.sh <service-name>}"
 DEST="${REPO_ROOT}/monorepo/services/${SERVICE_NAME}"
 
+if [ -e "${DEST}" ]; then
+  echo "ERROR: ${DEST} already exists. Remove it first or use 'copier update' to update." >&2
+  exit 1
+fi
+
 copier copy --trust --vcs-ref HEAD \
   "${TEMPLATE_PATH}" "${DEST}" \
   --data service_name="${SERVICE_NAME}"

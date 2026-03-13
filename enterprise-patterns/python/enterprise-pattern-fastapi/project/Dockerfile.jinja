@@ -13,6 +13,7 @@ COPY libs/tdp-fastapi-core ./libs/tdp-fastapi-core
 # Copy service dependency manifests and install
 COPY services/{{ service_name }}/pyproject.toml services/{{ service_name }}/uv.lock ./services/{{ service_name }}/
 WORKDIR /build/services/{{ service_name }}
+ENV UV_PROJECT_ENVIRONMENT="/opt/venv"
 RUN uv sync --frozen --no-dev --no-editable
 
 # ---------------------------------------------------------------------------

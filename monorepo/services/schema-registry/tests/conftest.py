@@ -62,7 +62,9 @@ async def db_session(settings_override: Settings) -> AsyncSession:
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        yield session
+        async with session.begin():
+            yield session
+            await session.rollback()
 
     await engine.dispose()
 
