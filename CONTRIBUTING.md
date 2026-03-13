@@ -208,11 +208,12 @@ For local, the default password is `admin`.
 New services are scaffolded from a Copier template using `scripts/new-service.sh`.
 
 ```bash
-./scripts/new-service.sh
+./scripts/new-service.sh <service-name>
 ```
 
-The script runs Copier against the service template in `monorepo/templates/service/`
-and generates a fully-configured service directory under `monorepo/services/`.
+The script runs Copier against the service template in
+`enterprise-patterns/python/enterprise-pattern-fastapi/` and generates a
+fully-configured service directory under `monorepo/services/`.
 
 #### Template questions and defaults
 

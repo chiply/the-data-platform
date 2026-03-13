@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from tdp_fastapi_core import configure_logging, register_exception_handlers, setup_telemetry
 from tdp_fastapi_core.middleware import RequestIDMiddleware
 
+import schema_registry
 from schema_registry.config import Settings
 from schema_registry.database import engine
 from schema_registry.dependencies import get_settings
@@ -37,7 +38,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="schema-registry",
         description="Centralized schema registry for the data platform",
-        version="0.1.0",
+        version=schema_registry.__version__,
         lifespan=lifespan,
     )
 

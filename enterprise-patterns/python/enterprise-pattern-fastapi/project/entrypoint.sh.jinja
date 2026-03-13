@@ -6,8 +6,7 @@ set -e
 # exec replaces the shell process so SIGTERM reaches Gunicorn directly,
 # enabling graceful shutdown in Kubernetes rolling deployments.
 exec gunicorn {{ module_name }}.main:app \
-    --config gunicorn_conf.py \
-    --bind "0.0.0.0:{{ service_port }}"
+    --config gunicorn_conf.py
 {% else %}
 # Use Uvicorn directly (single-worker mode).
 # exec replaces the shell process so SIGTERM reaches Uvicorn directly,

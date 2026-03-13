@@ -40,8 +40,8 @@ bazel test //services/schema-registry/...
 # Build the base image first (if not already built)
 docker build -f monorepo/services/Dockerfile.base -t tdp-python-base monorepo/services/
 
-# Build the service image
-docker build -t schema-registry .
+# Build the service image (from monorepo root)
+docker build -f services/schema-registry/Dockerfile -t schema-registry .
 ```
 
 ## Project Structure

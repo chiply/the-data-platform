@@ -42,8 +42,8 @@ bazel test //services/{{ service_name }}/...
 # Build the base image first (if not already built)
 docker build -f monorepo/services/Dockerfile.base -t tdp-python-base monorepo/services/
 
-# Build the service image
-docker build -t {{ service_name }} .
+# Build the service image (from monorepo root)
+docker build -f services/{{ service_name }}/Dockerfile -t {{ service_name }} .
 ```
 
 ## Project Structure
