@@ -1,5 +1,7 @@
 """Shared test fixtures and configuration."""
 
+import os
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -12,6 +14,13 @@ from sqlalchemy.orm import sessionmaker
 from schema_registry.dependencies import get_db_session
 
 pytest_plugins: list[str] = []
+
+# Read test DATABASE_URL from env with localhost fallback.
+# CI sets this env var; local dev uses the Tiltfile-provisioned CNPG.
+_TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://localhost:5432/schema_registry_test",
+)
 
 
 @pytest.fixture()
@@ -27,7 +36,7 @@ def settings_override() -> Settings:
         environment="LOCAL",
         service_port=8000,
         log_level="DEBUG",
-        database_url="postgresql+asyncpg://localhost:5432/schema_registry_test",
+        database_url=_TEST_DATABASE_URL,
     )
 
 
