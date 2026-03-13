@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.5...schema-registry-v0.1.6) (2026-03-13)
+
+
+### Features
+
+* shared platform library (tdp-fastapi-core) with Copier template integration ([#28](https://github.com/chiply/the-data-platform/issues/28)) ([aa9d5a8](https://github.com/chiply/the-data-platform/commit/aa9d5a81a1d4904ffc0891cc18b4742f8e31e48f))
+
 ## [0.1.5](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.4...schema-registry-v0.1.5) (2026-03-12)
 
 

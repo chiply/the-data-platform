@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.12](https://github.com/chiply/the-data-platform/compare/platform-v0.1.11...platform-v0.1.12) (2026-03-13)
+
+
+### Features
+
+* shared platform library (tdp-fastapi-core) with Copier template integration ([#28](https://github.com/chiply/the-data-platform/issues/28)) ([aa9d5a8](https://github.com/chiply/the-data-platform/commit/aa9d5a81a1d4904ffc0891cc18b4742f8e31e48f))
+
 ## [0.1.11](https://github.com/chiply/the-data-platform/compare/platform-v0.1.10...platform-v0.1.11) (2026-03-12)
 
 
