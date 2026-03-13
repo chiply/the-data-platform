@@ -17,6 +17,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Exported tracer for creating custom spans:
+#   from tdp_fastapi_core.telemetry import tracer
+#   with tracer.start_as_current_span("my-operation"):
+#       ...
+tracer = trace.get_tracer(__name__)
+
 
 def setup_telemetry(
     app: FastAPI,
