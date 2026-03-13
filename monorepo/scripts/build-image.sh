@@ -126,11 +126,25 @@ if [ -z "$COMPONENT_PATH" ] || [ "$COMPONENT_PATH" = "null" ]; then
 fi
 
 DOCKERFILE_PATH="${REPO_ROOT}/${COMPONENT_PATH}/Dockerfile"
-CONTEXT_DIR="${REPO_ROOT}/${COMPONENT_PATH}"
+# Use monorepo/ as build context — service Dockerfiles use monorepo-relative COPY paths
+MONOREPO_DIR="${REPO_ROOT}/monorepo"
+CONTEXT_DIR="${MONOREPO_DIR}"
 
 if [ ! -f "$DOCKERFILE_PATH" ]; then
   echo "ERROR: No Dockerfile found at ${DOCKERFILE_PATH}" >&2
   exit 1
+fi
+
+# Build tdp-python-base if not already available
+BASE_IMAGE_TAG="tdp-python-base"
+if ! docker image inspect "${BASE_IMAGE_TAG}" &>/dev/null; then
+  BASE_DOCKERFILE="${MONOREPO_DIR}/services/Dockerfile.base"
+  if [ -f "$BASE_DOCKERFILE" ]; then
+    echo "Building base image: ${BASE_IMAGE_TAG}"
+    docker buildx build --tag "${BASE_IMAGE_TAG}" --file "${BASE_DOCKERFILE}" --load "${MONOREPO_DIR}/services/"
+  else
+    echo "WARNING: ${BASE_DOCKERFILE} not found, skipping base image build" >&2
+  fi
 fi
 
 IMAGE_NAME="${REGISTRY}/${ORG}/${SERVICE_NAME}"
