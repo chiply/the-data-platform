@@ -1,0 +1,82 @@
+name: Deploy Dev Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "monorepo/infra/**"
+
+jobs:
+  pulumi-preview:
+    name: "Pulumi Preview: ${{ matrix.stack }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        include:
+          - stack: dev
+            project: cluster
+            working-directory: monorepo/infra/cluster
+          - stack: dev
+            project: platform
+            working-directory: monorepo/infra/platform
+    defaults:
+      run:
+        working-directory: ${{ matrix.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: pulumi/actions@v6
+        with:
+          command: preview
+          stack-name: ${{ matrix.stack }}
+          work-dir: ${{ matrix.working-directory }}
+          comment-on-summary: true
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+
+  pulumi-up:
+    name: "Pulumi Up: ${{ matrix.stack }}"
+    needs: pulumi-preview
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        include:
+          - stack: dev
+            project: cluster
+            working-directory: monorepo/infra/cluster
+          - stack: dev
+            project: platform
+            working-directory: monorepo/infra/platform
+    defaults:
+      run:
+        working-directory: ${{ matrix.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: pulumi/actions@v6
+        with:
+          command: up
+          stack-name: ${{ matrix.stack }}
+          work-dir: ${{ matrix.working-directory }}
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
