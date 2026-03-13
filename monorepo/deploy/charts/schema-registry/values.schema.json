@@ -188,6 +188,13 @@
         "maxUnavailable": { "type": ["integer", "string"] }
       }
     },
+    "migrations": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      },
+      "description": "Database migration Job configuration"
+    },
     "env": {
       "type": "array",
       "description": "Environment variables for the container"

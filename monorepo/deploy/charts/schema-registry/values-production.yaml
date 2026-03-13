@@ -10,6 +10,13 @@ imagePullSecrets:
 
 replicaCount: 2
 
+migrations:
+  enabled: true
+
+env:
+  - name: RUN_MIGRATIONS_ON_START
+    value: "false"
+
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
