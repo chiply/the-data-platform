@@ -1,0 +1,194 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/copier-service-templates",
+  "description": "Create a Copier-based FastAPI service template at enterprise-patterns/python/enterprise-pattern-fastapi/ and replace the schema-registry stub with a service generated from it.",
+  "sourceDesignDoc": "docs/design/006-copier-service-templates.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-006-01",
+      "title": "Create Copier template configuration",
+      "description": "As a developer, I want a copier.yml configuration file so that new FastAPI services can be generated with parameterized settings. Create enterprise-patterns/python/enterprise-pattern-fastapi/copier.yml with _subdirectory: project, _min_copier_version: 9.1.0, _envops for clean Jinja output, _skip_if_exists for alembic/versions/*.py and CHANGELOG.md, _tasks for chmod +x entrypoint.sh, and questions with validators for service_name (kebab-case), module_name (Python identifier), service_description, service_port, service_version, use_database, use_gunicorn. Also create the project/{{ _copier_conf.answers_file }}.jinja answers file template recording _src_path, _commit, and all answer values.",
+      "acceptanceCriteria": [
+        "copier.yml exists at enterprise-patterns/python/enterprise-pattern-fastapi/copier.yml",
+        "_subdirectory is set to 'project'",
+        "_min_copier_version is set to '9.1.0'",
+        "_envops has trim_blocks and lstrip_blocks set to true",
+        "_skip_if_exists includes alembic/versions/*.py and CHANGELOG.md",
+        "_tasks includes chmod +x entrypoint.sh with OS guard",
+        "service_name question has kebab-case regex validator",
+        "module_name question has Python identifier validator and derives default from service_name",
+        "use_database and use_gunicorn are boolean questions with true defaults",
+        "Answers file template exists at project/{{ _copier_conf.answers_file }}.jinja with all required fields"
+      ],
+      "priority": 1,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-006-02",
+      "title": "Create template project files \u2014 core modules",
+      "description": "As a developer, I want the core template files so that generated services have a complete FastAPI project structure. Create the project/ subdirectory with Jinja2-templated files: main.py (app factory with lifespan, exception handlers, router includes), config.py (pydantic-settings with Environment enum), exceptions.py (AppException hierarchy with handlers), schemas.py (base model with icontract example), dependencies.py (get_settings with lru_cache, get_db_session conditional), routers/health.py (health and version endpoints), __init__.py, py.typed, Dockerfile (FROM tdp-python-base), .dockerignore, requirements.in, requirements.txt, README.md with post-generation checklist, entrypoint.sh with exec for signal propagation, and logging_config.py with dictConfig JSON formatter and OTel trace/span injection.",
+      "acceptanceCriteria": [
+        "project/src/{{ module_name }}/main.py.jinja exists with FastAPI app factory, lifespan context manager, exception handler registration, and router includes",
+        "project/src/{{ module_name }}/config.py.jinja exists with pydantic-settings BaseSettings, Environment enum, and SettingsConfigDict",
+        "project/src/{{ module_name }}/exceptions.py.jinja exists with AppException base class, NotFound/BadRequest/PermissionDenied/NotAuthenticated subclasses, and registered handlers",
+        "project/src/{{ module_name }}/schemas.py.jinja exists with base Pydantic model and icontract @invariant example",
+        "project/src/{{ module_name }}/dependencies.py.jinja exists with get_settings() using @lru_cache and conditional get_db_session()",
+        "project/src/{{ module_name }}/routers/__init__.py and routers/health.py.jinja exist with /health and /version endpoints",
+        "project/Dockerfile.jinja uses FROM tdp-python-base and adds only service-specific layers",
+        "project/.dockerignore excludes tests, __pycache__, .copier-answers.yml, BUILD.bazel, README.md, *.pyc",
+        "project/requirements.in.jinja and requirements.txt.jinja exist with appropriate dependencies",
+        "project/entrypoint.sh.jinja uses exec for signal propagation",
+        "project/logging_config.py.jinja uses dictConfig with JSON formatter injecting OTel trace_id and span_id"
+      ],
+      "priority": 2,
+      "passes": true,
+      "humanReview": true,
+      "notes": "Large effort task (EFFORT: L). All template files must use Jinja2 syntax compatible with Copier's _envops settings."
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-006-03",
+      "title": "Create template project files \u2014 OTel instrumentation",
+      "description": "As a developer, I want OpenTelemetry instrumentation included in generated services so that every service starts compliant with platform observability standards. Create src/{{ module_name }}/telemetry.py.jinja with TracerProvider, OTLPSpanExporter, Resource configuration, FastAPIInstrumentor, conditional SQLAlchemyInstrumentor, HTTPXClientInstrumentor, and exported tracer example. Add OTel dependencies to requirements.in.jinja.",
+      "acceptanceCriteria": [
+        "project/src/{{ module_name }}/telemetry.py.jinja exists",
+        "TracerProvider configured with OTLPSpanExporter",
+        "Resource set with service.name, service.version, deployment.environment from settings",
+        "FastAPIInstrumentor auto-instrumentation configured",
+        "SQLAlchemyInstrumentor conditionally included when use_database is true",
+        "HTTPXClientInstrumentor configured for outgoing calls",
+        "Exported tracer = trace.get_tracer(__name__) for custom spans",
+        "OTel dependencies added to requirements.in.jinja: opentelemetry-api, opentelemetry-sdk, opentelemetry-exporter-otlp, opentelemetry-instrumentation-fastapi, opentelemetry-instrumentation-sqlalchemy (conditional), opentelemetry-instrumentation-httpx"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-006-04",
+      "title": "Create template project files \u2014 database (conditional)",
+      "description": "As a developer, I want conditional database support so that services that need a database get async SQLAlchemy and Alembic setup automatically. Create database.py.jinja with create_async_engine (pool config), async_sessionmaker, expire_on_commit=False. Create models/__init__.py, alembic/env.py.jinja with async migration pattern, alembic/script.py.mako (verbatim, no .jinja), alembic/versions/.gitkeep, alembic.ini.jinja. Add database dependencies to requirements.in.jinja. Ensure lifespan in main.py disposes engine on shutdown.",
+      "acceptanceCriteria": [
+        "project/src/{{ module_name }}/{% if use_database %}database{% endif %}.py.jinja exists with create_async_engine, pool_size, max_overflow, pool_pre_ping=True, async_sessionmaker, expire_on_commit=False",
+        "project/src/{{ module_name }}/{% if use_database %}models{% endif %}/__init__.py exists",
+        "project/{% if use_database %}alembic{% endif %}/env.py.jinja exists with run_async pattern and NullPool",
+        "project/{% if use_database %}alembic{% endif %}/script.py.mako exists (no .jinja suffix)",
+        "project/{% if use_database %}alembic{% endif %}/versions/.gitkeep exists",
+        "project/{% if use_database %}alembic.ini{% endif %}.jinja exists",
+        "Database dependencies added to requirements.in.jinja: sqlalchemy[asyncio], asyncpg, alembic, psycopg2-binary",
+        "main.py lifespan context manager disposes database engine on shutdown when use_database is true"
+      ],
+      "priority": 4,
+      "passes": true,
+      "humanReview": false,
+      "notes": "alembic/script.py.mako must NOT have .jinja suffix due to Mako syntax conflicts with Jinja2"
+    },
+    {
+      "id": "US-005",
+      "sourceTaskId": "TDP-006-05",
+      "title": "Create template project files \u2014 testing skeleton",
+      "description": "As a developer, I want a testing skeleton so that generated services include examples of all mandated testing patterns. Create tests/conftest.py.jinja with AsyncClient fixture, test database fixture (conditional), settings_override fixture, asyncio_mode=auto. Create test_health.py.jinja, test_schemas.py.jinja (Polyfactory example), test_properties.py.jinja (Hypothesis + icontract example). Add test dependencies to requirements.in.jinja.",
+      "acceptanceCriteria": [
+        "project/tests/__init__.py exists",
+        "project/tests/conftest.py.jinja exists with AsyncClient fixture using httpx.AsyncClient + ASGITransport, conditional test database fixture, settings_override fixture, and asyncio_mode=auto",
+        "project/tests/test_health.py.jinja exists with /health and /version endpoint smoke tests",
+        "project/tests/test_schemas.py.jinja exists with Polyfactory model factory example and serialization round-trip",
+        "project/tests/test_properties.py.jinja exists with Hypothesis @given example and icontract @invariant + ViolationError test",
+        "Test dependencies added to requirements.in.jinja: pytest, pytest-asyncio, httpx, hypothesis, polyfactory, icontract"
+      ],
+      "priority": 5,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "sourceTaskId": "TDP-006-06",
+      "title": "Create Bazel BUILD template",
+      "description": "As a developer, I want an initial BUILD.bazel file so that generated services work with Bazel from the start. Create BUILD.bazel.jinja with py_library for source files, py_binary for service entrypoint, py_test for test files. Document in README.md that BUILD files are maintained by Gazelle post-generation.",
+      "acceptanceCriteria": [
+        "project/BUILD.bazel.jinja exists with py_library, py_binary, and py_test targets",
+        "py_library covers src/{{ module_name }} source files",
+        "py_binary target for the service entrypoint",
+        "py_test targets for each test file",
+        "README.md.jinja mentions Gazelle for BUILD file maintenance"
+      ],
+      "priority": 6,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "sourceTaskId": "TDP-006-07",
+      "title": "Create scripts/new-service.sh wrapper",
+      "description": "As a developer, I want a wrapper script so that service generation is consistent and safe. Create scripts/new-service.sh that verifies working tree is clean in enterprise-patterns/, resolves template path from repo root, passes --trust --vcs-ref HEAD automatically, accepts service name as first argument, and prints a post-generation checklist.",
+      "acceptanceCriteria": [
+        "scripts/new-service.sh exists and is executable",
+        "Script verifies enterprise-patterns/ working tree is clean before proceeding",
+        "Script resolves template path relative to repo root",
+        "Script passes --trust and --vcs-ref HEAD to copier copy",
+        "Script accepts service name as first positional argument with usage message on missing arg",
+        "Script prints post-generation checklist mentioning Helm chart and release-please registration"
+      ],
+      "priority": 7,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "sourceTaskId": "TDP-006-08",
+      "title": "Generate schema-registry from template",
+      "description": "As a developer, I want the schema-registry service regenerated from the template so that it follows platform standards. Remove the existing monorepo/services/schema-registry/ stub and generate a replacement using scripts/new-service.sh. Add schema-specific endpoints (/schemas, /schemas/{name}) as service-level customizations in routers/schemas.py.",
+      "acceptanceCriteria": [
+        "Old schema-registry stub is removed",
+        "New schema-registry is generated from the Copier template",
+        ".copier-answers.yml exists in the generated service with correct values",
+        "routers/schemas.py exists with /schemas and /schemas/{name} endpoints",
+        "All template-generated files are present and syntactically valid Python"
+      ],
+      "priority": 8,
+      "passes": true,
+      "humanReview": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "sourceTaskId": "TDP-006-09",
+      "title": "Verify build and deploy cycle",
+      "description": "As a developer, I want to verify the generated schema-registry builds and deploys correctly. Verify: docker build succeeds with FROM tdp-python-base pattern, bazel build works, Helm chart values align, service deploys to local k3d and responds on /health and /version, copier update works.",
+      "acceptanceCriteria": [
+        "Python files in generated schema-registry pass py_compile",
+        "Dockerfile syntax is valid",
+        "BUILD.bazel has valid Bazel syntax",
+        "copier update --trust --vcs-ref HEAD --pretend runs without errors on the generated service"
+      ],
+      "priority": 9,
+      "passes": true,
+      "humanReview": true,
+      "notes": "End of main dependency chain \u2014 natural verification checkpoint. Full k3d deploy verification requires manual testing."
+    },
+    {
+      "id": "US-010",
+      "sourceTaskId": "TDP-006-10",
+      "title": "Verify release-please compatibility",
+      "description": "As a developer, I want to verify release-please still tracks the schema-registry component correctly after the restructure. Verify release-please-config.json and .release-please-manifest.json still reference the correct path, CHANGELOG.md is preserved, and conventional commits map correctly.",
+      "acceptanceCriteria": [
+        "release-please-config.json references monorepo/services/schema-registry path correctly",
+        ".release-please-manifest.json includes schema-registry entry",
+        "CHANGELOG.md is preserved (covered by _skip_if_exists in copier.yml)"
+      ],
+      "priority": 10,
+      "passes": true,
+      "humanReview": true,
+      "notes": "End of main chain verification. Release-please config may need manual inspection."
+    }
+  ]
+}

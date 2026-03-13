@@ -1,0 +1,53 @@
+# Ralph Progress Log
+Started: 2026-03-12
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-copier-template.json
+
+## Codebase Patterns
+- Answers file must use shell commands for creation since filename contains {{ }} Jinja2 syntax
+- Copier _tasks OS guard uses _copier_conf.os with values linux, macos, windows
+- Copier validators use Jinja2 {% if %} blocks where non-empty output = validation failure
+- routers/__init__.py has no .jinja suffix since it has no template variables
+- logging_config.py uses try/except for OTel import to gracefully degrade
+- OTelJsonFormatter inherits from pythonjsonlogger.jsonlogger.JsonFormatter and overrides add_fields
+- Conditional file/dir names with {% if %} in filename are literal on disk — Copier interprets them
+- script.py.mako must NOT have .jinja suffix (Mako conflicts with Jinja2)
+- database.py exports `engine` and `async_session_factory` matching imports in main.py and dependencies.py
+- ExampleSchema has icontract @invariant requiring non-empty name — Polyfactory factory needs custom name() override
+- Test settings override uses FastAPI dependency_overrides (not patching @lru_cache)
+- pytest.ini at project root configures asyncio_mode = auto
+---
+
+## [Shared Libs] US-004 - Add version pin CI validation
+- What was implemented: Created monorepo/scripts/check-lib-versions.py that discovers all libs and services, validates version constraints using packaging.specifiers. Added lib-version-check CI job to .github/workflows/ci.yml. Script passes on current repo state.
+- Files changed: monorepo/scripts/check-lib-versions.py, .github/workflows/ci.yml
+---
+
+## [Shared Libs] US-003 - Regenerate schema-registry with shared library
+- What was implemented: Updated schema-registry to use tdp-fastapi-core. pyproject.toml includes tdp-fastapi-core dep with [tool.uv.sources]. main.py imports from tdp_fastapi_core. telemetry/exceptions/logging_config are thin wrappers. Dockerfile uses monorepo build context. All 10 tests pass. uv sync installs tdp-fastapi-core as editable.
+- Files changed: pyproject.toml, main.py, telemetry.py, exceptions.py, logging_config.py, Dockerfile, uv.lock
+---
+
+## [Shared Libs] US-002 - Wire shared library into Copier template
+- What was implemented: Updated Copier template to depend on tdp-fastapi-core. Added [tool.uv.sources] with editable path dep. main.py.jinja now imports from tdp_fastapi_core. telemetry.py.jinja, exceptions.py.jinja, logging_config.py.jinja converted to thin wrappers. Dockerfile.jinja restructured for monorepo build context with libs copied in.
+- Files changed: pyproject.toml.jinja, main.py.jinja, telemetry.py.jinja, exceptions.py.jinja, logging_config.py.jinja, Dockerfile.jinja
+- Learnings:
+  - Dockerfile must use monorepo/ as build context, preserving directory layout for relative path resolution
+  - uv sync --no-editable prevents editable installs in production Docker builds
+  - configure_logging() and setup_telemetry() called in lifespan (not module level) so settings are available
+---
+
+## [Shared Libs] US-001 - Create tdp-fastapi-core shared library
+- What was implemented: Created the tdp-fastapi-core shared library at monorepo/libs/tdp-fastapi-core/ with src/ layout and hatchling build system. Extracted and parameterized four modules: logging (JSON formatter with OTel trace injection), telemetry (configurable TracerProvider with optional instrumentors), exceptions (AppException hierarchy with FastAPI handlers), and request ID middleware. All 15 tests pass.
+- Files changed: monorepo/libs/tdp-fastapi-core/ (12 files)
+- Learnings:
+  - python-json-logger v4 moved pythonjsonlogger.jsonlogger to pythonjsonlogger.json
+  - Formatter class path in dict-config must be fully qualified (tdp_fastapi_core.logging.OTelJsonFormatter)
+  - Optional instrumentors (httpx, sqlalchemy) should use lazy imports with try/except
+  - type: ignore[arg-type] needed on add_exception_handler for Starlette types
+---
+
+## US-001 - Create Copier template configuration
+- What was implemented: copier.yml with all metadata and 7 parameterized questions with validators; answers file template
+- Files changed: enterprise-patterns/python/enterprise-pattern-fastapi/copier.yml, project/{{ _copier_conf.answers_file }}.jinja
+---

@@ -70,16 +70,36 @@ the-data-platform/
 
 ### Pattern Inheritance
 
-Templates follow a layered fork model:
+Templates use [Copier](https://copier.readthedocs.io/) for parameterized project generation
+with update support. Templates live in `enterprise-patterns/`:
 
 ```
-publicly maintained template repo
-  └─► org-wide fork (enterprise-patterns)
-        └─► project-specific fork
+enterprise-patterns/
+  python/
+    enterprise-pattern-fastapi/    # FastAPI service template
 ```
 
-This is a sensible default, but the depth is arbitrary — the deeper the inheritance tree, the more
-room for differentiation at each level. Each layer can override or extend the layer above it.
+To create a new service from a template:
+
+```bash
+./scripts/new-service.sh my-service
+```
+
+To pull template updates into an existing service:
+
+```bash
+cd monorepo/services/my-service
+copier update --trust --vcs-ref HEAD
+```
+
+Copier's 3-way merge preserves service-specific customizations while applying template
+changes. When template and service changes overlap, conflict markers are produced for
+manual resolution. The `.copier-answers.yml` file in each generated service tracks the
+template source and generation parameters — do not edit it manually.
+
+**Scope:** This template approach applies to FastAPI HTTP services. Non-HTTP service types
+(gRPC, Temporal workers, Dagster pipelines) should get their own templates under
+`enterprise-patterns/python/` when the time comes.
 
 ---
 

@@ -1,4 +1,4 @@
-# Build context: monorepo/ (run with docker build -f services/schema-registry/Dockerfile .)
+# Build context: monorepo/ (run with docker build -f services/{{ service_name }}/Dockerfile .)
 
 # ---------------------------------------------------------------------------
 # Stage 1 — builder (install service dependencies into /opt/venv)
@@ -12,8 +12,8 @@ WORKDIR /build
 COPY libs/tdp-fastapi-core ./libs/tdp-fastapi-core
 
 # Copy service dependency manifests and install
-COPY services/schema-registry/pyproject.toml services/schema-registry/uv.lock ./services/schema-registry/
-WORKDIR /build/services/schema-registry
+COPY services/{{ service_name }}/pyproject.toml services/{{ service_name }}/uv.lock ./services/{{ service_name }}/
+WORKDIR /build/services/{{ service_name }}
 ENV UV_PROJECT_ENVIRONMENT="/opt/venv"
 RUN uv sync --frozen --no-dev --no-editable
 
@@ -30,16 +30,18 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 
 # Copy application source and supporting files
-COPY services/schema-registry/src/ ./src/
-COPY services/schema-registry/logging_config.py ./
-COPY services/schema-registry/entrypoint.sh ./
-COPY services/schema-registry/gunicorn_conf.py ./
+COPY services/{{ service_name }}/src/ ./src/
+COPY services/{{ service_name }}/logging_config.py ./
+COPY services/{{ service_name }}/entrypoint.sh ./
+{% if use_gunicorn %}
+COPY services/{{ service_name }}/gunicorn_conf.py ./
+{% endif %}
 
 RUN chmod +x ./entrypoint.sh
 
 # Drop back to non-root for runtime
 USER app
 
-EXPOSE 8000
+EXPOSE {{ service_port }}
 
 CMD ["./entrypoint.sh"]

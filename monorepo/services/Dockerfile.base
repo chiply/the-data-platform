@@ -11,6 +11,12 @@
 #   ... install service-specific deps and copy application code ...
 
 # ---------------------------------------------------------------------------
+# Stage 0 — uv binary
+# ---------------------------------------------------------------------------
+ARG UV_VERSION=0.7
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
+# ---------------------------------------------------------------------------
 # Stage 1 — builder
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim AS builder
@@ -23,14 +29,17 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
     rm -rf /var/lib/apt/lists/*
 
+# Install uv for fast, reproducible dependency management
+COPY --from=uv /uv /usr/local/bin/uv
+
 # Create a virtualenv so we can copy it cleanly into the runtime stage
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+RUN uv venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    UV_PROJECT_ENVIRONMENT="/opt/venv"
 
 # Install base dependencies shared by all services
 COPY requirements-base.txt /tmp/requirements-base.txt
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /tmp/requirements-base.txt
+RUN uv pip install -r /tmp/requirements-base.txt
 
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime
@@ -40,9 +49,11 @@ FROM python:3.12-slim AS runtime
 # Same env vars as builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    UV_PROJECT_ENVIRONMENT="/opt/venv"
 
-# Copy the pre-built virtualenv from the builder stage
+# Copy uv and the pre-built virtualenv from the builder stage
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 COPY --from=builder /opt/venv /opt/venv
 
 # Create a non-root user for running services

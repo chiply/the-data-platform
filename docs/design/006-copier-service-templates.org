@@ -1,6 +1,6 @@
 #+TITLE: 006 - Copier-Based Service Templates & Pattern Inheritance
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Complete
 #+CATEGORY: architecture
 #+CREATED: [2026-03-12]
 #+LAST_MODIFIED: [2026-03-12]
@@ -52,8 +52,7 @@ enterprise-patterns/
         {{ _copier_conf.answers_file }}.jinja # Answers file (required for copier update)
         Dockerfile.jinja
         .dockerignore
-        requirements.in.jinja
-        requirements.txt.jinja
+        pyproject.toml.jinja
         BUILD.bazel.jinja
         README.md.jinja
         src/
@@ -195,7 +194,7 @@ conventions. It is NOT a fork — we cherry-pick patterns and rewrite them to fi
 | Exceptions             | Typed HTTP exception hierarchy with registered handlers        |
 | Testing                | pytest + icontract + Hypothesis + Polyfactory examples         |
 | Build                  | Bazel =BUILD.bazel= — initial targets, maintained by Gazelle post-generation |
-| Package management     | =requirements.in= (human-edited ranges) + =requirements.txt= (pinned via =pip-compile=) |
+| Package management     | =pyproject.toml= (dependencies) + =uv.lock= (pinned via =uv lock=) |
 
 ** Key Module Specifications
 
@@ -297,6 +296,221 @@ exec uvicorn src.{{ module_name }}.main:app --host 0.0.0.0 --port {{ service_por
 
 The template also includes a =.dockerignore= excluding =tests/=, =__pycache__/=,
 =.copier-answers.yml=, =BUILD.bazel=, =README.md=, and =*.pyc=.
+
+** Package Management with uv
+
+The template uses [[https://docs.astral.sh/uv/][uv]] for Python package management instead of pip/pip-tools. uv handles
+virtual environment creation, dependency resolution, and lockfile generation in a single tool
+that is orders of magnitude faster than pip.
+
+*** =pyproject.toml= as Single Source of Truth
+
+Each service declares dependencies in =pyproject.toml= (PEP 621) instead of =requirements.in=.
+This is the standard Python packaging metadata format and works with uv, pip, and build tools.
+
+#+begin_src toml
+[project]
+name = "{{ service_name }}"
+version = "{{ service_version }}"
+description = "{{ service_description }}"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.27,<1",
+    "pydantic-settings>=2,<3",
+    # ... etc
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.23,<1",
+    "httpx>=0.27,<1",
+    "hypothesis>=6.98,<7",
+    "polyfactory>=2.14,<3",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+#+end_src
+
+*** =uv.lock= Replaces =requirements.txt=
+
+=uv lock= generates a cross-platform lockfile (=uv.lock=) that pins every transitive dependency.
+This replaces the =pip-compile= workflow:
+
+#+begin_src bash
+# Lock dependencies (generates/updates uv.lock)
+uv lock
+
+# Install into virtual environment (creates .venv if needed)
+uv sync
+
+# Install with dev dependencies
+uv sync --dev
+
+# Run commands inside the virtual environment
+uv run pytest
+uv run uvicorn schema_registry.main:app --reload
+#+end_src
+
+*** Virtual Environment Strategy
+
+=uv sync= automatically creates a =.venv= in the service directory. This keeps each service's
+dependencies isolated:
+
+#+begin_src
+monorepo/services/schema-registry/
+  .venv/                    # Created by uv sync, gitignored
+  pyproject.toml            # Dependency declaration
+  uv.lock                  # Pinned lockfile (committed)
+#+end_src
+
+*** Dockerfile Integration
+
+The =Dockerfile.base= installs uv. Service Dockerfiles use =uv sync --frozen --no-dev= for
+reproducible production installs without re-resolving dependencies:
+
+#+begin_src dockerfile
+FROM tdp-python-base
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+
+COPY src/ ./src/
+# ...
+#+end_src
+
+=--frozen= ensures the lockfile is used exactly as committed (fails if lockfile is stale).
+=--no-dev= excludes test dependencies from the production image.
+
+*** =scripts/new-service.sh= Post-Generation
+
+After Copier generates the service, the wrapper script runs:
+
+#+begin_src bash
+cd "${DEST}"
+uv lock    # Generate initial lockfile
+uv sync    # Create .venv and install dependencies
+#+end_src
+
+This ensures a working development environment immediately after generation.
+
+** Shared Platform Libraries
+
+Cross-cutting concerns (structured logging, telemetry setup, exception hierarchy, common
+middleware) are extracted into reusable libraries under =monorepo/libs/=. Services depend on
+these libraries, and the Copier template wires up the dependencies automatically.
+
+*** Library Location and Structure
+
+#+begin_src
+monorepo/libs/
+  tdp-fastapi-core/
+    pyproject.toml            # name = "tdp-fastapi-core", version = "0.1.0"
+    src/tdp_fastapi_core/
+      __init__.py
+      logging.py              # Structured JSON logging with OTel trace injection
+      telemetry.py            # TracerProvider, OTLP exporter, auto-instrumentation
+      exceptions.py           # AppException hierarchy + FastAPI handlers
+      middleware.py            # Request ID, correlation headers
+    tests/
+      ...
+#+end_src
+
+Each library is a standard Python package with its own =pyproject.toml=, test suite, and
+version. Libraries follow the same =src/= layout as services for consistency.
+
+*** Local Development — Editable Installs by Default
+
+Services declare platform libraries as standard dependencies in =[project] dependencies=:
+
+#+begin_src toml
+[project]
+dependencies = [
+    "tdp-fastapi-core>=0.1.0",
+    "fastapi>=0.110,<1",
+    # ...
+]
+#+end_src
+
+A =[tool.uv.sources]= section overrides these with local editable path installs:
+
+#+begin_src toml
+[tool.uv.sources]
+tdp-fastapi-core = { path = "../../libs/tdp-fastapi-core", editable = true }
+#+end_src
+
+With this setup, =uv sync= installs =tdp-fastapi-core= as an editable install from the
+monorepo. Changes to the library source are immediately visible to the service without
+reinstalling — this is the key developer experience benefit.
+
+*** Version Pinning Strategy
+
+The version constraint in =[project] dependencies= (e.g., =>=0.1.0=) serves as a
+compatibility contract even when =[tool.uv.sources]= overrides the install source:
+
+- *Local development:* =[tool.uv.sources]= takes precedence. The editable install uses
+  whatever is on disk (latest). The version constraint is informational but not enforced
+  by uv when a source override is present.
+- *CI / production Docker builds:* Two options depending on build strategy:
+  - *Option A — Copy libs into build context (recommended for monorepo):* The Dockerfile
+    copies the lib source alongside the service and uses the same path dependency. The
+    version in the lib's =pyproject.toml= must satisfy the service's constraint.
+  - *Option B — Private package index:* If libs are published to a private index, builds
+    use =uv sync --no-sources= which ignores =[tool.uv.sources]= and resolves from the
+    index. The version pin in =[project] dependencies= controls which version is installed.
+
+For this monorepo, Option A is the default. The Dockerfile copies libs explicitly:
+
+#+begin_src dockerfile
+# Build context: monorepo/ (run with docker build -f services/<name>/Dockerfile .)
+FROM tdp-python-base AS builder
+
+WORKDIR /build
+
+# Copy platform libraries (context-relative path)
+COPY libs/tdp-fastapi-core ./libs/tdp-fastapi-core
+
+COPY services/<name>/pyproject.toml services/<name>/uv.lock ./services/<name>/
+WORKDIR /build/services/<name>
+RUN uv sync --frozen --no-dev --no-editable
+
+FROM tdp-python-base AS runtime
+COPY --from=builder /opt/venv /opt/venv
+WORKDIR /app
+COPY services/<name>/src/ ./src/
+#+end_src
+
+*** Template Integration
+
+The Copier template generates the =[tool.uv.sources]= entries for platform libraries.
+A new boolean toggle =use_platform_libs= (default: =true=) controls whether the shared
+library dependency and source override are included. When enabled, the generated
+=pyproject.toml= includes:
+
+#+begin_src toml
+[tool.uv.sources]
+tdp-fastapi-core = { path = "../../libs/tdp-fastapi-core", editable = true }
+#+end_src
+
+And the service's =main.py= imports from the shared library instead of having inline
+implementations:
+
+#+begin_src python
+from tdp_fastapi_core.telemetry import setup_telemetry
+from tdp_fastapi_core.exceptions import register_exception_handlers
+from tdp_fastapi_core.logging import configure_logging
+#+end_src
+
+*** Migration Path
+
+Extracting code into shared libraries is incremental:
+1. Create the lib under =monorepo/libs/= with its own =pyproject.toml=
+2. Move shared code from the template into the lib
+3. Update the template to import from the lib instead of inlining
+4. Existing services pick up the change on next =copier update=
+5. Services that have customized the extracted modules resolve merge conflicts normally
 
 ** Bazel BUILD Strategy
 
@@ -516,7 +730,7 @@ consistency and safety.
 
 Implementation tasks with IDs in format =[TDP-006-XX]=.
 
-** TODO [TDP-006-01] Create Copier template configuration                   :p1:
+** DONE [TDP-006-01] Create Copier template configuration                   :p1:
 :PROPERTIES:
 :EFFORT: M
 :END:
@@ -534,7 +748,7 @@ Create =enterprise-patterns/python/enterprise-pattern-fastapi/copier.yml= with:
 Create the =.copier-answers.yml.jinja= answers file template recording =_src_path=,
 =_commit=, and all answer values.
 
-** TODO [TDP-006-02] Create template project files — core modules            :p1:
+** DONE [TDP-006-02] Create template project files — core modules            :p1:
 :PROPERTIES:
 :EFFORT: L
 :END:
@@ -563,7 +777,7 @@ Create the =project/= subdirectory with Jinja2-templated files for core service 
 - =entrypoint.sh.jinja= — uses =exec= for signal propagation
 - =logging_config.py.jinja= — =dictConfig= with JSON formatter + OTel trace/span injection
 
-** TODO [TDP-006-03] Create template project files — OTel instrumentation    :p1:
+** DONE [TDP-006-03] Create template project files — OTel instrumentation    :p1:
 :PROPERTIES:
 :EFFORT: M
 :END:
@@ -582,7 +796,7 @@ Create =src/{{ module_name }}/telemetry.py.jinja= — dedicated OTel module:
   =opentelemetry-instrumentation-sqlalchemy= (conditional),
   =opentelemetry-instrumentation-httpx=
 
-** TODO [TDP-006-04] Create template project files — database (conditional)  :p1:
+** DONE [TDP-006-04] Create template project files — database (conditional)  :p1:
 :PROPERTIES:
 :EFFORT: M
 :END:
@@ -601,7 +815,7 @@ Create conditional database files (only included when =use_database=True=):
   =alembic=, =psycopg2-binary=
 - =lifespan= context manager in =main.py= disposes engine on shutdown
 
-** TODO [TDP-006-05] Create template project files — testing skeleton        :p1:
+** DONE [TDP-006-05] Create template project files — testing skeleton        :p1:
 :PROPERTIES:
 :EFFORT: M
 :END:
@@ -618,7 +832,7 @@ Create test files that establish all mandated testing patterns:
 - Test dependencies in =requirements.in.jinja=: =pytest=, =pytest-asyncio=, =httpx=,
   =hypothesis=, =polyfactory=, =icontract=
 
-** TODO [TDP-006-06] Create Bazel BUILD template                             :p1:
+** DONE [TDP-006-06] Create Bazel BUILD template                             :p1:
 :PROPERTIES:
 :EFFORT: S
 :END:
@@ -634,7 +848,7 @@ Note: After initial generation, =BUILD.bazel= should be added to =_skip_if_exist
 prevent =copier update= from overwriting Gazelle-managed changes. This is handled in the
 =copier.yml= after the first successful generation across all services.
 
-** TODO [TDP-006-07] Create =scripts/new-service.sh= wrapper                 :p1:
+** DONE [TDP-006-07] Create =scripts/new-service.sh= wrapper                 :p1:
 :PROPERTIES:
 :EFFORT: S
 :END:
@@ -646,7 +860,7 @@ Create mandatory wrapper script that:
 - Accepts service name as first argument
 - Prints post-generation checklist (Helm chart, release-please registration)
 
-** TODO [TDP-006-08] Generate schema-registry from template                  :p1:
+** DONE [TDP-006-08] Generate schema-registry from template                  :p1:
 :PROPERTIES:
 :EFFORT: S
 :END:
@@ -655,7 +869,7 @@ Remove the existing =monorepo/services/schema-registry/= stub and generate a rep
 using =scripts/new-service.sh=. Add schema-specific endpoints (=/schemas=, =/schemas/{name}=)
 as service-level customizations in =routers/schemas.py=.
 
-** TODO [TDP-006-09] Verify build and deploy cycle                           :p1:
+** DONE [TDP-006-09] Verify build and deploy cycle                           :p1:
 :PROPERTIES:
 :EFFORT: M
 :END:
@@ -668,7 +882,7 @@ Verify the generated schema-registry:
 - =copier update --trust --vcs-ref HEAD= works on the generated service
 - =copier update= works from a fresh clone at a different filesystem path
 
-** TODO [TDP-006-10] Verify release-please compatibility                     :p1:
+** DONE [TDP-006-10] Verify release-please compatibility                     :p1:
 :PROPERTIES:
 :EFFORT: S
 :END:
@@ -680,7 +894,7 @@ track the schema-registry component after the file structure change:
 - The restructured layout does not break changelog detection
 - Conventional commits still map correctly to the component
 
-** TODO [TDP-006-11] Add template validation CI job                          :p2:
+** DONE [TDP-006-11] Add template validation CI job                          :p2:
 :PROPERTIES:
 :EFFORT: M
 :END:
@@ -693,7 +907,7 @@ Add a CI job that validates the template itself:
 - =pytest= on the generated test suite
 - Catches template regressions before they affect downstream services
 
-** TODO [TDP-006-12] Add template drift detection CI check                   :p2:
+** DONE [TDP-006-12] Add template drift detection CI check                   :p2:
 :PROPERTIES:
 :EFFORT: S
 :END:
@@ -703,7 +917,7 @@ each generated service (identified by presence of =.copier-answers.yml=). Warns 
 service is behind the template. Ensures drift is visible before it accumulates across
 multiple services.
 
-** TODO [TDP-006-13] Update ARCHITECTURE.md                                  :p2:
+** DONE [TDP-006-13] Update ARCHITECTURE.md                                  :p2:
 :PROPERTIES:
 :EFFORT: S
 :END:
@@ -713,7 +927,103 @@ in the Design section. Remove references to the "layered fork model". Add note t
 template approach applies to FastAPI HTTP services only; non-HTTP service types should get
 separate templates.
 
-** TODO [TDP-006-14] Update CONTRIBUTING.md                                  :p2:
+** DONE [TDP-006-15] Switch template to uv and pyproject.toml                :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Replace =requirements.in.jinja= and =requirements.txt.jinja= with =pyproject.toml.jinja=.
+Replace =pytest.ini= configuration with =[tool.pytest.ini_options]= in =pyproject.toml=.
+Add =uv.lock= to =_skip_if_exists= in =copier.yml= (lockfile is service-specific, should
+not be overwritten by template updates). Add =.venv/= to =.dockerignore= and =.gitignore=.
+Update =Dockerfile.jinja= to use =uv sync --frozen --no-dev= instead of
+=pip install -r requirements.txt=. Update =Dockerfile.base= to install uv.
+
+** DONE [TDP-006-16] Regenerate schema-registry with uv                      :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Regenerate =monorepo/services/schema-registry/= from the updated template. Run =uv lock=
+and =uv sync= to create the lockfile and virtual environment. Verify all tests pass with
+=uv run pytest=.
+
+** DONE [TDP-006-17] Update scripts and docs for uv                          :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update =scripts/new-service.sh= to run =uv lock && uv sync= after generation.
+Update =CONTRIBUTING.md= to document uv workflow (=uv sync=, =uv run=, =uv lock=).
+Update =README.md.jinja= post-generation checklist. Update CI template validation
+job to use =uv sync= instead of =pip install=.
+
+** DONE [TDP-006-18] Create tdp-fastapi-core shared library                  :p1:
+:PROPERTIES:
+:EFFORT: L
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-12]
+:END:
+
+Create =monorepo/libs/tdp-fastapi-core/= with:
+- =pyproject.toml= with =name = "tdp-fastapi-core"=, =version = "0.1.0"=, hatchling build
+  system, =src/= layout
+- =src/tdp_fastapi_core/logging.py= — extract structured logging setup from template's
+  =logging_config.py.jinja= (JSON formatter with OTel trace/span injection, environment-aware
+  formatting)
+- =src/tdp_fastapi_core/telemetry.py= — extract OTel setup from template's =telemetry.py.jinja=
+  (TracerProvider, OTLP exporter, FastAPI/SQLAlchemy/httpx auto-instrumentation)
+- =src/tdp_fastapi_core/exceptions.py= — extract exception hierarchy and FastAPI handlers from
+  template's =exceptions.py.jinja=
+- =src/tdp_fastapi_core/middleware.py= — request ID generation, correlation header propagation
+- Test suite validating each module independently
+- =uv.lock= for the library itself
+
+** DONE [TDP-006-19] Wire shared library into Copier template                :p1:
+:PROPERTIES:
+:EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-12]
+:END:
+
+Update the Copier template to depend on =tdp-fastapi-core=:
+- Add =tdp-fastapi-core= to =[project] dependencies= in =pyproject.toml.jinja= with version
+  constraint (e.g., =>=0.1.0=)
+- Add =[tool.uv.sources]= section to =pyproject.toml.jinja= with editable path dependency:
+  =tdp-fastapi-core = { path = "../../libs/tdp-fastapi-core", editable = true }=
+- Update =main.py.jinja= to import from =tdp_fastapi_core= instead of inlining telemetry
+  setup, exception handlers, and logging config
+- Simplify =telemetry.py.jinja=, =logging_config.py.jinja=, =exceptions.py.jinja= to thin
+  wrappers or remove them in favor of direct library imports
+- Update =Dockerfile.jinja= to copy platform libs into build context
+
+** DONE [TDP-006-20] Regenerate schema-registry with shared library          :p1:
+:PROPERTIES:
+:EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-12]
+:END:
+
+Regenerate =monorepo/services/schema-registry/= from the updated template. Verify:
+- =uv sync= resolves =tdp-fastapi-core= from the local path
+- Editable install works (changes to lib source reflect immediately)
+- All existing tests pass
+- Docker build works with libs copied into context
+
+** DONE [TDP-006-21] Add version pin CI validation                           :p2:
+:PROPERTIES:
+:EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-12]
+:END:
+
+Add a CI check that verifies each service's =tdp-fastapi-core= version constraint in
+=[project] dependencies= is satisfied by the version in the lib's =pyproject.toml=.
+This catches cases where a lib bumps a major version but a service still pins to the old
+range. The check parses both =pyproject.toml= files and validates the constraint using
+=packaging.specifiers=.
+
+** DONE [TDP-006-14] Update CONTRIBUTING.md                                  :p2:
 :PROPERTIES:
 :EFFORT: S
 :END:
@@ -759,6 +1069,31 @@ infrequent operation.
 OpenTelemetry is a mandatory platform standard. The template includes a dedicated
 =telemetry.py= module with =TracerProvider=, OTLP exporter, and auto-instrumentation for
 FastAPI, SQLAlchemy, and httpx. Every generated service starts compliant from day one.
+
+** DECIDED Use uv with pyproject.toml instead of pip/pip-tools with requirements files
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+uv replaces pip, pip-compile, and virtualenv with a single tool that is significantly faster.
+=pyproject.toml= (PEP 621) replaces =requirements.in= as the dependency declaration format —
+it is the Python packaging standard and consolidates project metadata, dependencies, and tool
+configuration (pytest, etc.) in one file. =uv.lock= replaces =requirements.txt= as the pinned
+lockfile. =uv sync= handles both virtual environment creation and dependency installation.
+Docker builds use =uv sync --frozen --no-dev= for reproducible production installs.
+
+** DECIDED Use uv sources with editable path deps for shared libraries
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+Shared platform libraries live under =monorepo/libs/= and are referenced via
+=[tool.uv.sources]= with =editable = true= for local development. Services declare a
+version-constrained dependency in standard =[project] dependencies= (e.g.,
+=tdp-fastapi-core>=0.1.0=) which acts as the compatibility contract. Local dev uses
+editable installs from the monorepo path; Docker builds copy libs into the build context
+and install non-editable. This avoids the need for a private package index while keeping
+the option open for the future (switch to =uv sync --no-sources= when libs are published).
 
 ** DECIDED Single template with boolean toggles, not separate templates
 :PROPERTIES:

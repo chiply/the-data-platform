@@ -210,6 +210,56 @@ jobs:
         if: steps.filter.outputs.deploy_changed != 'true'
         run: echo "No changes in monorepo/deploy/, skipping helm lint"
 
+  template-validate:
+    name: Template Validation (db=${{ matrix.use_database }}, gunicorn=${{ matrix.use_gunicorn }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        use_database: [true, false]
+        use_gunicorn: [true, false]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Copier
+        run: pip install copier
+
+      - name: Generate service from template
+        run: |
+          copier copy --trust --vcs-ref HEAD \
+            --defaults \
+            --data service_name=test-service \
+            --data use_database=${{ matrix.use_database }} \
+            --data use_gunicorn=${{ matrix.use_gunicorn }} \
+            enterprise-patterns/python/enterprise-pattern-fastapi \
+            /tmp/test-service
+
+      - name: Compile all generated Python files
+        run: |
+          find /tmp/test-service -name '*.py' -exec python -m py_compile {} +
+
+      - name: Build base Docker image
+        run: docker build -f monorepo/services/Dockerfile.base -t tdp-python-base monorepo/services/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Stage generated service into monorepo
+        run: cp -r /tmp/test-service monorepo/services/test-service
+
+      - name: Generate lock file for test service
+        run: |
+          cd monorepo/services/test-service
+          uv lock
+
+      - name: Build Docker image
+        run: docker build -f monorepo/services/test-service/Dockerfile monorepo/
+
   monorepo-structure:
     name: Monorepo Structure Validation
     runs-on: ubuntu-latest
@@ -279,3 +329,40 @@ jobs:
             fi
             echo "OK: ${base}/${f} exists"
           done
+
+  template-drift:
+    name: Template Drift Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install copier
+        run: pip install copier
+
+      - name: Check for template drift
+        run: ./scripts/check-template-drift.sh
+
+  lib-version-check:
+    name: Library Version Pin Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install packaging
+
+      - name: Check library version constraints
+        run: python scripts/check-lib-versions.py

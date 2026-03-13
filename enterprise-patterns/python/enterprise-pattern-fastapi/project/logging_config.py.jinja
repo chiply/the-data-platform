@@ -1,0 +1,17 @@
+"""Structured logging configuration for {{ service_name }}.
+
+Thin wrapper around :mod:`tdp_fastapi_core.logging`.  The platform library
+provides the JSON formatter with OpenTelemetry trace/span ID injection and
+a ``configure_logging`` helper.  Services that need to customise the logging
+dict-config can override :func:`get_logging_config` here.
+"""
+
+from __future__ import annotations
+
+from tdp_fastapi_core.logging import OTelJsonFormatter, configure_logging, get_logging_config
+
+__all__ = [
+    "OTelJsonFormatter",
+    "configure_logging",
+    "get_logging_config",
+]
