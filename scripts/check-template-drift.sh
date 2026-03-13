@@ -7,7 +7,8 @@ for service_dir in monorepo/services/*/; do
   if [ -f "${service_dir}/.copier-answers.yml" ]; then
     echo "Checking ${service_dir}..."
     cd "${service_dir}"
-    if ! copier update --trust --vcs-ref HEAD --pretend --skip-answered 2>/dev/null | grep -q "No changes"; then
+    output=$(copier update --trust --vcs-ref HEAD --pretend --skip-answered 2>&1) || true
+    if ! echo "$output" | grep -q "No changes"; then
       echo "WARNING: ${service_dir} has template drift"
       DRIFT_FOUND=1
     fi

@@ -1146,23 +1146,23 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", specifier = ">=0.100.0" },
+    { name = "fastapi", specifier = ">=0.100.0,<1" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "opentelemetry-api", marker = "extra == 'dev'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-api", marker = "extra == 'telemetry'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-api", marker = "extra == 'telemetry'", specifier = ">=1.20.0,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'dev'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'telemetry'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'telemetry'", specifier = ">=1.20.0,<2" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'dev'", specifier = ">=0.41b0" },
-    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'telemetry'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'telemetry'", specifier = ">=0.41b0,<1" },
     { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'dev'", specifier = ">=0.41b0" },
-    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'telemetry-httpx'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'telemetry-httpx'", specifier = ">=0.41b0,<1" },
     { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'dev'", specifier = ">=0.41b0" },
-    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'telemetry-sqlalchemy'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'telemetry-sqlalchemy'", specifier = ">=0.41b0,<1" },
     { name = "opentelemetry-sdk", marker = "extra == 'dev'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'telemetry'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'telemetry'", specifier = ">=1.20.0,<2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
-    { name = "python-json-logger", specifier = ">=2.0.0" },
+    { name = "python-json-logger", specifier = ">=2.0.0,<3" },
 ]
 provides-extras = ["telemetry", "telemetry-httpx", "telemetry-sqlalchemy", "dev"]
 

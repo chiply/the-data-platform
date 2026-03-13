@@ -6,7 +6,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 TEMPLATE_PATH="${REPO_ROOT}/enterprise-patterns/python/enterprise-pattern-fastapi"
 
 # Verify working tree is clean (required for copier update to work correctly later)
-if ! git diff --quiet HEAD -- enterprise-patterns/; then
+if ! git diff --quiet -- enterprise-patterns/ || ! git diff --cached --quiet -- enterprise-patterns/; then
   echo "ERROR: Uncommitted changes in enterprise-patterns/. Commit first." >&2
   exit 1
 fi

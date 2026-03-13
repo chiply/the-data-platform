@@ -10,7 +10,7 @@ from tdp_fastapi_core.middleware import RequestIDMiddleware
 
 import schema_registry
 from schema_registry.config import Settings
-from schema_registry.database import engine
+from schema_registry.database import get_engine
 from schema_registry.dependencies import get_settings
 from schema_registry.routers import health, schemas
 
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     yield
     # Shutdown
-    await engine.dispose()
+    await get_engine().dispose()
 
 
 def create_app() -> FastAPI:

@@ -10,7 +10,7 @@ from tdp_fastapi_core import configure_logging, register_exception_handlers, set
 from tdp_fastapi_core.middleware import RequestIDMiddleware
 
 {% if use_database %}
-from {{ module_name }}.database import engine
+from {{ module_name }}.database import get_engine
 {% endif %}
 from {{ module_name }}.config import Settings
 from {{ module_name }}.dependencies import get_settings
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
 {% if use_database %}
-    await engine.dispose()
+    await get_engine().dispose()
 {% endif %}
 
 
