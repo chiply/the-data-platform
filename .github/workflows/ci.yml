@@ -279,3 +279,23 @@ jobs:
             fi
             echo "OK: ${base}/${f} exists"
           done
+
+  lib-version-check:
+    name: Library Version Pin Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install packaging
+
+      - name: Check library version constraints
+        run: python scripts/check-lib-versions.py
