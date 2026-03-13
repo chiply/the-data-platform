@@ -332,3 +332,23 @@ jobs:
 
       - name: Check for template drift
         run: ./scripts/check-template-drift.sh
+
+  lib-version-check:
+    name: Library Version Pin Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install packaging
+
+      - name: Check library version constraints
+        run: python scripts/check-lib-versions.py
