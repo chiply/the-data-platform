@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/chiply/the-data-platform/compare/platform-v0.1.12...platform-v0.1.13) (2026-03-13)
+
+
+### Bug Fixes
+
+* build-image.sh uses monorepo context and builds base image ([#30](https://github.com/chiply/the-data-platform/issues/30)) ([2f8473f](https://github.com/chiply/the-data-platform/commit/2f8473fab5b942e43a45ca4f683b30d631bd2f38))
+
 ## [0.1.12](https://github.com/chiply/the-data-platform/compare/platform-v0.1.11...platform-v0.1.12) (2026-03-13)
 
 
