@@ -21,6 +21,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2,<3",
     "asyncpg>=0.29,<1",
     "alembic>=1.13,<2",
+    "tdp-db>=0.1.0",
     # Production server
     "gunicorn>=21,<23",
 ]
@@ -47,3 +48,4 @@ testpaths = ["tests"]
 
 [tool.uv.sources]
 tdp-fastapi-core = { path = "../../libs/tdp-fastapi-core", editable = true }
+tdp-db = { path = "../../libs/tdp-db", editable = true }
