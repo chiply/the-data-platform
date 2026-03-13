@@ -56,7 +56,7 @@
         "main.py includes both health and schemas routers"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
       "notes": "Depends on US-002. After regeneration, manually re-add the schemas router import and include in main.py if copier overwrites it. Verify editable install works by checking that changes to tdp-fastapi-core source reflect immediately."
     },
