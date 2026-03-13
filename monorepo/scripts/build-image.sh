@@ -126,9 +126,16 @@ if [ -z "$COMPONENT_PATH" ] || [ "$COMPONENT_PATH" = "null" ]; then
 fi
 
 DOCKERFILE_PATH="${REPO_ROOT}/${COMPONENT_PATH}/Dockerfile"
-# Use monorepo/ as build context — service Dockerfiles use monorepo-relative COPY paths
 MONOREPO_DIR="${REPO_ROOT}/monorepo"
-CONTEXT_DIR="${MONOREPO_DIR}"
+
+# Detect build context from Dockerfile comment (e.g. "# Build context: monorepo/")
+# Falls back to the component directory if no marker is found
+CONTEXT_HINT=$(grep -m1 '# Build context:' "$DOCKERFILE_PATH" 2>/dev/null | sed 's/.*# Build context: *//' | tr -d '[:space:]' || true)
+if [ "$CONTEXT_HINT" = "monorepo/" ]; then
+  CONTEXT_DIR="${MONOREPO_DIR}"
+else
+  CONTEXT_DIR="${REPO_ROOT}/${COMPONENT_PATH}"
+fi
 
 if [ ! -f "$DOCKERFILE_PATH" ]; then
   echo "ERROR: No Dockerfile found at ${DOCKERFILE_PATH}" >&2

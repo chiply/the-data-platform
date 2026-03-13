@@ -1,0 +1,24 @@
+# Exclude non-essential directories from Docker build context
+.git
+**/__pycache__
+**/.pytest_cache
+**/.hypothesis
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/node_modules
+**/bazel-*
+**/*.egg-info
+**/.env
+**/.env.*
+
+# Dev/test artifacts
+**/htmlcov
+**/.coverage
+**/coverage.xml
+
+# Documentation and design (not needed in images)
+docs/
+tools/
+scripts/
+third_party/
