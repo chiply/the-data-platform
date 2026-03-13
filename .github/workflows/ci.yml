@@ -243,8 +243,22 @@ jobs:
         run: |
           find /tmp/test-service -name '*.py' -exec python -m py_compile {} +
 
+      - name: Build base Docker image
+        run: docker build -f monorepo/services/Dockerfile.base -t tdp-python-base monorepo/services/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Stage generated service into monorepo
+        run: cp -r /tmp/test-service monorepo/services/test-service
+
+      - name: Generate lock file for test service
+        run: |
+          cd monorepo/services/test-service
+          uv lock
+
       - name: Build Docker image
-        run: docker build -f /tmp/test-service/Dockerfile /tmp/test-service
+        run: docker build -f monorepo/services/test-service/Dockerfile monorepo/
 
   monorepo-structure:
     name: Monorepo Structure Validation
