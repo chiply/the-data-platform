@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------
 FROM tdp-python-base AS builder
 
+USER root
 WORKDIR /build
 
 # Copy platform libraries (path must match relative reference in pyproject.toml)
@@ -21,6 +22,8 @@ RUN uv sync --frozen --no-dev --no-editable
 # ---------------------------------------------------------------------------
 FROM tdp-python-base AS runtime
 
+USER root
+
 # Copy the virtualenv with all installed dependencies from builder
 COPY --from=builder /opt/venv /opt/venv
 
@@ -34,6 +37,7 @@ COPY services/schema-registry/gunicorn_conf.py ./
 
 RUN chmod +x ./entrypoint.sh
 
+# Drop back to non-root for runtime
 USER app
 
 EXPOSE 8000
