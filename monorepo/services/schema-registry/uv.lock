@@ -1014,6 +1014,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-json-logger" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "tdp-fastapi-core" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1047,6 +1048,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23,<1" },
     { name = "python-json-logger", specifier = ">=2,<3" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2,<3" },
+    { name = "tdp-fastapi-core", editable = "../../libs/tdp-fastapi-core" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.27,<1" },
 ]
 provides-extras = ["dev"]
@@ -1132,6 +1134,37 @@ sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
 ]
+
+[[package]]
+name = "tdp-fastapi-core"
+version = "0.1.0"
+source = { editable = "../../libs/tdp-fastapi-core" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "python-json-logger" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.100.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.24" },
+    { name = "opentelemetry-api", marker = "extra == 'dev'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-api", marker = "extra == 'telemetry'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'dev'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'telemetry'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'dev'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'telemetry'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'dev'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'telemetry-httpx'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'dev'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'telemetry-sqlalchemy'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'dev'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'telemetry'", specifier = ">=1.20.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
+    { name = "python-json-logger", specifier = ">=2.0.0" },
+]
+provides-extras = ["telemetry", "telemetry-httpx", "telemetry-sqlalchemy", "dev"]
 
 [[package]]
 name = "typing-extensions"

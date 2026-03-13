@@ -9,6 +9,7 @@ dependencies = [
     "pydantic-settings>=2,<3",
     "python-json-logger>=2,<3",
     "icontract>=2.7,<3",
+    "tdp-fastapi-core>=0.1.0",
     # Observability
     "opentelemetry-api>=1.20,<2",
     "opentelemetry-sdk>=1.20,<2",
@@ -43,3 +44,6 @@ packages = ["src/schema_registry"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.uv.sources]
+tdp-fastapi-core = { path = "../../libs/tdp-fastapi-core", editable = true }
