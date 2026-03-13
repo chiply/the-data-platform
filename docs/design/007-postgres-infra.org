@@ -3,7 +3,7 @@
 #+STATUS: Accepted
 #+CATEGORY: infra
 #+CREATED: [2026-03-12]
-#+LAST_MODIFIED: [2026-03-12]
+#+LAST_MODIFIED: [2026-03-12 Thu]
 #+SETUPFILE: ../../org-setup.org
 
 * Summary
@@ -135,6 +135,21 @@ cloud resources as K8s CRDs that ArgoCD reconciles continuously. However:
   across multiple providers where team self-service via K8s manifests is
   valuable
 
+*** Recovery Objectives
+
+| Target | Dev           | Production     |
+|--------+---------------+----------------|
+| RPO    | 1 hour        | 5 minutes      |
+| RTO    | 1 hour        | 30 minutes     |
+
+RPO is bounded by WAL archiving frequency — CNPG archives continuously, so actual
+RPO approaches zero in normal operation; the targets account for archiver lag and
+partial failures. RTO includes time from "cluster destroyed" to "service accepting
+reads" including PITR restore. These targets inform backup freshness alert
+thresholds (TDP-007-10) and DR test acceptance criteria.
+
+Local has no recovery objectives — the environment is fully disposable.
+
 *** Per-Environment Comparison
 
 | Concern               | Local (k3d)                     | Dev (Linode k3s)                | Production (Linode k3s)          |
@@ -142,15 +157,162 @@ cloud resources as K8s CRDs that ArgoCD reconciles continuously. However:
 | Operator              | CloudNativePG via Tiltfile      | CloudNativePG via Pulumi        | CloudNativePG via Pulumi         |
 | Cluster CRD           | 1 instance, no replicas         | 1 instance, no replicas         | 1 instance (HA replicas later)   |
 | Postgres version      | 16                              | 16                              | 16                               |
-| Storage               | local-path provisioner          | local-path provisioner          | Linode Block Storage (persistent)|
+| Storage               | local-path provisioner          | Linode Block Storage            | Linode Block Storage (persistent)|
 | WAL archiving         | Disabled                        | Enabled (validates pipeline)    | Enabled (Linode Object Storage)  |
+| WAL encryption        | N/A                             | AES256 (client-side)            | AES256 (client-side)             |
 | Base backups          | None                            | Daily (7d retention)            | Daily (30d retention)            |
-| Credentials           | Hardcoded defaults              | Pulumi secret                   | Pulumi ESC secret                |
+| Data checksums        | Enabled                         | Enabled                         | Enabled                          |
+| Credentials           | Hardcoded defaults              | Per-service Pulumi secrets      | Per-service Pulumi ESC secrets   |
+| TLS (app → DB)        | Disabled                        | verify-full                     | verify-full                      |
+| NetworkPolicy         | Not enforced (Flannel)          | Enforced (allow tdp → 5432)    | Enforced (allow tdp → 5432)     |
 | Connection pooling    | None                            | None                            | None (CNPG PgBouncer later)      |
 | High availability     | Single instance                 | Single instance                 | Single instance (HA later)       |
 | Data                  | Seed/synthetic                  | Seed/synthetic                  | Real                             |
 | Disposability         | Fully disposable                | Fully disposable                | Persistent, backed up            |
-| Init                  | Alembic migrate on start        | Alembic migrate on start        | Alembic migrate (gated)          |
+| Init                  | Alembic migrate on start        | K8s Job (pre-deploy)            | K8s Job (pre-deploy)             |
+
+** Security
+
+*** Network Isolation
+
+The =tdp= namespace enforces =default-deny-all= NetworkPolicy. Database traffic
+requires explicit allow rules:
+- Egress from application pods in =tdp= to CNPG Postgres pods on port 5432
+- Ingress on CNPG Postgres pods from =tdp= namespace
+- Egress from Postgres pods to Linode Object Storage (HTTPS/443) for WAL archiving
+- Ingress from CNPG operator pods for management
+
+The CNPG operator runs in =cnpg-system= namespace. Postgres =Cluster= pods run in
+the =tdp= namespace alongside application workloads, simplifying NetworkPolicy
+rules (no cross-namespace policies needed for app → DB traffic).
+
+*** TLS
+
+CloudNativePG auto-generates TLS certificates (server cert, client CA) for each
+Cluster. Application connections must use these:
+- Dev/production: =sslmode=verify-full= in the connection string; mount the
+  CNPG-generated CA certificate into application pods
+- =pg_hba.conf= configured with =hostssl= entries only (reject plaintext
+  connections) in dev/production
+- Local: =sslmode=disable= — unnecessary for ephemeral k3d
+
+*** Per-Service Credentials
+
+Each service gets its own database user and K8s Secret, following least-privilege:
+- =schema_registry_app= user with access restricted to =schema_registry= database
+- =feed_service_app= user with access restricted to =feed_service= database
+- Per-service K8s Secrets: =tdp-schema-registry-db-credentials=,
+  =tdp-feed-service-db-credentials=, etc.
+- The CNPG superuser (=postgres=) is reserved for emergency administrative access
+  via =kubectl cnpg= plugin; remote superuser login is disabled via =pg_hba.conf=
+
+Credentials are created via a post-init SQL script or Pulumi-managed =CREATE USER=
+/ =GRANT= statements, since CNPG's =initdb= runs only on initial cluster creation.
+
+*** Credential Rotation
+
+- *Database passwords:* Update in Pulumi ESC → =pulumi up= to update K8s Secret →
+  rolling restart of application pods. Document procedure.
+- *Object Storage keys:* Rotate via Linode API, update in Pulumi secrets, run
+  =pulumi up=. CNPG picks up the new credentials from the referenced K8s Secret.
+- *TLS certificates:* CNPG auto-rotates these before expiry. No manual action
+  needed.
+
+*** Backup Security
+
+- WAL segments and base backups are encrypted client-side before upload using
+  CNPG's built-in Barman encryption (=barmanObjectStore.wal.encryption: AES256=,
+  =barmanObjectStore.data.encryption: AES256=)
+- Object Storage endpoint uses HTTPS (=endpointURL: https://...=)
+- Dedicated Object Storage access keys with minimal permissions (write-only for
+  archiving, read for restore)
+
+*** Kubernetes Secrets
+
+For production, enable etcd encryption at rest for Secrets (k3s
+=--secrets-encryption= flag). This protects database passwords, TLS certs, and
+Object Storage keys stored as K8s Secrets.
+
+** Migration Strategy
+
+Alembic migrations use different strategies per environment:
+
+- *Local:* =alembic upgrade head= in the service entrypoint. Acceptable because
+  there is exactly one replica and the environment is disposable.
+- *Dev/Production:* A Kubernetes Job runs =alembic upgrade head= as a Helm
+  pre-upgrade hook (=helm.sh/hook: pre-install,pre-upgrade=) before the
+  Deployment rolls out. This prevents the race condition where multiple replicas
+  attempt the same DDL concurrently.
+
+The migration Job uses =pg_advisory_lock= in Alembic's =run_migrations_online= to
+guarantee exclusive execution even if the Job is retried.
+
+*Backward compatibility rule:* All migrations must be backward-compatible with the
+previous application version. Additive changes only (new columns with defaults, new
+tables). Destructive changes (column drops, renames) are split across two releases:
+1. Release N: deploy new code that no longer uses the column
+2. Release N+1: migration drops the column
+
+** Resource Sizing
+
+Follow the =monitoring.ts= pattern with explicit presets keyed to =resourceTier=:
+
+| Preset    | CPU req/limit   | RAM req/limit   | Use case              |
+|-----------+-----------------+-----------------+-----------------------|
+| minimal   | 100m / 500m     | 256Mi / 512Mi   | Local, dev            |
+| standard  | 500m / 1 core   | 1Gi / 2Gi       | Early production      |
+
+Postgres tuning parameters set in the CNPG Cluster CRD's
+=postgresql.parameters= section:
+- =shared_buffers=: 25% of memory limit
+- =effective_cache_size=: 75% of memory limit
+- =max_connections=: 100 (default; explicitly set for visibility)
+
+** Adding New Service Databases
+
+The CNPG =initdb= section runs only on initial cluster creation. To add a database
+for a new service after the cluster exists:
+1. Add a Pulumi-managed =CREATE DATABASE= + =CREATE USER= + =GRANT= statement
+   that runs via =kubectl exec= or a K8s Job
+2. Create the per-service K8s Secret
+3. The next =pulumi up= provisions the database idempotently
+
+** Task Dependencies
+
+Tasks can be parallelized where dependencies allow:
+
+#+begin_example
+  ┌───────────┐   ┌───────────┐   ┌───────────┐
+  │ 01 (local)│   │ 02 (Pulumi│   │ 03 (models│
+  │  Tiltfile) │   │  platform)│   │  + tests) │
+  └─────┬─────┘   └─────┬─────┘   └─────┬─────┘
+        │               │               │
+        │               │         ┌─────┴─────┐
+        │               │         │ 04 (migra-│
+        │               │         │   tion)   │
+        │               │         └─────┬─────┘
+        │               │         ┌─────┴──────────┐
+        │               │   ┌─────┴─────┐   ┌──────┴────┐
+        │               │   │05 (routers│   │06 (entry- │
+        │               │   │  need 01) │   │  point)   │
+        │               │   └───────────┘   └───────────┘
+        │         ┌─────┴─────┐
+        │         │10 (WAL    │
+        │         │ validate) │
+        │         └───────────┘
+        │
+  ┌─────┴──────────────────────┐
+  │ 07 (DB_URL, needs 01 or 02)│
+  └─────┬──────────────────────┘
+        │
+  ┌─────┴─────┐
+  │08 (template│
+  │  update)  │
+  └───────────┘
+
+  Independent: 09 (CI), 11 (Pulumi CI), 12 (smoke test, needs 05+07)
+  Independent: 13 (NetworkPolicy), 14 (monitoring), 15 (shared base)
+#+end_example
 
 ** Option A: Bitnami PostgreSQL Helm Chart
 
@@ -213,6 +375,16 @@ For local development, CloudNativePG runs the same way (operator + single-instan
 Cluster CRD on k3d), ensuring full parity with dev/production. The operator
 footprint is minimal (~50MB RAM) and acceptable even on local k3d.
 
+*Data checksums* are enabled via =enableDataChecksums: true= in the Cluster CRD.
+This is a one-time decision that cannot be changed after cluster creation without a
+full dump/restore.
+
+*Connection pooling trigger:* PgBouncer is deferred but not forgotten. Add CNPG
+PgBouncer when connection count exceeds 50% of =max_connections= under normal
+load, or when adding a third service to the database instance. A Prometheus alert
+on =cnpg_backends_total= approaching =max_connections= (alert at 80%) ensures this
+is caught before connections start failing.
+
 * Tasks
 :PROPERTIES:
 :CATEGORY: tasks
@@ -241,17 +413,25 @@ Create Pulumi modules for CloudNativePG following the existing pattern from
 =cert-manager.ts= and =monitoring.ts=:
 - Deploy CNPG operator Helm chart via Pulumi Helm Release
 - Create a =Cluster= CRD via Pulumi K8s provider:
-  - Read credentials from Pulumi stack config (=dbPassword=, =dbUsername=, etc.)
-  - Use =resourceTier= config to size requests/limits
-  - Configure storage: =local-path= for dev, Linode Block Storage for production
+  - Read per-service credentials from Pulumi stack config
+  - Use =resourceTier= config to size requests/limits (see Resource Sizing section)
+  - Enable =enableDataChecksums: true=
+  - Configure storage: Linode Block Storage for both dev and production
   - Configure WAL archiving to Linode Object Storage (=barmanObjectStore= in
     the Cluster spec) for dev and production
+  - Enable WAL/data encryption: =barmanObjectStore.wal.encryption: AES256=,
+    =barmanObjectStore.data.encryption: AES256=
   - Set =wal_level=logical= for future CDC use cases
   - Configure =initdb= to create per-service databases
+  - Configure =pg_hba.conf= with =hostssl= entries only (reject plaintext)
+  - Set =postgresql.parameters=: =shared_buffers=, =effective_cache_size=,
+    =max_connections= per Resource Sizing section
+- Create per-service database users and K8s Secrets (=tdp-<service>-db-credentials=)
 - Configure backup schedule: daily base backups via =ScheduledBackup= CRD
 - Wire into =index.ts= deployment sequence (CNPG operator → Cluster → app deployments)
 - Update =Pulumi.dev.yaml= and =Pulumi.production.yaml= with CNPG config
-- Store Linode Object Storage credentials as Pulumi secrets
+- Store Linode Object Storage credentials as Pulumi secrets (dedicated keys with
+  minimal permissions)
 
 ** TODO [TDP-007-03] Define schema registry SQLAlchemy models                 :p1:
 :PROPERTIES:
@@ -259,11 +439,24 @@ Create Pulumi modules for CloudNativePG following the existing pattern from
 :END:
 
 Create SQLAlchemy ORM models in =schema_registry/models/=:
-- =Schema= model: name, version, schema_type (avro/protobuf/json), definition
-  (JSONB), compatibility_mode, created_at, updated_at
-- =SchemaVersion= model: schema_id FK, version string, definition, checksum,
-  created_at
-- Appropriate indexes for lookup by name, name+version
+- =Subject= model: name (unique), compatibility_mode (enum: BACKWARD, FORWARD,
+  FULL, NONE, plus transitive variants), description, created_at, updated_at.
+  A subject is a named context under which schemas are registered — the same
+  schema can be registered under different subjects with different compatibility
+  rules.
+- =SchemaVersion= model: subject_id FK, version (integer, auto-incremented per
+  subject), schema_type (enum: AVRO, PROTOBUF, JSON), definition (JSONB),
+  fingerprint (canonical hash for dedup), checksum, created_at
+- =SchemaReference= model: schema_version_id FK, referenced_schema_version_id FK,
+  reference_name. Tracks cross-schema dependencies (e.g., Protobuf imports, Avro
+  named types).
+- Appropriate indexes: subject name lookup, subject+version unique, fingerprint
+  for dedup
+- Compatibility mode enum with check constraint
+- Add icontract invariants per ARCHITECTURE.md: =schema_type= must be valid enum,
+  =definition= must be parseable for declared =schema_type=, version must be
+  positive integer
+- Add Polyfactory factories and Hypothesis strategies for model invariant tests
 
 ** TODO [TDP-007-04] Create initial Alembic migration                         :p1:
 :PROPERTIES:
@@ -274,6 +467,10 @@ Generate the initial Alembic migration from the models defined in TDP-007-03:
 - =alembic revision --autogenerate -m "initial schema tables"=
 - Verify the migration applies cleanly against a fresh database
 - Verify =alembic downgrade= reverses cleanly
+- Add a migration drift test: autogenerate against current models and assert no
+  changes are produced (catches model/migration divergence)
+- Add =pg_advisory_lock= wrapper in =run_migrations_online= for safe concurrent
+  execution (used by the K8s migration Job)
 - Add migration to CI test pipeline
 
 ** TODO [TDP-007-05] Wire database session into schema registry routers       :p1:
@@ -289,17 +486,22 @@ queries:
 - Add =create_schema= endpoint (=POST /schemas=)
 - Update tests to use the test database fixture from =conftest.py=
 
-** TODO [TDP-007-06] Add entrypoint migration hook                            :p2:
+** TODO [TDP-007-06] Implement migration execution strategy                   :p1:
 :PROPERTIES:
-:EFFORT: S
+:EFFORT: M
 :END:
 
-Update the service =entrypoint.sh= to run Alembic migrations before starting
-the application:
-- Run =alembic upgrade head= on startup (idempotent)
-- For production, consider a separate migration Job instead of entrypoint hook
-  (to avoid race conditions with multiple replicas)
-- Document the migration strategy in the service README
+Implement the two-track migration strategy (see Migration Strategy section):
+- *Local:* Update =entrypoint.sh= to run =alembic upgrade head= before starting
+  the application (single replica, no race condition)
+- *Dev/Production:* Create a Kubernetes Job as a Helm pre-upgrade hook
+  (=helm.sh/hook: pre-install,pre-upgrade=) that runs =alembic upgrade head=.
+  The Job uses the =pg_advisory_lock= wrapper from TDP-007-04 for safety.
+  The Deployment does NOT run migrations on entrypoint.
+- Update the Helm chart with a =migration-job.yaml= template, gated on a
+  =migrations.enabled= value (=false= for local, =true= for dev/production)
+- Document the backward compatibility rule and rollback procedure in the
+  service README
 
 ** TODO [TDP-007-07] Configure DATABASE_URL injection via K8s secrets         :p2:
 :PROPERTIES:
@@ -307,12 +509,17 @@ the application:
 :END:
 
 Update the schema registry Helm chart to construct =DATABASE_URL= from the
-=tdp-db-credentials= secret:
+per-service =tdp-schema-registry-db-credentials= secret:
 - Add env vars to the deployment: =DB_HOST=, =DB_PORT=, =DB_NAME=, =DB_USER=,
-  =DB_PASSWORD= from secretKeyRef, or construct a single =DATABASE_URL= in an
-  init container / entrypoint
-- Update =config.py= to build the connection string from individual env vars
-  (more flexible than a single URL for different drivers)
+  =DB_PASSWORD=, =DB_SSLMODE= from secretKeyRef
+- Update =config.py= to add optional individual env var fields (=db_host=,
+  =db_port=, etc.) with a Pydantic validator that assembles =database_url= from
+  them when present. Keep =database_url= as the assembled output field for
+  backward compatibility with existing code.
+- For dev/production: set =DB_SSLMODE=verify-full= and mount the CNPG CA
+  certificate into the application pod (from the CNPG-generated =<cluster>-ca=
+  K8s Secret)
+- For local: =DB_SSLMODE=disable= or omit (falls back to default)
 - Verify connectivity in the =health= endpoint (add a DB ping check)
 
 ** TODO [TDP-007-08] Update Copier template database defaults                 :p2:
@@ -322,9 +529,18 @@ Update the schema registry Helm chart to construct =DATABASE_URL= from the
 
 Update the enterprise-pattern-fastapi Copier template so that
 =use_database=true= generates a working configuration:
-- Default =database_url= should reference env vars that come from K8s secrets
+- Add individual =DB_*= env var fields to =config.py.jinja= with a validator that
+  assembles =database_url=. Keep =database_url= as the output field — do NOT
+  rename it, as this would break existing services on =copier update=.
+- Update =conftest.py.jinja= to read the test =DATABASE_URL= from an env var
+  with a localhost fallback, so CI can override the host
+- Add =migration-job.yaml= template to the Helm chart (gated on
+  =migrations.enabled= value)
+- Ensure =entrypoint.sh.jinja= includes migration step gated on
+  =run_migrations_on_start= (default =true= for local, =false= for deployed)
 - Add a note in generated README about local Postgres via Tiltfile
-- Ensure =entrypoint.sh.jinja= includes optional migration step
+- *Validate:* Run =copier update= on the schema-registry after template changes
+  and resolve any conflicts — this validates the upgrade path
 
 ** TODO [TDP-007-09] Add Postgres to CI pipeline                              :p2:
 :PROPERTIES:
@@ -337,6 +553,9 @@ integration tests:
 - Set =DATABASE_URL= env var for test jobs
 - Run Alembic migrations before tests
 - Validate that tests using =get_db_session= pass against real Postgres
+- Document how local integration tests use the Tiltfile-provisioned Postgres
+  (developers run =tilt up= then =bazel test //...= with =DATABASE_URL= pointing
+  at the local CNPG instance)
 
 ** TODO [TDP-007-10] Validate WAL archiving and document restore procedure    :p1:
 :PROPERTIES:
@@ -345,15 +564,19 @@ integration tests:
 
 WAL archiving is configured as part of TDP-007-02 (CNPG Cluster CRD). This task
 validates the pipeline end-to-end and documents the restore procedure:
-- Verify WAL segments are arriving in Linode Object Storage
+- Verify WAL segments are arriving in Linode Object Storage (encrypted)
 - Verify =ScheduledBackup= CRD produces daily base backups
 - Test point-in-time recovery: insert data, note timestamp, destroy cluster,
-  restore from backup to that timestamp, verify data
+  restore from backup to that timestamp, verify data. Acceptance criteria:
+  recovery completes within the RTO target (30 min production, 1 hr dev).
 - Document the restore procedure (=kubectl cnpg= plugin or manual CRD approach)
+- Document credential rotation procedure for Object Storage keys
 - Configure retention policy in the =barmanObjectStore= spec: 7 days for dev,
   30 days for production
-- Add monitoring: alert if last successful backup is older than expected
-  (Prometheus metrics exposed by the CNPG operator)
+- Add monitoring via =PrometheusRule= CRD:
+  - Alert if last successful backup is older than 25 hours (daily schedule + margin)
+  - Alert if WAL archiving has errors (=cnpg_pg_wal_archiving_failing=)
+  - Alert on =last_available_backup_timestamp= lagging beyond RPO
 
 ** TODO [TDP-007-11] Add CI workflow for Pulumi infrastructure deployment     :p1:
 :PROPERTIES:
@@ -382,6 +605,54 @@ Extend =smoke-test.sh= to verify database connectivity per environment:
 - Verify Alembic migration version matches expected (via a =/_status= or
   =/health/ready= endpoint)
 - Works across local, dev, and production (following TDP-004-08 pattern)
+
+** TODO [TDP-007-13] Add NetworkPolicy for database traffic                   :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create NetworkPolicy rules to allow application-to-database traffic within the
+existing =default-deny-all= policy framework:
+- Egress NetworkPolicy in =tdp= namespace allowing pods with app labels to reach
+  CNPG Cluster pods on port 5432
+- Egress from CNPG Postgres pods to Linode Object Storage (HTTPS/443) for WAL
+  archiving
+- Ingress on CNPG Postgres pods from CNPG operator in =cnpg-system= namespace
+- Follow the existing pattern in =tdp-default-deny.yaml= and
+  =tdp-allow-traefik.yaml=
+- Validate that the schema-registry can connect to Postgres with policies enforced
+
+** TODO [TDP-007-14] Add Postgres monitoring dashboard and alerts              :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Wire CNPG Prometheus metrics into the existing monitoring stack:
+- Enable CNPG =PodMonitor= or =ServiceMonitor= so Prometheus scrapes the metrics
+  endpoint
+- Deploy the official CNPG Grafana dashboard (grafana.com dashboard #20417) via
+  the monitoring Pulumi module or as a ConfigMap
+- Create a =PrometheusRule= CRD with alerts:
+  - Connection pool saturation: =cnpg_backends_total= > 80% of =max_connections=
+  - PVC usage > 80%
+  - Long-running queries (> 5 min)
+  - WAL archiving failures
+  - Replication lag (future-proofing for HA)
+- These alerts complement the backup-specific alerts in TDP-007-10
+
+** TODO [TDP-007-15] Create shared SQLAlchemy base library                     :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Create a shared SQLAlchemy base package in =monorepo/libs/= with common model
+infrastructure:
+- =DeclarativeBase= class with naming conventions (snake_case tables, indexes)
+- Timestamp mixin: =created_at= (server_default), =updated_at= (onupdate)
+- Common column types and type annotations
+- Bazel BUILD file exposing the library as a dependency
+- Used by schema-registry and all future services — prevents each service from
+  defining its own conventions
 
 * Questions
 :PROPERTIES:
@@ -450,6 +721,16 @@ See the *Infrastructure Rollout Policy* section under Design.
 
 * Changelog
 
+- *[2026-03-12]:* Design review feedback incorporated: added Security section
+  (NetworkPolicy, TLS, per-service credentials, credential rotation, backup
+  encryption, K8s secrets encryption at rest); added Recovery Objectives
+  (RTO/RPO); added Migration Strategy (K8s Job for dev/prod, entrypoint for
+  local); added Resource Sizing presets; added Task Dependencies graph; added
+  procedure for adding new service databases post-init; enriched data model
+  (subjects, references, icontract invariants); elevated TDP-007-06 to P1;
+  changed dev storage from local-path to Linode Block Storage; added connection
+  pooling trigger criteria; new tasks: TDP-007-13 (NetworkPolicy), TDP-007-14
+  (monitoring dashboard/alerts), TDP-007-15 (shared SQLAlchemy base library)
 - *[2026-03-12]:* Resolved all open questions; decided CloudNativePG, database
   per service, WAL archiving via Barman, rollout policy tied to git events
 - *[2026-03-12]:* Initial draft
