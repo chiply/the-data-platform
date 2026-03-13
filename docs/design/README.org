@@ -48,6 +48,7 @@ this table to determine valid categories.
 | 004 | [[file:004-dev-environment.org][Dev Environment on Linode]] | Complete |
 | 005 | [[file:005-argocd-gitops-deployment.org][ArgoCD GitOps Deployment & Local Dev]] | Accepted |
 | 006 | [[file:006-copier-service-templates.org][Copier-Based Service Templates & Pattern Inheritance]] | Accepted |
+| 007 | [[file:007-postgres-infra.org][PostgreSQL Infrastructure]] | Accepted |
 
 * Elisp Setup
 :PROPERTIES:

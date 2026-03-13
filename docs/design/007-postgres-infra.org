@@ -1,0 +1,455 @@
+#+TITLE: 007 - PostgreSQL Infrastructure
+#+AUTHOR: Charlie Holland
+#+STATUS: Accepted
+#+CATEGORY: infra
+#+CREATED: [2026-03-12]
+#+LAST_MODIFIED: [2026-03-12]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Provision PostgreSQL databases across the platform's three environments (local,
+dev, production) and wire up existing services — starting with the schema
+registry — to use them. The Copier template already scaffolds database plumbing
+(SQLAlchemy async engine, Alembic migrations, =database_url= config), and Pulumi
+already creates a =tdp-db-credentials= K8s Secret with connection parameters.
+What's missing is the actual database.
+
+* Motivation
+
+The schema registry (and every future service generated from the Copier template
+with =use_database=true=) has full database scaffolding that is currently dead
+code:
+
+- =database.py= — async SQLAlchemy engine/session factory
+- =dependencies.py= — =get_db_session= FastAPI dependency (never injected)
+- =models/__init__.py= — empty, no SQLAlchemy models defined
+- =alembic/= — migration infrastructure with no migrations
+- =config.py= — =database_url= setting pointing at a nonexistent database
+
+Pulumi's =app-secrets.ts= creates a =tdp-db-credentials= K8s Secret with host,
+port, database, username, and password fields — but nothing provisions the
+Postgres instance those credentials point to. The dev stack references
+=db.dev.internal= and production references =db.production.internal=, neither of
+which exists.
+
+Until a real database is provisioned:
+1. Services cannot store persistent state
+2. The schema registry cannot evolve beyond hardcoded stubs
+3. Alembic migrations cannot be tested in CI or locally
+4. The Copier template's =use_database= option is misleading — it scaffolds
+   plumbing that doesn't work
+
+The feed reader sample service (see =SAMPLE-SERVICE.md=) will need persistent
+storage for feed metadata, user subscriptions, and ingestion state, making this
+a prerequisite for the platform's reference implementation.
+
+* Design
+
+** Guiding Principles
+
+- *Open source everything* — use vanilla PostgreSQL, not a managed cloud service
+- *Local testing is first-class* — developers must be able to run Postgres
+  locally with zero cloud dependency
+- *Parity across environments* — same Postgres version, same connection pattern,
+  same migration tooling in local/dev/production
+- *Invest in the right foundation* — use CloudNativePG from the start so WAL
+  archiving, backups, and the HA upgrade path are built in rather than bolted on
+
+** Environment Rollout Strategy
+
+Following the pattern established in [[file:004-dev-environment.org][design doc 004]], the platform has three
+environments: local, dev, and production. Each requires Postgres but with
+different operational characteristics.
+
+*** Rollout Order
+
+Changes are validated in order: *local → dev → production*. Each environment
+must be fully working before promoting to the next.
+
+1. *Local* — validates that the database, migrations, and application code work
+   together. Fast iteration, no infrastructure cost.
+2. *Dev* — validates that the Pulumi provisioning, K8s secrets, and
+   service-to-database connectivity work on real infrastructure. Disposable.
+3. *Production* — applies the validated pattern with production-grade settings
+   (backups, credentials via ESC, persistent storage).
+
+*** Infrastructure Rollout Policy
+
+Pulumi-managed infrastructure changes follow the same git-driven workflow as
+application code. Each environment is triggered by a specific version control
+event:
+
+| Environment | Git Trigger                    | Mechanism                          | Approval           |
+|-------------+--------------------------------+------------------------------------+--------------------|
+| Local       | Manual (=tilt up=)             | Tiltfile deploys CNPG + Cluster    | None               |
+| Dev         | Merge to =main=                | CI runs =pulumi up= on dev stacks  | Automatic          |
+| Production  | Release-please PR merged (tag) | CI runs =pulumi up= on prod stacks | Manual (see below) |
+
+*How it works:*
+
+1. A developer makes infrastructure changes (Pulumi code, CNPG Cluster CRD
+   values, Helm chart config) on a feature branch.
+2. They validate locally with =tilt up= — the Tiltfile deploys the same CNPG
+   operator and Cluster CRD that dev/production use.
+3. The PR is reviewed and merged to =main=.
+4. *CI automatically runs =pulumi up= on the dev stacks* (cluster then
+   platform). Pulumi's state tracking makes this idempotent — unchanged
+   resources are skipped, only diffs are applied.
+5. Dev is validated (smoke tests, manual inspection).
+6. When ready for production, the normal release-please flow applies: commits
+   accumulate on =main=, release-please opens a Release PR, and *merging that
+   PR triggers CI to run =pulumi up= on the production stacks*.
+
+*Production approval gate:*
+
+Production deployments require a manual approval step via a GitHub Environment
+protection rule on the =production= environment. This means:
+- CI creates the deployment, GitHub pauses for approval
+- A designated approver reviews the =pulumi preview= output and approves
+- CI proceeds with =pulumi up=
+
+This leverages GitHub's built-in environment protection rather than inventing a
+custom approval mechanism.
+
+*Pulumi state and idempotency:*
+
+Pulumi tracks every resource in its state backend. On each =pulumi up=:
+- Resources that already exist and haven't changed → no-op
+- Resources that changed → updated in place (or replaced if required)
+- New resources → created
+- Removed from code → deleted
+
+This means re-running =pulumi up= after a failed or partial deployment is safe.
+Drift from manual cluster changes is corrected on the next run.
+
+*What Crossplane would add (and why we skip it for now):*
+
+Crossplane could replace Pulumi for in-cluster resource management by defining
+cloud resources as K8s CRDs that ArgoCD reconciles continuously. However:
+- CloudNativePG already handles Postgres declaratively inside the cluster
+- The only remaining cloud resource is a Linode Object Storage bucket for WAL
+  backups — not enough to justify another operator
+- Pulumi already handles bootstrapping (clusters, platform services) well
+- Revisit Crossplane if the platform grows to manage many cloud resources
+  across multiple providers where team self-service via K8s manifests is
+  valuable
+
+*** Per-Environment Comparison
+
+| Concern               | Local (k3d)                     | Dev (Linode k3s)                | Production (Linode k3s)          |
+|-----------------------+---------------------------------+---------------------------------+----------------------------------|
+| Operator              | CloudNativePG via Tiltfile      | CloudNativePG via Pulumi        | CloudNativePG via Pulumi         |
+| Cluster CRD           | 1 instance, no replicas         | 1 instance, no replicas         | 1 instance (HA replicas later)   |
+| Postgres version      | 16                              | 16                              | 16                               |
+| Storage               | local-path provisioner          | local-path provisioner          | Linode Block Storage (persistent)|
+| WAL archiving         | Disabled                        | Enabled (validates pipeline)    | Enabled (Linode Object Storage)  |
+| Base backups          | None                            | Daily (7d retention)            | Daily (30d retention)            |
+| Credentials           | Hardcoded defaults              | Pulumi secret                   | Pulumi ESC secret                |
+| Connection pooling    | None                            | None                            | None (CNPG PgBouncer later)      |
+| High availability     | Single instance                 | Single instance                 | Single instance (HA later)       |
+| Data                  | Seed/synthetic                  | Seed/synthetic                  | Real                             |
+| Disposability         | Fully disposable                | Fully disposable                | Persistent, backed up            |
+| Init                  | Alembic migrate on start        | Alembic migrate on start        | Alembic migrate (gated)          |
+
+** Option A: Bitnami PostgreSQL Helm Chart
+
+Use the [[https://github.com/bitnami/charts/tree/main/bitnami/postgresql][Bitnami PostgreSQL Helm chart]] — the most widely used community Postgres
+chart. Deployed via Pulumi's Helm support for dev/production; via Tilt for local.
+
+Pros:
+- Battle-tested, well-documented, actively maintained
+- Supports persistence, replication, metrics, and backups out of the box
+- Consistent with the platform's existing Helm-based deployment pattern
+- Single-instance mode is simple; can scale to primary-replica later
+
+Cons:
+- Bitnami charts are opinionated about image tags and update cadence
+- Large chart with many values — only a fraction is needed initially
+
+** Option B: CloudNativePG Operator
+
+Use [[https://cloudnative-pg.io/][CloudNativePG]] — a CNCF Sandbox Kubernetes operator purpose-built for
+PostgreSQL lifecycle management (provisioning, failover, backup, monitoring).
+
+Pros:
+- Kubernetes-native — declarative CRDs for clusters, backups, pooling
+- Automated failover, WAL archiving, and point-in-time recovery
+- Growing CNCF ecosystem adoption
+
+Cons:
+- Heavier footprint — installs a CRD + operator pod
+- More complexity than needed for a single-instance database at this stage
+- Learning curve for the CRD API
+
+** Option C: Raw Postgres Container (StatefulSet)
+
+Deploy a plain =postgres:16= container as a K8s StatefulSet with a PVC.
+
+Pros:
+- Simplest possible approach, full control
+- No chart dependency
+
+Cons:
+- Must manually handle health checks, init scripts, credential injection
+- No upgrade path without rewriting to a chart or operator
+- Reinvents what Helm charts already solve
+
+* Decision
+
+*Option B: CloudNativePG Operator.* The decision to use WAL archiving from the
+start makes CloudNativePG the natural choice — it provides WAL archiving, base
+backups, and PITR as native CRD configuration rather than requiring manual
+wal-g/pgBackRest setup. The operator also gives us a clear path to HA (streaming
+replication + automated failover) when the time comes, without re-architecting.
+
+CloudNativePG is deployed as:
+1. *Operator* — installed once per cluster via Helm chart, manages all Postgres
+   =Cluster= CRDs
+2. *Cluster CRD* — one per environment, declares the Postgres instance(s),
+   storage, backup schedule, and WAL archiving destination
+
+For local development, CloudNativePG runs the same way (operator + single-instance
+Cluster CRD on k3d), ensuring full parity with dev/production. The operator
+footprint is minimal (~50MB RAM) and acceptable even on local k3d.
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+** TODO [TDP-007-01] Install CloudNativePG operator in local dev (Tiltfile)   :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Add CloudNativePG operator to the local k3d environment via Tiltfile:
+- Deploy the CNPG operator Helm chart (=cloudnative-pg/cloudnative-pg=)
+- Create a =Cluster= CRD for local dev: single instance, =local-path= storage,
+  no WAL archiving, credentials matching =app-secrets.ts= local defaults
+- Configure =initdb= to create per-service databases (=schema_registry=, etc.)
+- Expose the Postgres port for local tooling (psql, pgAdmin)
+- Ensure the Cluster is healthy before services start (Tilt resource dependencies)
+- Validate that =tdp-db-credentials= secret values match the Cluster config
+
+** TODO [TDP-007-02] Add CloudNativePG to Pulumi platform stack              :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create Pulumi modules for CloudNativePG following the existing pattern from
+=cert-manager.ts= and =monitoring.ts=:
+- Deploy CNPG operator Helm chart via Pulumi Helm Release
+- Create a =Cluster= CRD via Pulumi K8s provider:
+  - Read credentials from Pulumi stack config (=dbPassword=, =dbUsername=, etc.)
+  - Use =resourceTier= config to size requests/limits
+  - Configure storage: =local-path= for dev, Linode Block Storage for production
+  - Configure WAL archiving to Linode Object Storage (=barmanObjectStore= in
+    the Cluster spec) for dev and production
+  - Set =wal_level=logical= for future CDC use cases
+  - Configure =initdb= to create per-service databases
+- Configure backup schedule: daily base backups via =ScheduledBackup= CRD
+- Wire into =index.ts= deployment sequence (CNPG operator → Cluster → app deployments)
+- Update =Pulumi.dev.yaml= and =Pulumi.production.yaml= with CNPG config
+- Store Linode Object Storage credentials as Pulumi secrets
+
+** TODO [TDP-007-03] Define schema registry SQLAlchemy models                 :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create SQLAlchemy ORM models in =schema_registry/models/=:
+- =Schema= model: name, version, schema_type (avro/protobuf/json), definition
+  (JSONB), compatibility_mode, created_at, updated_at
+- =SchemaVersion= model: schema_id FK, version string, definition, checksum,
+  created_at
+- Appropriate indexes for lookup by name, name+version
+
+** TODO [TDP-007-04] Create initial Alembic migration                         :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Generate the initial Alembic migration from the models defined in TDP-007-03:
+- =alembic revision --autogenerate -m "initial schema tables"=
+- Verify the migration applies cleanly against a fresh database
+- Verify =alembic downgrade= reverses cleanly
+- Add migration to CI test pipeline
+
+** TODO [TDP-007-05] Wire database session into schema registry routers       :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Replace the hardcoded stub data in =routers/schemas.py= with real database
+queries:
+- Inject =get_db_session= dependency into route handlers
+- Implement =list_schemas= → =SELECT= query
+- Implement =get_schema= → =SELECT ... WHERE name = := query
+- Add =create_schema= endpoint (=POST /schemas=)
+- Update tests to use the test database fixture from =conftest.py=
+
+** TODO [TDP-007-06] Add entrypoint migration hook                            :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update the service =entrypoint.sh= to run Alembic migrations before starting
+the application:
+- Run =alembic upgrade head= on startup (idempotent)
+- For production, consider a separate migration Job instead of entrypoint hook
+  (to avoid race conditions with multiple replicas)
+- Document the migration strategy in the service README
+
+** TODO [TDP-007-07] Configure DATABASE_URL injection via K8s secrets         :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update the schema registry Helm chart to construct =DATABASE_URL= from the
+=tdp-db-credentials= secret:
+- Add env vars to the deployment: =DB_HOST=, =DB_PORT=, =DB_NAME=, =DB_USER=,
+  =DB_PASSWORD= from secretKeyRef, or construct a single =DATABASE_URL= in an
+  init container / entrypoint
+- Update =config.py= to build the connection string from individual env vars
+  (more flexible than a single URL for different drivers)
+- Verify connectivity in the =health= endpoint (add a DB ping check)
+
+** TODO [TDP-007-08] Update Copier template database defaults                 :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update the enterprise-pattern-fastapi Copier template so that
+=use_database=true= generates a working configuration:
+- Default =database_url= should reference env vars that come from K8s secrets
+- Add a note in generated README about local Postgres via Tiltfile
+- Ensure =entrypoint.sh.jinja= includes optional migration step
+
+** TODO [TDP-007-09] Add Postgres to CI pipeline                              :p2:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Update =.github/workflows/ci.yml= to run a Postgres service container for
+integration tests:
+- Add =services: postgres:= section with health checks
+- Set =DATABASE_URL= env var for test jobs
+- Run Alembic migrations before tests
+- Validate that tests using =get_db_session= pass against real Postgres
+
+** TODO [TDP-007-10] Validate WAL archiving and document restore procedure    :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+WAL archiving is configured as part of TDP-007-02 (CNPG Cluster CRD). This task
+validates the pipeline end-to-end and documents the restore procedure:
+- Verify WAL segments are arriving in Linode Object Storage
+- Verify =ScheduledBackup= CRD produces daily base backups
+- Test point-in-time recovery: insert data, note timestamp, destroy cluster,
+  restore from backup to that timestamp, verify data
+- Document the restore procedure (=kubectl cnpg= plugin or manual CRD approach)
+- Configure retention policy in the =barmanObjectStore= spec: 7 days for dev,
+  30 days for production
+- Add monitoring: alert if last successful backup is older than expected
+  (Prometheus metrics exposed by the CNPG operator)
+
+** TODO [TDP-007-11] Add CI workflow for Pulumi infrastructure deployment     :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create GitHub Actions workflows that run =pulumi up= on git events:
+- *Dev deployment workflow*: triggered on push to =main=, runs =pulumi up= on
+  dev cluster and platform stacks sequentially
+- *Production deployment workflow*: triggered on release tag (from release-please),
+  runs =pulumi up= on production stacks with a GitHub Environment protection
+  rule requiring manual approval
+- Both workflows run =pulumi preview= first and post the diff as a check
+  summary for visibility
+- Store Pulumi access token, Linode token, and Object Storage credentials as
+  GitHub Actions secrets
+- Add the =production= GitHub Environment with required reviewers configured
+
+** TODO [TDP-007-12] Smoke test database connectivity                         :p3:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Extend =smoke-test.sh= to verify database connectivity per environment:
+- Hit the health endpoint and check for a DB-connected status
+- Verify Alembic migration version matches expected (via a =/_status= or
+  =/health/ready= endpoint)
+- Works across local, dev, and production (following TDP-004-08 pattern)
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Should each service get its own database or share one?
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+Option 2: database per service within a single Postgres instance. Each service
+gets its own database (e.g., =schema_registry=, =feed_service=) with a dedicated
+connection string. This provides clean isolation boundaries (independent backups,
+no accidental cross-service joins) at zero additional cost versus shared schemas,
+since all databases run on the same pod and resources.
+
+** DECIDED Should we use CloudNativePG?
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+Yes — use CloudNativePG from the start, not just for future HA. The decision to
+use WAL archiving makes CNPG the natural choice since it provides WAL shipping,
+base backups, and PITR as native CRD configuration (=barmanObjectStore=) rather
+than requiring manual wal-g/pgBackRest setup. Starting with CNPG also means the
+HA upgrade path (adding replicas + automated failover) is a config change, not a
+re-architecture. The operator footprint is minimal (~50MB RAM).
+
+** DECIDED What backup strategy for production?
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+WAL archiving to Linode Object Storage (S3-compatible) via CloudNativePG's
+built-in Barman integration (=barmanObjectStore= in the Cluster CRD).
+This provides:
+
+- *Point-in-time recovery* — restore to any second, not just last snapshot
+- *Continuous protection* — WAL segments stream as they're produced, minimizing
+  data loss window
+- *Future applications* — WAL enables CDC (change data capture), logical
+  replication to analytics systems, and event sourcing patterns beyond just
+  backup/restore
+
+The setup consists of:
+1. Periodic base backups (e.g., daily) to Linode Object Storage
+2. Continuous WAL segment archiving between base backups
+3. Retention policy (e.g., 7 days of PITR for dev, 30 days for production)
+
+For dev: WAL archiving is optional since the environment is disposable, but
+running it validates the backup pipeline before production.
+
+For local: no WAL archiving — unnecessary overhead for ephemeral development.
+
+** DECIDED Do we need a formal environment promotion / rollout policy?
+:PROPERTIES:
+:DECIDED: [2026-03-12]
+:END:
+
+Yes — define a rollout policy for Pulumi-managed infrastructure tied to version
+control events. This applies to all infrastructure in this doc and generalizes
+to future Pulumi-managed resources.
+
+See the *Infrastructure Rollout Policy* section under Design.
+
+* Changelog
+
+- *[2026-03-12]:* Resolved all open questions; decided CloudNativePG, database
+  per service, WAL archiving via Barman, rollout policy tied to git events
+- *[2026-03-12]:* Initial draft
