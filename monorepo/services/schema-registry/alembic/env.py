@@ -1,10 +1,14 @@
-"""Alembic environment configuration for async migrations."""
+"""Alembic environment configuration for async migrations.
+
+Uses pg_advisory_lock to ensure safe concurrent migration execution
+(e.g., when a K8s Job is retried or multiple replicas start simultaneously).
+"""
 
 import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -17,18 +21,21 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import all models so Alembic can detect them
+# Import all models so Alembic can detect them for autogenerate
 from schema_registry.models import *  # noqa: F401, F403
 
 # Set target metadata for autogenerate support
-# When you define models with a DeclarativeBase, set target_metadata here:
-# from schema_registry.models.base import Base
-# target_metadata = Base.metadata
-target_metadata = None
+from tdp_db import Base
+
+target_metadata = Base.metadata
 
 # Override sqlalchemy.url from application settings
 settings = Settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)
+
+# Advisory lock ID — arbitrary but fixed integer to prevent concurrent migrations.
+# Using a hash of "tdp-schema-registry-migration" for uniqueness.
+MIGRATION_LOCK_ID = 737_007_001
 
 
 def run_migrations_offline() -> None:
@@ -50,11 +57,18 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    """Run migrations with the given connection."""
-    context.configure(connection=connection, target_metadata=target_metadata)
+    """Run migrations with pg_advisory_lock for safe concurrent execution."""
+    # Acquire an advisory lock to prevent concurrent migration runs.
+    # pg_advisory_lock blocks until the lock is available (session-level lock,
+    # automatically released when the connection closes).
+    connection.execute(text(f"SELECT pg_advisory_lock({MIGRATION_LOCK_ID})"))
 
-    with context.begin_transaction():
-        context.run_migrations()
+    try:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+    finally:
+        connection.execute(text(f"SELECT pg_advisory_unlock({MIGRATION_LOCK_ID})"))
 
 
 async def run_async_migrations() -> None:

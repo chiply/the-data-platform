@@ -166,6 +166,68 @@ if argocd_mode:
     )
 
 # ---------------------------------------------------------------------------
+# CloudNativePG — PostgreSQL operator and local cluster
+# ---------------------------------------------------------------------------
+# Deployed in both modes: services need a database regardless of how
+# application deployments are managed.
+
+# Install the CNPG operator via Helm chart. The CRD install is handled
+# by the chart itself when installCRDs is true (default).
+local_resource(
+    "cnpg-operator",
+    cmd=" && ".join([
+        "helm repo add cnpg https://cloudnative-pg.github.io/charts 2>/dev/null || true",
+        "helm repo update cnpg",
+        "helm upgrade --install cnpg cnpg/cloudnative-pg"
+        "  --namespace cnpg-system --create-namespace"
+        "  --wait --timeout 120s",
+    ]),
+    labels=["database"],
+)
+
+# Apply the local Postgres cluster and credentials.
+# The superuser secret must exist before the Cluster CRD references it.
+# The db-credentials secret is consumed by application pods.
+local_resource(
+    "cnpg-cluster",
+    cmd=" && ".join([
+        "kubectl create namespace tdp 2>/dev/null || true",
+        "kubectl apply -f deploy/postgres/superuser-secret-local.yaml",
+        "kubectl apply -f deploy/postgres/db-credentials-local.yaml",
+        "kubectl apply -f deploy/postgres/cluster-local.yaml",
+    ]),
+    deps=[
+        "deploy/postgres/cluster-local.yaml",
+        "deploy/postgres/superuser-secret-local.yaml",
+        "deploy/postgres/db-credentials-local.yaml",
+    ],
+    resource_deps=["cnpg-operator"],
+    labels=["database"],
+)
+
+# Wait for the Postgres cluster to become healthy before services start.
+local_resource(
+    "cnpg-cluster-ready",
+    cmd=" && ".join([
+        "echo 'Waiting for CNPG cluster to be ready...'",
+        "kubectl wait --for=condition=Ready cluster/tdp-postgres -n tdp --timeout=180s 2>/dev/null"
+        " || kubectl rollout status deployment/tdp-postgres-1 -n tdp --timeout=180s 2>/dev/null"
+        " || (echo 'Waiting for Postgres pod...' && sleep 10 && kubectl wait pod -l cnpg.io/cluster=tdp-postgres -n tdp --for=condition=Ready --timeout=120s)",
+    ]),
+    resource_deps=["cnpg-cluster"],
+    labels=["database"],
+)
+
+# Expose Postgres port for local tooling (psql, pgAdmin, etc.)
+# Port 5432 on localhost -> tdp-postgres-rw service in the cluster.
+local_resource(
+    "cnpg-port-forward",
+    serve_cmd="kubectl port-forward svc/tdp-postgres-rw -n tdp 5432:5432",
+    resource_deps=["cnpg-cluster-ready"],
+    labels=["database"],
+)
+
+# ---------------------------------------------------------------------------
 # Mode: tilt-only (default) — direct docker_build + helm deployment
 # ---------------------------------------------------------------------------
 
@@ -220,10 +282,12 @@ if not argocd_mode:
         )
     )
 
-    # Configure schema-registry Kubernetes resource
+    # Configure schema-registry Kubernetes resource.
+    # Depends on cnpg-cluster-ready so Postgres is available before the service starts.
     k8s_resource(
         "schema-registry",
         port_forwards=["8000:8000"],
+        resource_deps=["cnpg-cluster-ready"],
         labels=["services"],
     )
 

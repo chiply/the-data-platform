@@ -10,7 +10,10 @@
 - [uv](https://docs.astral.sh/uv/) (`brew install uv` or `pip install uv`)
 - Bazel (see `MODULE.bazel` at the monorepo root)
 {% if use_database %}
-- PostgreSQL (for local development)
+- PostgreSQL — provisioned automatically via CloudNativePG in the local k3d
+  cluster. Run `cd monorepo && tilt up` to start. The Tiltfile deploys the
+  CNPG operator and creates a local Postgres cluster with a database for this
+  service. Port 5432 is forwarded to localhost for psql/pgAdmin access.
 {% endif %}
 
 ### Setup
@@ -113,4 +116,16 @@ After generating this service from the template, complete these steps:
 - [ ] Run `bazel run //:gazelle` to sync BUILD files with actual dependencies
 {% if use_database %}
 - [ ] Create the database and run initial Alembic migration
+- [ ] Add `migration-job.yaml` to the Helm chart (gated on `migrations.enabled` value)
+- [ ] Add database to the CNPG Cluster CRD in `deploy/postgres/cluster-local.yaml`
+
+### Migration Strategy
+
+- **Local:** `entrypoint.sh` runs `alembic upgrade head` before starting the app
+  (controlled by `RUN_MIGRATIONS_ON_START` env var, defaults to `true`).
+- **Dev/Production:** A K8s Job (Helm pre-upgrade hook) runs migrations before
+  the Deployment rolls out. Set `RUN_MIGRATIONS_ON_START=false` in Helm values.
+- **Backward compatibility rule:** All migrations must be backward-compatible with
+  the previous application version. Destructive changes (column drops, renames) are
+  split across two releases: Release N deploys new code, Release N+1 drops the column.
 {% endif %}

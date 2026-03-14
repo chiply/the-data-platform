@@ -119,6 +119,12 @@ serviceAccount:
   # -- Service account name (generated if not set)
   name: ""
 
+# -- Database migration configuration
+migrations:
+  # -- Enable migration Job (Helm pre-upgrade hook).
+  # Set to true for dev/production; false for local (entrypoint handles it).
+  enabled: false
+
 # -- ConfigMap data
 config: {}
 

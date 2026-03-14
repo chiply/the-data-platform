@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tdp-db"
+version = "0.1.0"
+description = "Shared SQLAlchemy base library for The Data Platform"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tdp_db"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
