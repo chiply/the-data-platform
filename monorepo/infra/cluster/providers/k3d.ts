@@ -8,10 +8,19 @@ import * as command from "@pulumi/command";
  * - A local container registry (k3d-{name}-registry on port 5111)
  * - Port mappings for Traefik ingress (80, 443)
  * - Configurable worker node count (default: 2)
+ * - Pinned k3s image for reproducible environments
  *
  * The cluster uses k3s under the hood, which bundles Traefik as its
  * ingress controller and Klipper as its service load balancer.
+ *
+ * k3s image is pinned to v1.31 because k3s >= 1.33 uses nftables-based
+ * kube-proxy, which has a bug where pods with init containers lose
+ * ClusterIP service connectivity after the init container completes.
+ * This breaks CloudNativePG initdb jobs (and anything else using init
+ * containers that need to reach the Kubernetes API).
  */
+
+const K3S_IMAGE = "rancher/k3s:v1.31.6-k3s1";
 
 export interface K3dClusterResult {
   /** The kubeconfig for connecting to the cluster */
@@ -43,6 +52,7 @@ export function createK3dCluster(): K3dClusterResult {
     "k3d-cluster",
     {
       create: pulumi.interpolate`k3d cluster create ${clusterName} \
+        --image ${K3S_IMAGE} \
         --agents ${workerCount} \
         --registry-use k3d-${registryName}:${registryPort} \
         --port "80:80@loadbalancer" \

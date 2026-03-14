@@ -257,7 +257,6 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
   // Build the Cluster spec
   const clusterSpec: Record<string, unknown> = {
     instances: 1,
-    enableDataChecksums: true,
     imageName: "ghcr.io/cloudnative-pg/postgresql:16",
 
     postgresql: {
@@ -267,6 +266,7 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
 
     bootstrap: {
       initdb: {
+        dataChecksums: true,
         database: "tdp",
         owner: "tdp",
         postInitSQL: combinedPostInitSQL.apply((sql) =>

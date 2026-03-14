@@ -76,6 +76,29 @@ spec:
         - protocol: TCP
           port: 443
 ---
+# Allow CNPG Postgres pods (including initdb Jobs) egress to the Kubernetes
+# API server. Required for CNPG bootstrap — the initdb pod calls the k8s API
+# to read the Cluster CRD during initialization.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-egress-apiserver
+  namespace: tdp
+  labels:
+    app.kubernetes.io/part-of: the-data-platform
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: tdp-postgres
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+---
 # Allow CNPG operator pods in cnpg-system namespace to manage Postgres pods
 # in the tdp namespace. The operator needs ingress access for health checks,
 # status updates, and instance management.

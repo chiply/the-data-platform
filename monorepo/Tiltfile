@@ -178,8 +178,8 @@ local_resource(
     cmd=" && ".join([
         "helm repo add cnpg https://cloudnative-pg.github.io/charts 2>/dev/null || true",
         "helm repo update cnpg",
-        "helm upgrade --install cnpg cnpg/cloudnative-pg"
-        "  --namespace cnpg-system --create-namespace"
+        "helm upgrade --install cnpg cnpg/cloudnative-pg" +
+        "  --namespace cnpg-system --create-namespace" +
         "  --wait --timeout 120s",
     ]),
     labels=["database"],
@@ -210,8 +210,8 @@ local_resource(
     "cnpg-cluster-ready",
     cmd=" && ".join([
         "echo 'Waiting for CNPG cluster to be ready...'",
-        "kubectl wait --for=condition=Ready cluster/tdp-postgres -n tdp --timeout=180s 2>/dev/null"
-        " || kubectl rollout status deployment/tdp-postgres-1 -n tdp --timeout=180s 2>/dev/null"
+        "kubectl wait --for=condition=Ready cluster/tdp-postgres -n tdp --timeout=180s 2>/dev/null" +
+        " || kubectl rollout status deployment/tdp-postgres-1 -n tdp --timeout=180s 2>/dev/null" +
         " || (echo 'Waiting for Postgres pod...' && sleep 10 && kubectl wait pod -l cnpg.io/cluster=tdp-postgres -n tdp --for=condition=Ready --timeout=120s)",
     ]),
     resource_deps=["cnpg-cluster"],
@@ -240,22 +240,15 @@ if not argocd_mode:
     #     after live_update syncs them into the container.
     docker_build(
         "k3d-tdp-local-registry:5111/schema-registry",
-        context="services/schema-registry",
+        context=".",
         dockerfile="services/schema-registry/Dockerfile",
-        entrypoint="/opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+        entrypoint="/opt/venv/bin/uvicorn schema_registry.main:app --host 0.0.0.0 --port 8000 --reload --app-dir /app/src",
         live_update=[
             # If the Dockerfile itself changes, do a full rebuild (no live update).
-            # Path is relative to the docker_build context (services/schema-registry/).
             fall_back_on(["services/schema-registry/Dockerfile"]),
 
-            # Sync all files into the container's /app directory.
-            sync("services/schema-registry/", "/app/"),
-
-            # When requirements.txt changes, re-install dependencies into the venv.
-            run(
-                "/opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt",
-                trigger=["services/schema-registry/requirements.txt"],
-            ),
+            # Sync service source into the container's /app directory.
+            sync("services/schema-registry/src/", "/app/src/"),
         ],
     )
 

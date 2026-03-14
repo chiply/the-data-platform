@@ -24,14 +24,13 @@ spec:
       # Local dev: allow all connections without TLS
       - host all all 0.0.0.0/0 md5
 
-  enableDataChecksums: true
-
   storage:
     size: 1Gi
     storageClass: local-path
 
   bootstrap:
     initdb:
+      dataChecksums: true
       database: tdp
       owner: tdp
       secret:
