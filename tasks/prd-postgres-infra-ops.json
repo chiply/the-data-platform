@@ -1,0 +1,108 @@
+{
+  "project": "TDP",
+  "branchName": "ralph/postgres-infra-ops",
+  "description": "Provision PostgreSQL infrastructure via Pulumi, add CI workflows for deployment and testing, configure NetworkPolicy and monitoring. Part of design doc 007 (Infra + Ops workstream).",
+  "sourceDesignDoc": "docs/design/007-postgres-infra.org",
+  "userStories": [
+    {
+      "id": "US-001",
+      "sourceTaskId": "TDP-007-02",
+      "title": "Add CloudNativePG to Pulumi platform stack",
+      "description": "As a platform engineer, I want CloudNativePG provisioned via Pulumi so that dev and production environments have managed PostgreSQL with WAL archiving, backups, and per-service credentials.",
+      "acceptanceCriteria": [
+        "CNPG operator Helm chart deployed via Pulumi Helm Release",
+        "Cluster CRD created via Pulumi K8s provider with per-service credentials from stack config",
+        "resourceTier config sizes requests/limits per Resource Sizing section",
+        "enableDataChecksums: true configured",
+        "Storage uses Linode Block Storage for both dev and production",
+        "WAL archiving configured to Linode Object Storage via barmanObjectStore",
+        "WAL and data encryption enabled (AES256)",
+        "wal_level=logical set for future CDC use cases",
+        "initdb creates per-service databases",
+        "pg_hba.conf configured with hostssl entries only",
+        "postgresql.parameters set: shared_buffers, effective_cache_size, max_connections",
+        "Per-service database users and K8s Secrets created (tdp-<service>-db-credentials)",
+        "ScheduledBackup CRD configured for daily base backups",
+        "Wired into index.ts deployment sequence (operator → Cluster → app deployments)",
+        "Pulumi.dev.yaml and Pulumi.production.yaml updated with CNPG config",
+        "Linode Object Storage credentials stored as Pulumi secrets"
+      ],
+      "priority": 1,
+      "passes": false,
+      "humanReview": true,
+      "notes": "Effort: M. NEEDS-REVIEW: Critical infrastructure — verify Pulumi CNPG module, Cluster CRD config, WAL archiving, and per-service secrets."
+    },
+    {
+      "id": "US-002",
+      "sourceTaskId": "TDP-007-13",
+      "title": "Add NetworkPolicy for database traffic",
+      "description": "As a platform engineer, I want NetworkPolicy rules so that database traffic is explicitly allowed within the default-deny-all policy framework, maintaining security while enabling connectivity.",
+      "acceptanceCriteria": [
+        "Egress NetworkPolicy in tdp namespace: app pods → CNPG Cluster pods on port 5432",
+        "Egress from CNPG Postgres pods to Linode Object Storage (HTTPS/443) for WAL archiving",
+        "Ingress on CNPG Postgres pods from CNPG operator in cnpg-system namespace",
+        "Follows existing pattern in tdp-default-deny.yaml and tdp-allow-traefik.yaml",
+        "Schema-registry can connect to Postgres with policies enforced"
+      ],
+      "priority": 2,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: S. Independent but logically follows US-001."
+    },
+    {
+      "id": "US-003",
+      "sourceTaskId": "TDP-007-11",
+      "title": "Add CI workflow for Pulumi infrastructure deployment",
+      "description": "As a platform engineer, I want GitHub Actions workflows that run pulumi up on git events so that infrastructure changes are deployed automatically through the environment promotion pipeline.",
+      "acceptanceCriteria": [
+        "Dev deployment workflow: triggered on push to main, runs pulumi up on dev stacks sequentially",
+        "Production deployment workflow: triggered on release tag, runs pulumi up on production stacks",
+        "Production uses GitHub Environment protection rule requiring manual approval",
+        "Both workflows run pulumi preview first and post diff as check summary",
+        "Pulumi access token, Linode token, and Object Storage credentials stored as GitHub Actions secrets",
+        "production GitHub Environment created with required reviewers configured"
+      ],
+      "priority": 3,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: M. Logically depends on US-001 (Pulumi modules must exist)."
+    },
+    {
+      "id": "US-004",
+      "sourceTaskId": "TDP-007-09",
+      "title": "Add Postgres to CI pipeline",
+      "description": "As a developer, I want a Postgres service container in CI so that integration tests run against a real database instead of mocks.",
+      "acceptanceCriteria": [
+        "services: postgres: section added to ci.yml with health checks",
+        "DATABASE_URL env var set for test jobs",
+        "Alembic migrations run before tests",
+        "Tests using get_db_session pass against real Postgres",
+        "Documentation on how local integration tests use Tiltfile-provisioned Postgres"
+      ],
+      "priority": 4,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: M. Independent — CI Postgres is a service container, not CNPG."
+    },
+    {
+      "id": "US-005",
+      "sourceTaskId": "TDP-007-14",
+      "title": "Add Postgres monitoring dashboard and alerts",
+      "description": "As a platform engineer, I want CNPG Prometheus metrics wired into the monitoring stack with alerts so that database health issues are detected before they impact services.",
+      "acceptanceCriteria": [
+        "CNPG PodMonitor or ServiceMonitor enabled for Prometheus scraping",
+        "Official CNPG Grafana dashboard (#20417) deployed via monitoring Pulumi module or ConfigMap",
+        "PrometheusRule CRD with alerts: connection pool saturation (>80% max_connections)",
+        "PrometheusRule alert: PVC usage > 80%",
+        "PrometheusRule alert: long-running queries (> 5 min)",
+        "PrometheusRule alert: WAL archiving failures",
+        "PrometheusRule alert: replication lag (future-proofing for HA)",
+        "Alerts complement backup-specific alerts in TDP-007-10"
+      ],
+      "priority": 5,
+      "passes": true,
+      "humanReview": false,
+      "notes": "Effort: M. Logically depends on US-001 (CNPG must be deployed to have metrics)."
+    }
+  ]
+}
