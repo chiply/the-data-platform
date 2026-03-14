@@ -113,9 +113,9 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
-      "notes": "Effort: M. NEEDS-REVIEW: Verify DB-backed CRUD endpoints and test fixtures work correctly."
+      "notes": "Effort: M. Reviewed and approved."
     },
     {
       "id": "US-007",
@@ -152,9 +152,9 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
-      "notes": "Effort: S. NEEDS-REVIEW: Verify Copier template changes produce correct output and copier update on schema-registry has no unexpected conflicts."
+      "notes": "Effort: S. Reviewed and approved."
     }
   ]
 }

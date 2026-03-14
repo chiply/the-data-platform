@@ -28,9 +28,9 @@
         "Linode Object Storage credentials stored as Pulumi secrets"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "humanReview": true,
-      "notes": "Effort: M. NEEDS-REVIEW: Critical infrastructure — verify Pulumi CNPG module, Cluster CRD config, WAL archiving, and per-service secrets."
+      "notes": "Effort: M. Reviewed and approved."
     },
     {
       "id": "US-002",
