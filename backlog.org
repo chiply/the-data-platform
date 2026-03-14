@@ -8,6 +8,19 @@ Active tasks checked out from design docs.
 ** Active
 # Queue tasks here with /task-queue or M-x backlog/task-queue
 
+*** DONE [Ralph] Design doc 007 - PostgreSQL Infrastructure (13/15 tasks)
+:PROPERTIES:
+:DESIGN: [[file:docs/design/007-postgres-infra.org][007 PostgreSQL Infrastructure]]
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
+:END:
+
+Ralph completed 13/15 tasks. Remaining interactive tasks:
+- [TDP-007-10] Validate WAL archiving and document restore procedure
+- [TDP-007-12] Smoke test database connectivity
+
+Use /backlog:task-queue to work these interactively.
+
 
 
 

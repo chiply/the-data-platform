@@ -1,6 +1,6 @@
 #+TITLE: 007 - PostgreSQL Infrastructure
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Active
 #+CATEGORY: infra
 #+CREATED: [2026-03-12]
 #+LAST_MODIFIED: [2026-03-12 Thu]
@@ -390,9 +390,11 @@ is caught before connections start failing.
 :CATEGORY: tasks
 :END:
 
-** TODO [TDP-007-01] Install CloudNativePG operator in local dev (Tiltfile)   :p1:
+** DONE [TDP-007-01] Install CloudNativePG operator in local dev (Tiltfile)   :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Add CloudNativePG operator to the local k3d environment via Tiltfile:
@@ -404,9 +406,11 @@ Add CloudNativePG operator to the local k3d environment via Tiltfile:
 - Ensure the Cluster is healthy before services start (Tilt resource dependencies)
 - Validate that =tdp-db-credentials= secret values match the Cluster config
 
-** TODO [TDP-007-02] Add CloudNativePG to Pulumi platform stack              :p1:
+** DONE [TDP-007-02] Add CloudNativePG to Pulumi platform stack              :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Create Pulumi modules for CloudNativePG following the existing pattern from
@@ -433,9 +437,11 @@ Create Pulumi modules for CloudNativePG following the existing pattern from
 - Store Linode Object Storage credentials as Pulumi secrets (dedicated keys with
   minimal permissions)
 
-** TODO [TDP-007-03] Define schema registry SQLAlchemy models                 :p1:
+** DONE [TDP-007-03] Define schema registry SQLAlchemy models                 :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Create SQLAlchemy ORM models in =schema_registry/models/=:
@@ -458,9 +464,11 @@ Create SQLAlchemy ORM models in =schema_registry/models/=:
   positive integer
 - Add Polyfactory factories and Hypothesis strategies for model invariant tests
 
-** TODO [TDP-007-04] Create initial Alembic migration                         :p1:
+** DONE [TDP-007-04] Create initial Alembic migration                         :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Generate the initial Alembic migration from the models defined in TDP-007-03:
@@ -473,9 +481,11 @@ Generate the initial Alembic migration from the models defined in TDP-007-03:
   execution (used by the K8s migration Job)
 - Add migration to CI test pipeline
 
-** TODO [TDP-007-05] Wire database session into schema registry routers       :p1:
+** DONE [TDP-007-05] Wire database session into schema registry routers       :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Replace the hardcoded stub data in =routers/schemas.py= with real database
@@ -486,9 +496,11 @@ queries:
 - Add =create_schema= endpoint (=POST /schemas=)
 - Update tests to use the test database fixture from =conftest.py=
 
-** TODO [TDP-007-06] Implement migration execution strategy                   :p1:
+** DONE [TDP-007-06] Implement migration execution strategy                   :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Implement the two-track migration strategy (see Migration Strategy section):
@@ -503,9 +515,11 @@ Implement the two-track migration strategy (see Migration Strategy section):
 - Document the backward compatibility rule and rollback procedure in the
   service README
 
-** TODO [TDP-007-07] Configure DATABASE_URL injection via K8s secrets         :p2:
+** DONE [TDP-007-07] Configure DATABASE_URL injection via K8s secrets         :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Update the schema registry Helm chart to construct =DATABASE_URL= from the
@@ -522,9 +536,11 @@ per-service =tdp-schema-registry-db-credentials= secret:
 - For local: =DB_SSLMODE=disable= or omit (falls back to default)
 - Verify connectivity in the =health= endpoint (add a DB ping check)
 
-** TODO [TDP-007-08] Update Copier template database defaults                 :p2:
+** DONE [TDP-007-08] Update Copier template database defaults                 :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Update the enterprise-pattern-fastapi Copier template so that
@@ -542,9 +558,11 @@ Update the enterprise-pattern-fastapi Copier template so that
 - *Validate:* Run =copier update= on the schema-registry after template changes
   and resolve any conflicts — this validates the upgrade path
 
-** TODO [TDP-007-09] Add Postgres to CI pipeline                              :p2:
+** DONE [TDP-007-09] Add Postgres to CI pipeline                              :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Update =.github/workflows/ci.yml= to run a Postgres service container for
@@ -578,9 +596,11 @@ validates the pipeline end-to-end and documents the restore procedure:
   - Alert if WAL archiving has errors (=cnpg_pg_wal_archiving_failing=)
   - Alert on =last_available_backup_timestamp= lagging beyond RPO
 
-** TODO [TDP-007-11] Add CI workflow for Pulumi infrastructure deployment     :p1:
+** DONE [TDP-007-11] Add CI workflow for Pulumi infrastructure deployment     :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Create GitHub Actions workflows that run =pulumi up= on git events:
@@ -606,9 +626,11 @@ Extend =smoke-test.sh= to verify database connectivity per environment:
   =/health/ready= endpoint)
 - Works across local, dev, and production (following TDP-004-08 pattern)
 
-** TODO [TDP-007-13] Add NetworkPolicy for database traffic                   :p1:
+** DONE [TDP-007-13] Add NetworkPolicy for database traffic                   :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Create NetworkPolicy rules to allow application-to-database traffic within the
@@ -622,9 +644,11 @@ existing =default-deny-all= policy framework:
   =tdp-allow-traefik.yaml=
 - Validate that the schema-registry can connect to Postgres with policies enforced
 
-** TODO [TDP-007-14] Add Postgres monitoring dashboard and alerts              :p2:
+** DONE [TDP-007-14] Add Postgres monitoring dashboard and alerts              :p2:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Wire CNPG Prometheus metrics into the existing monitoring stack:
@@ -640,9 +664,11 @@ Wire CNPG Prometheus metrics into the existing monitoring stack:
   - Replication lag (future-proofing for HA)
 - These alerts complement the backup-specific alerts in TDP-007-10
 
-** TODO [TDP-007-15] Create shared SQLAlchemy base library                     :p2:
+** DONE [TDP-007-15] Create shared SQLAlchemy base library                     :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-14]
 :END:
 
 Create a shared SQLAlchemy base package in =monorepo/libs/= with common model
@@ -721,6 +747,9 @@ See the *Infrastructure Rollout Policy* section under Design.
 
 * Changelog
 
+- *[2026-03-14]:* Ralph completed 13/13 stories across 2 workstreams. Tasks
+  TDP-007-10 and TDP-007-12 remain TODO (excluded for interactive work).
+- *[2026-03-12]:* Generated Ralph prd.json for autonomous execution (2 workstreams: app+local, infra+ops). Tasks TDP-007-10 and TDP-007-12 excluded for interactive work.
 - *[2026-03-12]:* Design review feedback incorporated: added Security section
   (NetworkPolicy, TLS, per-service credentials, credential rotation, backup
   encryption, K8s secrets encryption at rest); added Recovery Objectives
