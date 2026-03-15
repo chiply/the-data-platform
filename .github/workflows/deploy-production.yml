@@ -2,17 +2,11 @@ name: Deploy Production Infrastructure
 
 on:
   workflow_dispatch: {}
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
-    branches: [main]
+  workflow_call: {}
 
 jobs:
   cluster-preview:
     name: "Pulumi Preview: cluster/production"
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     defaults:
       run:
