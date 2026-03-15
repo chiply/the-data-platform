@@ -29,6 +29,13 @@ jobs:
           manifest-file: .release-please-manifest.json
           config-file: release-please-config.json
 
+  deploy-production:
+    name: Deploy Production
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    uses: ./.github/workflows/deploy-production.yml
+    secrets: inherit
+
   build-container:
     name: "Build Container: ${{ matrix.component }}"
     needs: release-please
