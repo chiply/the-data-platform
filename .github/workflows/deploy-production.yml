@@ -5,23 +5,12 @@ on:
     types: [published]
 
 jobs:
-  pulumi-preview:
-    name: "Pulumi Preview: ${{ matrix.stack }}"
+  cluster-preview:
+    name: "Pulumi Preview: cluster/production"
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      max-parallel: 1
-      matrix:
-        include:
-          - stack: production
-            project: cluster
-            working-directory: monorepo/infra/cluster
-          - stack: production
-            project: platform
-            working-directory: monorepo/infra/platform
     defaults:
       run:
-        working-directory: ${{ matrix.working-directory }}
+        working-directory: monorepo/infra/cluster
     steps:
       - uses: actions/checkout@v4
 
@@ -35,32 +24,21 @@ jobs:
       - uses: pulumi/actions@v6
         with:
           command: preview
-          stack-name: ${{ matrix.stack }}
-          work-dir: ${{ matrix.working-directory }}
+          stack-name: production
+          work-dir: monorepo/infra/cluster
           comment-on-summary: true
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
 
-  pulumi-up:
-    name: "Pulumi Up: ${{ matrix.stack }}"
-    needs: pulumi-preview
+  cluster-up:
+    name: "Pulumi Up: cluster/production"
+    needs: cluster-preview
     runs-on: ubuntu-latest
     environment: production
-    strategy:
-      fail-fast: true
-      max-parallel: 1
-      matrix:
-        include:
-          - stack: production
-            project: cluster
-            working-directory: monorepo/infra/cluster
-          - stack: production
-            project: platform
-            working-directory: monorepo/infra/platform
     defaults:
       run:
-        working-directory: ${{ matrix.working-directory }}
+        working-directory: monorepo/infra/cluster
     steps:
       - uses: actions/checkout@v4
 
@@ -74,8 +52,62 @@ jobs:
       - uses: pulumi/actions@v6
         with:
           command: up
-          stack-name: ${{ matrix.stack }}
-          work-dir: ${{ matrix.working-directory }}
+          stack-name: production
+          work-dir: monorepo/infra/cluster
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+
+  platform-preview:
+    name: "Pulumi Preview: platform/production"
+    needs: cluster-up
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo/infra/platform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: pulumi/actions@v6
+        with:
+          command: preview
+          stack-name: production
+          work-dir: monorepo/infra/platform
+          comment-on-summary: true
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+
+  platform-up:
+    name: "Pulumi Up: platform/production"
+    needs: platform-preview
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: monorepo/infra/platform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: pulumi/actions@v6
+        with:
+          command: up
+          stack-name: production
+          work-dir: monorepo/infra/platform
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
