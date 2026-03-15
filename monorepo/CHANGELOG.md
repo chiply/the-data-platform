@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.1.14](https://github.com/chiply/the-data-platform/compare/platform-v0.1.13...platform-v0.1.14) (2026-03-15)
+
+
+### Features
+
+* [TDP-007-01] install CloudNativePG operator in local dev (Tiltfile) ([0dec630](https://github.com/chiply/the-data-platform/commit/0dec630ef487f13175304daba9f28e22a5299714))
+* [TDP-007-02] add CloudNativePG to Pulumi platform stack ([3c16311](https://github.com/chiply/the-data-platform/commit/3c16311e90c91cad55416110e17797794136a5bd))
+* [TDP-007-06] implement migration execution strategy ([df55aa2](https://github.com/chiply/the-data-platform/commit/df55aa230ba9dd2d1342abd53e50a0e5ff68d8d7))
+* [TDP-007-07] configure DATABASE_URL injection via K8s secrets ([33f9e45](https://github.com/chiply/the-data-platform/commit/33f9e45b65c54b4f54ffbe23febbef0fe57aa802))
+* [TDP-007-13] add NetworkPolicy for database traffic ([7581ce8](https://github.com/chiply/the-data-platform/commit/7581ce8e98f5cf188cc154a0f84e1146b838e65e))
+* [TDP-007-14] add Postgres monitoring dashboard and alerts ([0f4e589](https://github.com/chiply/the-data-platform/commit/0f4e589511950f67c6e4993fb6bb4c20df4072b8))
+* [TDP-007-15] create shared SQLAlchemy base library ([c45b585](https://github.com/chiply/the-data-platform/commit/c45b5852ccd1912c7280c4be17b7d76bc4bc8b27))
+* add Conflict exception and handle duplicate subject creation ([fe6c847](https://github.com/chiply/the-data-platform/commit/fe6c847c3daba94fcf77b41ac378f58e940cf725))
+* automate database credentials and fix review feedback ([6be404c](https://github.com/chiply/the-data-platform/commit/6be404ca0c4f92c46896df20665c37ac80907047))
+* automate database credentials via Pulumi IaC ([44e6522](https://github.com/chiply/the-data-platform/commit/44e6522ee8a75935fdc23a45e5b5ab17c814aa0d))
+* PostgreSQL infrastructure (design doc 007) ([#32](https://github.com/chiply/the-data-platform/issues/32)) ([f707357](https://github.com/chiply/the-data-platform/commit/f707357b1b9b4e6f56dd400b9ffa942774ea8ff7))
+
+
+### Bug Fixes
+
+* add dependency from ObjectStorageKey to ObjectStorageBucket ([#35](https://github.com/chiply/the-data-platform/issues/35)) ([3be9d79](https://github.com/chiply/the-data-platform/commit/3be9d79d4e7ddc2f8f740e25528ca7e13b751556))
+* address Copilot review feedback on PR [#32](https://github.com/chiply/the-data-platform/issues/32) ([3e50449](https://github.com/chiply/the-data-platform/commit/3e5044976fa97178e83a700d16f588c6b22c3193))
+* enforce cluster→platform deploy ordering and update CONTRIBUTING.md ([d392fad](https://github.com/chiply/the-data-platform/commit/d392fad3b94b99f85b4d4776c1623bffc367e2e1))
+* production deploy workflow ordering and resource tier ([#37](https://github.com/chiply/the-data-platform/issues/37)) ([6a691eb](https://github.com/chiply/the-data-platform/commit/6a691ebdddabb0dae7450fd160000cd2b24e54df))
+* resolve CNPG initdb failures and schema-registry local dev issues ([dcbe903](https://github.com/chiply/the-data-platform/commit/dcbe9037abc8c0dfff7212a561cec57665c3a8b2))
+* use minimal resource tier for dev ([#36](https://github.com/chiply/the-data-platform/issues/36)) ([a01f0e4](https://github.com/chiply/the-data-platform/commit/a01f0e4501a2f0f449832fc15fd993f11fbabccd))
+
 ## [0.1.13](https://github.com/chiply/the-data-platform/compare/platform-v0.1.12...platform-v0.1.13) (2026-03-13)
 
 
