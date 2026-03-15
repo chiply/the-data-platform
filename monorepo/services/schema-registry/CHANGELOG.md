@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.9...schema-registry-v0.1.10) (2026-03-15)
+
+
+### Bug Fixes
+
+* correct Docker build context detection for schema-registry ([#50](https://github.com/chiply/the-data-platform/issues/50)) ([1ad8b00](https://github.com/chiply/the-data-platform/commit/1ad8b00b9da2f6c9323f42553d70d7f1831b3ace))
+
 ## [0.1.9](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.8...schema-registry-v0.1.9) (2026-03-15)
 
 
