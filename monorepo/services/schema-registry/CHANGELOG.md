@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.7...schema-registry-v0.1.8) (2026-03-15)
+
+
+### Bug Fixes
+
+* schema-registry local dev DB config ([#44](https://github.com/chiply/the-data-platform/issues/44)) ([8218f28](https://github.com/chiply/the-data-platform/commit/8218f28ef7f6d08d8b100bba2ae440f6be4ee83d))
+
 ## [0.1.7](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.6...schema-registry-v0.1.7) (2026-03-15)
 
 
