@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.9](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.8...schema-registry-v0.1.9) (2026-03-15)
+
+
+### Features
+
+* add DELETE endpoint and fix live_update file ownership ([#49](https://github.com/chiply/the-data-platform/issues/49)) ([56f7c40](https://github.com/chiply/the-data-platform/commit/56f7c40754a9f6359fa0e681e9554bc65dfe9af7))
+
+
+### Bug Fixes
+
+* push base image to registry in CI so buildx can resolve it ([#46](https://github.com/chiply/the-data-platform/issues/46)) ([6ca8d79](https://github.com/chiply/the-data-platform/commit/6ca8d79177ec69edd67d8b9ce5a6b70f5fed9847))
+
 ## [0.1.8](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.7...schema-registry-v0.1.8) (2026-03-15)
 
 
