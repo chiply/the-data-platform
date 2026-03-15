@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/chiply/the-data-platform/compare/platform-v0.1.15...platform-v0.1.16) (2026-03-15)
+
+
+### Features
+
+* App-of-Apps pattern for controlled dev deployments ([#42](https://github.com/chiply/the-data-platform/issues/42)) ([24ccfdb](https://github.com/chiply/the-data-platform/commit/24ccfdba00694a51c3ec3f9b54017a1f4e9a0808))
+
 ## [0.1.15](https://github.com/chiply/the-data-platform/compare/platform-v0.1.14...platform-v0.1.15) (2026-03-15)
 
 
