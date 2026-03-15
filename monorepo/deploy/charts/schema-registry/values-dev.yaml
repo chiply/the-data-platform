@@ -3,9 +3,8 @@
 image:
   repository: ghcr.io/chiply/the-data-platform/schema-registry
   pullPolicy: IfNotPresent
-  # tag must be set to an explicit semver on each promotion.
-  # Do NOT use "latest" — ArgoCD cannot detect image changes with mutable tags.
-  tag: "0.1.5"
+  # image.tag is set via helm.parameters in the ArgoCD Application CRD,
+  # not here, because targetRevision pins the chart source to a release tag.
 
 imagePullSecrets:
   - name: ghcr-credentials

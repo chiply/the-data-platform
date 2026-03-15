@@ -36,6 +36,81 @@ jobs:
     uses: ./.github/workflows/deploy-production.yml
     secrets: inherit
 
+  promote-dev:
+    name: "Promote to Dev: ${{ matrix.component }}"
+    needs: [release-please, build-container]
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: schema-registry
+            release_created: ${{ needs.release-please.outputs['schema-registry--release_created'] }}
+            tag_name: ${{ needs.release-please.outputs['schema-registry--tag_name'] }}
+    steps:
+      - name: Skip if not released
+        if: matrix.release_created != 'true'
+        run: echo "No release for ${{ matrix.component }}, skipping."
+
+      - uses: actions/checkout@v4
+        if: matrix.release_created == 'true'
+
+      - name: Parse version from tag
+        if: matrix.release_created == 'true'
+        id: parse
+        env:
+          TAG_NAME: ${{ matrix.tag_name }}
+        run: |
+          if ! echo "$TAG_NAME" | grep -qE '^.+-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: Tag '$TAG_NAME' does not match expected pattern"
+            exit 1
+          fi
+          version=$(echo "$TAG_NAME" | sed -E 's/^.+-v//')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Update dev Application CRD
+        if: matrix.release_created == 'true'
+        env:
+          TAG_NAME: ${{ matrix.tag_name }}
+          VERSION: ${{ steps.parse.outputs.version }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          app_file="monorepo/deploy/argocd/apps/dev/${COMPONENT}.yaml"
+          sed -i "s|targetRevision: ${COMPONENT}-v.*|targetRevision: ${TAG_NAME}|" "$app_file"
+          sed -i "s|value: \".*\"$|value: \"${VERSION}\"|" "$app_file"
+
+      - name: Create promotion PR
+        if: matrix.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ matrix.tag_name }}
+          VERSION: ${{ steps.parse.outputs.version }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          branch="promote-dev/${COMPONENT}-v${VERSION}"
+          git checkout -b "$branch"
+          git add "monorepo/deploy/argocd/apps/dev/${COMPONENT}.yaml"
+          git commit -m "chore: promote ${COMPONENT} v${VERSION} to dev"
+          git push -u origin "$branch"
+          gh pr create \
+            --title "chore: promote ${COMPONENT} v${VERSION} to dev" \
+            --body "$(cat <<EOF
+## Summary
+- Promotes \`${COMPONENT}\` release \`${TAG_NAME}\` to the dev environment
+- Updates \`targetRevision\` to \`${TAG_NAME}\`
+- Updates \`image.tag\` to \`${VERSION}\`
+
+Merging this PR will deploy the new version to dev via the App-of-Apps.
+EOF
+          )" \
+            --label "promotion"
+
   build-container:
     name: "Build Container: ${{ matrix.component }}"
     needs: release-please

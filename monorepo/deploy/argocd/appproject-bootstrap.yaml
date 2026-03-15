@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: tdp-bootstrap
+  namespace: argocd
+spec:
+  description: Bootstrap project for App-of-Apps root applications
+
+  # Same source restriction as the tdp project
+  sourceRepos:
+    - "https://github.com/chiply/the-data-platform.git"
+
+  # Root apps deploy Application CRDs into the argocd namespace
+  destinations:
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist: []
+
+  # Only allow managing Application resources
+  namespaceResourceWhitelist:
+    - group: argoproj.io
+      kind: Application

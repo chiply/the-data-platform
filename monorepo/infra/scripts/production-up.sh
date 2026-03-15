@@ -59,7 +59,7 @@ echo "==> Applying ArgoCD AppProject and applications..."
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/appproject.yaml"
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/rbac/"
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/network-policies/"
-kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/apps/schema-registry-production.yaml"
+kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/apps/production/schema-registry.yaml"
 
 echo "==> Waiting for ArgoCD to sync schema-registry..."
 kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=jsonpath='{.status.sync.status}'=Synced \
