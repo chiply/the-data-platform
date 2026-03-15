@@ -16,6 +16,12 @@ spec:
       valueFiles:
         - values.yaml
         - values-dev.yaml
+      # image.tag is set here rather than in values-dev.yaml because
+      # targetRevision pins the chart source to a release tag — ArgoCD
+      # reads value files from that tag, not from main.
+      parameters:
+        - name: image.tag
+          value: "0.1.7"
   destination:
     server: https://kubernetes.default.svc
     namespace: tdp

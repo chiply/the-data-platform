@@ -54,8 +54,9 @@ export_kubeconfig "${STACK_NAME}" "${KUBECONFIG_PATH}"
 # ---------------------------------------------------------------------------
 DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../../deploy" && pwd)"
 
-echo "==> Applying ArgoCD AppProject, RBAC, and network policies..."
+echo "==> Applying ArgoCD AppProjects, RBAC, and network policies..."
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/appproject.yaml"
+kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/appproject-bootstrap.yaml"
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/rbac/"
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/network-policies/"
 
