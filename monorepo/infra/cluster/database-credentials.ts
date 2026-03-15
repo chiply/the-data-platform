@@ -46,16 +46,20 @@ export function createDatabaseCredentials(): DatabaseCredentialsResult {
     // with the new region-based API
   });
 
-  const objectStorageKey = new linode.ObjectStorageKey("wal-archive-key", {
-    label: `${clusterName}-cnpg-wal-archive`,
-    bucketAccesses: [
-      {
-        region: objectStorageRegion,
-        bucketName: bucketName,
-        permissions: "read_write",
-      },
-    ],
-  });
+  const objectStorageKey = new linode.ObjectStorageKey(
+    "wal-archive-key",
+    {
+      label: `${clusterName}-cnpg-wal-archive`,
+      bucketAccesses: [
+        {
+          region: objectStorageRegion,
+          bucketName: bucket.label,
+          permissions: "read_write",
+        },
+      ],
+    },
+    { dependsOn: [bucket] },
+  );
 
   // ── Per-service database passwords ────────────────────────────────────
 
