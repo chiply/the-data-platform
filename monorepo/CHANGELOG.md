@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/chiply/the-data-platform/compare/platform-v0.1.14...platform-v0.1.15) (2026-03-15)
+
+
+### Bug Fixes
+
+* skip CNPG deployment in Tilt when Pulumi has already deployed it ([#40](https://github.com/chiply/the-data-platform/issues/40)) ([e928733](https://github.com/chiply/the-data-platform/commit/e928733a647ce2240301ea871bdec647630c2f92))
+
 ## [0.1.14](https://github.com/chiply/the-data-platform/compare/platform-v0.1.13...platform-v0.1.14) (2026-03-15)
 
 
