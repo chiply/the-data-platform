@@ -126,6 +126,7 @@ const cnpg = installCnpg({
   provider: k8sProvider,
   namespace: appSecrets.namespace,
   dependsOn: [appSecrets.namespace],
+  clusterStackRef: clusterStack,
 });
 
 // ---------------------------------------------------------------------------

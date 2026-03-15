@@ -18,8 +18,7 @@ config:
   # CloudNativePG configuration
   cnpg:storageSize: "10Gi"
   cnpg:backupRetentionDays: "7"
-  cnpg:objectStorageEndpoint: https://us-east-1.linodeobjects.com
-  cnpg:objectStorageBucket: tdp-dev-wal-archive
   cnpg:objectStoragePath: cnpg
-  # cnpg:objectStorageAccessKey and cnpg:objectStorageSecretKey provided by ESC (fn::secret)
-  # cnpg:schema-registryPassword and cnpg:feed-servicePassword provided by ESC (fn::secret)
+  # Object storage credentials and database passwords are now provided
+  # by the cluster stack (tdp-cluster/dev) via stack references.
+  # No manual ESC configuration needed for these values.
