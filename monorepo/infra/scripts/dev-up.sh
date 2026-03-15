@@ -54,15 +54,17 @@ export_kubeconfig "${STACK_NAME}" "${KUBECONFIG_PATH}"
 # ---------------------------------------------------------------------------
 DEPLOY_DIR="$(cd "${SCRIPT_DIR}/../../deploy" && pwd)"
 
-echo "==> Applying ArgoCD AppProject and applications..."
+echo "==> Applying ArgoCD AppProject, RBAC, and network policies..."
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/appproject.yaml"
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/rbac/"
 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/network-policies/"
-kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/apps/schema-registry.yaml"
 
-echo "==> Waiting for ArgoCD to sync schema-registry..."
+echo "==> Applying ArgoCD root App-of-Apps for dev..."
+kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${DEPLOY_DIR}/argocd/root-app-dev.yaml"
+
+echo "==> Waiting for ArgoCD to sync dev apps..."
 kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=jsonpath='{.status.sync.status}'=Synced \
-  application/schema-registry -n argocd --timeout=120s 2>/dev/null || \
+  application/tdp-dev-apps -n argocd --timeout=120s 2>/dev/null || \
   echo "  (sync not yet complete — ArgoCD will continue reconciling)"
 
 # ---------------------------------------------------------------------------

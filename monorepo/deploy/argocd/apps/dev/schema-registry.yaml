@@ -9,7 +9,8 @@ spec:
   project: tdp
   source:
     repoURL: https://github.com/chiply/the-data-platform.git
-    targetRevision: main
+    # Pinned to a release tag — updated by the promote-dev workflow.
+    targetRevision: schema-registry-v0.1.7
     path: monorepo/deploy/charts/schema-registry
     helm:
       valueFiles:
