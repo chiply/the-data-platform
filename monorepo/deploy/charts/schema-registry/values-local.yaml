@@ -20,7 +20,8 @@ podSecurityContext:
   runAsGroup: 1000
   fsGroup: 1000
 
-# Database connection — matches deploy/postgres/db-credentials-local.yaml
+# Database connection — password sourced from the CNPG-managed superuser
+# secret so it stays in sync even if CNPG regenerates credentials.
 env:
   - name: DB_HOST
     value: tdp-postgres-rw.tdp.svc.cluster.local
@@ -31,7 +32,10 @@ env:
   - name: DB_USER
     value: tdp
   - name: DB_PASSWORD
-    value: local-dev-password
+    valueFrom:
+      secretKeyRef:
+        name: tdp-postgres-superuser
+        key: password
 
 ingress:
   enabled: true
