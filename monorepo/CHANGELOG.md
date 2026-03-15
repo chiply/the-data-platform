@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/chiply/the-data-platform/compare/platform-v0.1.17...platform-v0.1.18) (2026-03-15)
+
+
+### Bug Fixes
+
+* push base image to registry in CI so buildx can resolve it ([#46](https://github.com/chiply/the-data-platform/issues/46)) ([6ca8d79](https://github.com/chiply/the-data-platform/commit/6ca8d79177ec69edd67d8b9ce5a6b70f5fed9847))
+
 ## [0.1.17](https://github.com/chiply/the-data-platform/compare/platform-v0.1.16...platform-v0.1.17) (2026-03-15)
 
 
