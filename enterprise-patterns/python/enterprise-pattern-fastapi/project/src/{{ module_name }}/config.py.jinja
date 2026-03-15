@@ -2,6 +2,9 @@
 
 from enum import Enum
 
+{% if use_database %}
+from pydantic import model_validator
+{% endif %}
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,5 +38,32 @@ class Settings(BaseSettings):
     service_port: int = {{ service_port }}
     log_level: str = "INFO"
 {% if use_database %}
+
+    # Database configuration — individual fields (from K8s secretKeyRef)
+    db_host: str | None = None
+    db_port: str | None = None
+    db_name: str | None = None
+    db_user: str | None = None
+    db_password: str | None = None
+    db_sslmode: str | None = None
+
+    # Assembled database URL — either set directly or assembled from individual fields
     database_url: str = "postgresql+asyncpg://localhost:5432/{{ module_name }}"
+
+    @model_validator(mode="after")
+    def assemble_database_url(self) -> "Settings":
+        """Assemble database_url from individual DB_* fields when present.
+
+        If all required individual fields (host, port, name, user, password)
+        are provided, the database_url is assembled from them. This allows
+        K8s secret injection via individual env vars while keeping
+        database_url as the single field consumed by SQLAlchemy.
+        """
+        if all([self.db_host, self.db_port, self.db_name, self.db_user, self.db_password]):
+            sslmode_param = f"?ssl={self.db_sslmode}" if self.db_sslmode else ""
+            self.database_url = (
+                f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
+                f"@{self.db_host}:{self.db_port}/{self.db_name}{sslmode_param}"
+            )
+        return self
 {% endif %}

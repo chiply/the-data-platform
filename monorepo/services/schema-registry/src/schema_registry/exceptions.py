@@ -3,6 +3,7 @@
 from tdp_fastapi_core.exceptions import (  # noqa: F401 — re-export
     AppException,
     BadRequest,
+    Conflict,
     NotAuthenticated,
     NotFound,
     PermissionDenied,
@@ -12,6 +13,7 @@ from tdp_fastapi_core.exceptions import (  # noqa: F401 — re-export
 __all__ = [
     "AppException",
     "BadRequest",
+    "Conflict",
     "NotAuthenticated",
     "NotFound",
     "PermissionDenied",

@@ -36,6 +36,11 @@ class PermissionDenied(AppException):
         super().__init__(status_code=403, detail=detail, error_code=error_code)
 
 
+class Conflict(AppException):
+    def __init__(self, detail: str = "Conflict", error_code: str | None = None) -> None:
+        super().__init__(status_code=409, detail=detail, error_code=error_code)
+
+
 class NotAuthenticated(AppException):
     def __init__(self, detail: str = "Not authenticated", error_code: str | None = None) -> None:
         super().__init__(status_code=401, detail=detail, error_code=error_code)

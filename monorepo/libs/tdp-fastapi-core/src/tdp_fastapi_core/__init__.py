@@ -5,6 +5,7 @@ from __future__ import annotations
 from tdp_fastapi_core.exceptions import (
     AppException,
     BadRequest,
+    Conflict,
     NotAuthenticated,
     NotFound,
     PermissionDenied,
@@ -17,6 +18,7 @@ from tdp_fastapi_core.telemetry import setup_telemetry
 __all__ = [
     "AppException",
     "BadRequest",
+    "Conflict",
     "NotAuthenticated",
     "NotFound",
     "OTelJsonFormatter",

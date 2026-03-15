@@ -20,6 +20,19 @@ podSecurityContext:
   runAsGroup: 1000
   fsGroup: 1000
 
+# Database connection — matches deploy/postgres/db-credentials-local.yaml
+env:
+  - name: DB_HOST
+    value: tdp-postgres-rw.tdp.svc.cluster.local
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: schema_registry
+  - name: DB_USER
+    value: tdp
+  - name: DB_PASSWORD
+    value: local-dev-password
+
 ingress:
   enabled: true
   className: traefik

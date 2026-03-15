@@ -1,6 +1,24 @@
 #!/bin/sh
 set -e
 
+{% if use_database %}
+# ---------------------------------------------------------------------------
+# Migration execution strategy
+# ---------------------------------------------------------------------------
+# Local: run migrations on entrypoint (single replica, no race condition).
+# Dev/Production: migrations run via K8s Job (pre-upgrade hook), so the
+# entrypoint skips them. Controlled by RUN_MIGRATIONS_ON_START env var.
+# ---------------------------------------------------------------------------
+
+RUN_MIGRATIONS_ON_START="${RUN_MIGRATIONS_ON_START:-true}"
+
+if [ "$RUN_MIGRATIONS_ON_START" = "true" ]; then
+    echo "Running Alembic migrations..."
+    alembic upgrade head
+    echo "Migrations complete."
+fi
+
+{% endif %}
 {% if use_gunicorn %}
 # Use Gunicorn with Uvicorn workers for production deployments.
 # exec replaces the shell process so SIGTERM reaches Gunicorn directly,

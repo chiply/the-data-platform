@@ -8,8 +8,9 @@ FROM tdp-python-base AS builder
 USER root
 WORKDIR /build
 
-# Copy platform libraries (path must match relative reference in pyproject.toml)
+# Copy platform libraries (paths must match relative references in pyproject.toml)
 COPY libs/tdp-fastapi-core ./libs/tdp-fastapi-core
+COPY libs/tdp-db ./libs/tdp-db
 
 # Copy service dependency manifests and install
 COPY services/schema-registry/pyproject.toml services/schema-registry/uv.lock ./services/schema-registry/
@@ -31,6 +32,8 @@ WORKDIR /app
 
 # Copy application source and supporting files
 COPY services/schema-registry/src/ ./src/
+COPY services/schema-registry/alembic/ ./alembic/
+COPY services/schema-registry/alembic.ini ./
 COPY services/schema-registry/logging_config.py ./
 COPY services/schema-registry/entrypoint.sh ./
 COPY services/schema-registry/gunicorn_conf.py ./

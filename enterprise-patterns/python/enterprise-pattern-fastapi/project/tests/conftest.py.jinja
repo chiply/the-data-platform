@@ -1,5 +1,7 @@
 """Shared test fixtures and configuration."""
 
+import os
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -14,6 +16,15 @@ from {{ module_name }}.dependencies import get_db_session
 {% endif %}
 
 pytest_plugins: list[str] = []
+
+{% if use_database %}
+# Read test DATABASE_URL from env with localhost fallback.
+# CI sets this env var; local dev uses the Tiltfile-provisioned CNPG.
+_TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://localhost:5432/{{ module_name }}_test",
+)
+{% endif %}
 
 
 @pytest.fixture()
@@ -30,7 +41,7 @@ def settings_override() -> Settings:
         service_port={{ service_port }},
         log_level="DEBUG",
 {% if use_database %}
-        database_url="postgresql+asyncpg://localhost:5432/{{ module_name }}_test",
+        database_url=_TEST_DATABASE_URL,
 {% endif %}
     )
 

@@ -59,6 +59,50 @@ jobs:
             exit "$status"
           fi
 
+  integration-test:
+    name: Integration Tests (Postgres)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monorepo
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tdp
+          POSTGRES_PASSWORD: tdp_test_password
+          POSTGRES_DB: schema_registry_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tdp"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql+asyncpg://tdp:tdp_test_password@localhost:5432/schema_registry_test"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install service dependencies
+        working-directory: monorepo/services/schema-registry
+        run: uv sync --frozen --extra dev
+
+      - name: Run Alembic migrations
+        working-directory: monorepo/services/schema-registry
+        run: uv run alembic upgrade head
+
+      - name: Run integration tests
+        working-directory: monorepo/services/schema-registry
+        run: uv run pytest tests/ -v --tb=short
+
   diagrams:
     name: Diagram Rendering
     runs-on: ubuntu-latest

@@ -10,6 +10,40 @@ imagePullSecrets:
 
 replicaCount: 2
 
+migrations:
+  enabled: true
+
+env:
+  - name: RUN_MIGRATIONS_ON_START
+    value: "false"
+  - name: DB_HOST
+    valueFrom:
+      secretKeyRef:
+        name: tdp-db-credentials
+        key: host
+  - name: DB_PORT
+    valueFrom:
+      secretKeyRef:
+        name: tdp-db-credentials
+        key: port
+  - name: DB_NAME
+    valueFrom:
+      secretKeyRef:
+        name: tdp-db-credentials
+        key: database
+  - name: DB_USER
+    valueFrom:
+      secretKeyRef:
+        name: tdp-db-credentials
+        key: username
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: tdp-db-credentials
+        key: password
+  - name: DB_SSLMODE
+    value: "require"
+
 podDisruptionBudget:
   enabled: true
   minAvailable: 1

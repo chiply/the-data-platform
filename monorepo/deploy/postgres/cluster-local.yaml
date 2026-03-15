@@ -1,0 +1,52 @@
+# CloudNativePG Cluster for local development (k3d).
+#
+# Single instance, local-path storage, no WAL archiving, no TLS.
+# Credentials match the app-secrets.ts local defaults so that
+# tdp-db-credentials and application config are consistent.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: tdp-postgres
+  namespace: tdp
+  labels:
+    app.kubernetes.io/part-of: the-data-platform
+    app.kubernetes.io/managed-by: tilt
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      shared_buffers: "128MB"
+      effective_cache_size: "384MB"
+      max_connections: "100"
+      wal_level: "logical"
+    pg_hba:
+      # Local dev: allow all connections without TLS
+      - host all all 0.0.0.0/0 md5
+
+  storage:
+    size: 1Gi
+    storageClass: local-path
+
+  bootstrap:
+    initdb:
+      dataChecksums: true
+      database: tdp
+      owner: tdp
+      secret:
+        name: tdp-postgres-superuser
+      postInitApplicationSQL:
+        # Create per-service databases and users
+        - CREATE DATABASE schema_registry OWNER tdp;
+
+  # No WAL archiving for local development
+  # No backup schedule for local development
+
+  # Resource sizing: minimal preset for local dev
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

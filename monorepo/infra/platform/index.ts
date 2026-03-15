@@ -4,6 +4,8 @@ import * as k8s from "@pulumi/kubernetes";
 import { installCertManager } from "./charts/cert-manager";
 import { installMonitoring } from "./charts/monitoring";
 import { installArgoCD } from "./charts/argocd";
+import { installCnpg } from "./charts/cnpg";
+import { installCnpgMonitoring } from "./charts/cnpg-monitoring";
 import { createAppSecrets } from "./app-secrets";
 
 // ---------------------------------------------------------------------------
@@ -110,9 +112,41 @@ const monitoring = installMonitoring({
   provider: k8sProvider,
 });
 
+// ---------------------------------------------------------------------------
+// CloudNativePG (operator + Postgres Cluster)
+// ---------------------------------------------------------------------------
+//
+// Deploys the CNPG operator into cnpg-system namespace, then creates a
+// Cluster CRD in the tdp namespace with per-service databases, WAL archiving
+// (non-local), and scheduled backups. Must complete before ArgoCD syncs
+// application deployments that depend on database connectivity.
+// ---------------------------------------------------------------------------
+
+const cnpg = installCnpg({
+  provider: k8sProvider,
+  namespace: appSecrets.namespace,
+  dependsOn: [appSecrets.namespace],
+});
+
+// ---------------------------------------------------------------------------
+// CNPG Monitoring (PodMonitor, Grafana dashboard, PrometheusRule alerts)
+// ---------------------------------------------------------------------------
+//
+// Wires CNPG Prometheus metrics into the monitoring stack with alerts for
+// connection saturation, PVC usage, long queries, WAL archiving, and
+// replication lag. Depends on both the monitoring stack and CNPG cluster.
+// ---------------------------------------------------------------------------
+
+const cnpgMonitoring = installCnpgMonitoring({
+  provider: k8sProvider,
+  namespace: appSecrets.namespace,
+  cluster: cnpg.cluster,
+  dependsOn: [monitoring, cnpg.cluster],
+});
+
 const argocd = installArgoCD({
   provider: k8sProvider,
-  dependsOn: [appSecrets.namespace],
+  dependsOn: [appSecrets.namespace, cnpg.cluster],
 });
 
 // ---------------------------------------------------------------------------
@@ -126,3 +160,8 @@ export const appSecretName = appSecrets.appSecretName;
 export const certManagerStatus = certManager.status;
 export const monitoringStatus = monitoring.status;
 export const argocdStatus = argocd.status;
+export const cnpgOperatorStatus = cnpg.operator.status;
+export const cnpgClusterName = cnpg.cluster.metadata.name;
+export const cnpgServiceSecrets = cnpg.serviceSecretNames;
+export const cnpgPodMonitorName = cnpgMonitoring.podMonitor.metadata.name;
+export const cnpgPrometheusRuleName = cnpgMonitoring.prometheusRule.metadata.name;
