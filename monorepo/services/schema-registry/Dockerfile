@@ -38,7 +38,8 @@ COPY services/schema-registry/logging_config.py ./
 COPY services/schema-registry/entrypoint.sh ./
 COPY services/schema-registry/gunicorn_conf.py ./
 
-RUN chmod +x ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh \
+ && chown -R app:app /app
 
 # Drop back to non-root for runtime
 USER app
