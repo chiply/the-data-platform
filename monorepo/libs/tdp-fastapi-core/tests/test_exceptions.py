@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from tdp_fastapi_core.exceptions import (
     AppException,
     BadRequest,
+    Conflict,
     NotAuthenticated,
     NotFound,
     PermissionDenied,
@@ -35,6 +36,10 @@ def _make_app() -> FastAPI:
     @app.get("/not-authenticated")
     async def _not_authenticated() -> None:
         raise NotAuthenticated()
+
+    @app.get("/conflict")
+    async def _conflict() -> None:
+        raise Conflict(detail="already exists", error_code="DUPLICATE")
 
     @app.get("/generic")
     async def _generic() -> None:
@@ -69,6 +74,14 @@ def test_permission_denied(client: TestClient) -> None:
 def test_not_authenticated(client: TestClient) -> None:
     resp = client.get("/not-authenticated")
     assert resp.status_code == 401
+
+
+def test_conflict(client: TestClient) -> None:
+    resp = client.get("/conflict")
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["detail"] == "already exists"
+    assert body["error_code"] == "DUPLICATE"
 
 
 def test_generic_app_exception(client: TestClient) -> None:

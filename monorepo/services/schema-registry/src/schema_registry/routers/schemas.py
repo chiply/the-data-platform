@@ -6,10 +6,11 @@ the injected async database session.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from schema_registry.dependencies import get_db_session
-from schema_registry.exceptions import NotFound
+from schema_registry.exceptions import Conflict, NotFound
 from schema_registry.models import Subject
 from schema_registry.schemas import SubjectCreate, SubjectResponse
 
@@ -50,6 +51,9 @@ async def create_schema(
         description=body.description,
     )
     session.add(subject)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        raise Conflict(detail=f"Subject '{body.name}' already exists")
     await session.refresh(subject)
     return subject
