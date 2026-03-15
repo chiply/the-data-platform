@@ -58,3 +58,17 @@ async def create_schema(
         raise Conflict(detail=f"Subject '{body.name}' already exists") from err
     await session.refresh(subject)
     return subject
+
+
+@router.delete("/{name}", status_code=204)
+async def delete_schema(
+    name: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Delete a subject by name."""
+    result = await session.execute(select(Subject).where(Subject.name == name))
+    subject = result.scalar_one_or_none()
+    if subject is None:
+        raise NotFound(detail=f"Schema '{name}' not found")
+    await session.delete(subject)
+    await session.commit()
