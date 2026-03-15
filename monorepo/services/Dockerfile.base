@@ -52,6 +52,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
     UV_PROJECT_ENVIRONMENT="/opt/venv"
 
+# Apply security patches from upstream
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy uv and the pre-built virtualenv from the builder stage
 COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 COPY --from=builder /opt/venv /opt/venv
