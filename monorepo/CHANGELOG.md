@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.20](https://github.com/chiply/the-data-platform/compare/platform-v0.1.19...platform-v0.1.20) (2026-03-15)
+
+
+### Bug Fixes
+
+* apply security patches in base image runtime stage ([#52](https://github.com/chiply/the-data-platform/issues/52)) ([78411da](https://github.com/chiply/the-data-platform/commit/78411daddfe3d52cb5efa0a6256cee3e5efda0a0))
+
 ## [0.1.19](https://github.com/chiply/the-data-platform/compare/platform-v0.1.18...platform-v0.1.19) (2026-03-15)
 
 
