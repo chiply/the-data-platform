@@ -190,6 +190,12 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
 
   let objectStorageSecret: k8s.core.v1.Secret | undefined;
   if (!isLocal && objectStorageEndpoint && objectStorageBucket) {
+    if (!objectStorageAccessKey || !objectStorageSecretKey) {
+      throw new Error(
+        "cnpg:objectStorageAccessKey and cnpg:objectStorageSecretKey are required " +
+        "when WAL archiving is enabled (objectStorageEndpoint and objectStorageBucket are set).",
+      );
+    }
     objectStorageSecret = new k8s.core.v1.Secret(
       "cnpg-object-storage-credentials",
       {
@@ -200,8 +206,8 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
         },
         type: "Opaque",
         stringData: {
-          ACCESS_KEY_ID: pulumi.output(objectStorageAccessKey ?? ""),
-          ACCESS_SECRET_KEY: pulumi.output(objectStorageSecretKey ?? ""),
+          ACCESS_KEY_ID: objectStorageAccessKey,
+          ACCESS_SECRET_KEY: objectStorageSecretKey,
         },
       },
       { provider, dependsOn: [namespace] },
@@ -218,12 +224,16 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
   for (const svc of serviceDatabases) {
     const password = pulumi.output(servicePasswords[svc.name]);
     postInitSQL.push(
-      password.apply((pw) => [
-        `CREATE DATABASE ${svc.database};`,
-        `CREATE USER ${svc.username} WITH PASSWORD '${pw}';`,
-        `GRANT ALL PRIVILEGES ON DATABASE ${svc.database} TO ${svc.username};`,
-        `ALTER DATABASE ${svc.database} OWNER TO ${svc.username};`,
-      ].join("\n")),
+      password.apply((pw) => {
+        // Use dollar-quoting to avoid SQL injection from passwords containing quotes
+        const escaped = pw.replace(/'/g, "''");
+        return [
+          `CREATE DATABASE ${svc.database};`,
+          `CREATE USER ${svc.username} WITH PASSWORD '${escaped}';`,
+          `GRANT ALL PRIVILEGES ON DATABASE ${svc.database} TO ${svc.username};`,
+          `ALTER DATABASE ${svc.database} OWNER TO ${svc.username};`,
+        ].join("\n");
+      }),
     );
   }
 

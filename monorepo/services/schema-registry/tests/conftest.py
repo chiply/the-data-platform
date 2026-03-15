@@ -20,7 +20,7 @@ pytest_plugins: list[str] = []
 # CI sets this env var; local dev uses the Tiltfile-provisioned CNPG.
 _TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://localhost:5432/schema_registry_test",
+    "postgresql+asyncpg://tdp:local-dev-password@localhost:5432/schema_registry_test",
 )
 
 

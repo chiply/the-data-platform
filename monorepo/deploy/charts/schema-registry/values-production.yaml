@@ -42,7 +42,7 @@ env:
         name: tdp-db-credentials
         key: password
   - name: DB_SSLMODE
-    value: "verify-full"
+    value: "require"
 
 podDisruptionBudget:
   enabled: true

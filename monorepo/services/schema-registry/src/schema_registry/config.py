@@ -8,6 +8,7 @@ Supports two modes of DATABASE_URL configuration:
 """
 
 from enum import Enum
+from urllib.parse import quote_plus
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -64,9 +65,11 @@ class Settings(BaseSettings):
         database_url as the single field consumed by SQLAlchemy.
         """
         if all([self.db_host, self.db_port, self.db_name, self.db_user, self.db_password]):
-            sslmode_param = f"?ssl={self.db_sslmode}" if self.db_sslmode else ""
+            user = quote_plus(self.db_user)  # type: ignore[arg-type]
+            password = quote_plus(self.db_password)  # type: ignore[arg-type]
+            sslmode_param = f"?sslmode={self.db_sslmode}" if self.db_sslmode else ""
             self.database_url = (
-                f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
+                f"postgresql+asyncpg://{user}:{password}"
                 f"@{self.db_host}:{self.db_port}/{self.db_name}{sslmode_param}"
             )
         return self

@@ -53,7 +53,8 @@ async def create_schema(
     session.add(subject)
     try:
         await session.commit()
-    except IntegrityError:
-        raise Conflict(detail=f"Subject '{body.name}' already exists")
+    except IntegrityError as err:
+        await session.rollback()
+        raise Conflict(detail=f"Subject '{body.name}' already exists") from err
     await session.refresh(subject)
     return subject

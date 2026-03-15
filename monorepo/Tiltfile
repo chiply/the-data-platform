@@ -211,8 +211,7 @@ local_resource(
     cmd=" && ".join([
         "echo 'Waiting for CNPG cluster to be ready...'",
         "kubectl wait --for=condition=Ready cluster/tdp-postgres -n tdp --timeout=180s 2>/dev/null" +
-        " || kubectl rollout status deployment/tdp-postgres-1 -n tdp --timeout=180s 2>/dev/null" +
-        " || (echo 'Waiting for Postgres pod...' && sleep 10 && kubectl wait pod -l cnpg.io/cluster=tdp-postgres -n tdp --for=condition=Ready --timeout=120s)",
+        " || kubectl wait pod -l cnpg.io/cluster=tdp-postgres -n tdp --for=condition=Ready --timeout=120s",
     ]),
     resource_deps=["cnpg-cluster"],
     labels=["database"],

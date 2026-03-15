@@ -1,7 +1,7 @@
 """Tests for schema registry SQLAlchemy models.
 
-Uses Polyfactory for model factories and Hypothesis for property-based tests
-to validate icontract invariants and model constraints.
+Uses Hypothesis for property-based tests to validate icontract invariants
+and model constraints.
 """
 
 import icontract

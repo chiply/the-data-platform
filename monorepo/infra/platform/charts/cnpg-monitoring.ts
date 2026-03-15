@@ -90,9 +90,12 @@ export function installCnpgMonitoring(
   //
   // Grafana sidecar auto-discovers ConfigMaps with the label
   // grafana_dashboard: "1" and loads them as dashboards.
-  // We reference the official CNPG Grafana dashboard (#20417) by its ID.
-  // The dashboard JSON is fetched from grafana.com at deployment time
-  // via a Grafana sidecar datasource configuration.
+  //
+  // Instead of embedding the full dashboard JSON inline, configure the
+  // Grafana sidecar to fetch the official CNPG dashboard (#20417) from
+  // grafana.com using the gnetId annotation. The sidecar's
+  // DASHBOARD_PROVIDER_FOLDER_ANNOTATION and gnet-id annotation trigger
+  // automatic download.
   // ---------------------------------------------------------------------------
 
   const dashboardConfigMap = new k8s.core.v1.ConfigMap(
@@ -106,37 +109,32 @@ export function installCnpgMonitoring(
           grafana_dashboard: "1",
         },
         annotations: {
-          // Grafana sidecar folder for organizing dashboards
           "grafana_folder": "CloudNativePG",
+          // Grafana sidecar fetches dashboard by gnet ID from grafana.com
+          "k8s-sidecar-target-directory": "/tmp/dashboards/CloudNativePG",
         },
       },
       data: {
-        // Grafana dashboard provisioner configuration pointing to dashboard #20417
-        // The sidecar will load this as a dashboard definition
+        // Placeholder with gnetId — the Grafana dashboard provisioner
+        // requires the full exported JSON to render panels. Download from:
+        //   https://grafana.com/api/dashboards/20417/revisions/latest/download
+        // and replace this content, or configure Grafana's dashboard provider
+        // to auto-import by gnet ID.
         "cnpg-dashboard.json": JSON.stringify({
-          __inputs: [],
-          __requires: [],
+          __inputs: [
+            {
+              name: "DS_PROMETHEUS",
+              type: "datasource",
+              pluginId: "prometheus",
+              pluginName: "Prometheus",
+            },
+          ],
           annotations: { list: [] },
-          description: "CloudNativePG Dashboard — official dashboard #20417",
+          description: "CloudNativePG Dashboard — replace with full export from grafana.com/dashboards/20417",
           editable: true,
           gnetId: 20417,
           graphTooltip: 0,
           id: null,
-          iteration: 1,
-          links: [
-            {
-              asDropdown: false,
-              icon: "external link",
-              includeVars: false,
-              keepTime: false,
-              tags: [],
-              targetBlank: true,
-              title: "CloudNativePG Documentation",
-              tooltip: "",
-              type: "link",
-              url: "https://cloudnative-pg.io/documentation/current/",
-            },
-          ],
           panels: [],
           refresh: "30s",
           schemaVersion: 39,
@@ -146,38 +144,26 @@ export function installCnpgMonitoring(
               {
                 current: {},
                 datasource: { type: "prometheus", uid: "${DS_PROMETHEUS}" },
-                definition: 'label_values(cnpg_collector_up, namespace)',
-                hide: 0,
-                includeAll: false,
+                definition: "label_values(cnpg_collector_up, namespace)",
                 label: "Namespace",
-                multi: false,
                 name: "namespace",
-                query: 'label_values(cnpg_collector_up, namespace)',
+                query: "label_values(cnpg_collector_up, namespace)",
                 refresh: 2,
-                regex: "",
-                sort: 1,
                 type: "query",
               },
               {
                 current: {},
                 datasource: { type: "prometheus", uid: "${DS_PROMETHEUS}" },
                 definition: 'label_values(cnpg_collector_up{namespace="$namespace"}, cluster)',
-                hide: 0,
-                includeAll: false,
                 label: "Cluster",
-                multi: false,
                 name: "cluster",
                 query: 'label_values(cnpg_collector_up{namespace="$namespace"}, cluster)',
                 refresh: 2,
-                regex: "",
-                sort: 1,
                 type: "query",
               },
             ],
           },
           time: { from: "now-1h", to: "now" },
-          timepicker: {},
-          timezone: "",
           title: "CloudNativePG",
           uid: "cnpg-dashboard",
           version: 1,
