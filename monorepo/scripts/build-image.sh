@@ -130,7 +130,7 @@ MONOREPO_DIR="${REPO_ROOT}/monorepo"
 
 # Detect build context from Dockerfile comment (e.g. "# Build context: monorepo/")
 # Falls back to the component directory if no marker is found
-CONTEXT_HINT=$(grep -m1 '# Build context:' "$DOCKERFILE_PATH" 2>/dev/null | sed 's/.*# Build context: *//' | tr -d '[:space:]' || true)
+CONTEXT_HINT=$(grep -m1 '# Build context:' "$DOCKERFILE_PATH" 2>/dev/null | sed 's/.*# Build context: *//; s/ .*//' | tr -d '[:space:]' || true)
 if [ "$CONTEXT_HINT" = "monorepo/" ]; then
   CONTEXT_DIR="${MONOREPO_DIR}"
 else

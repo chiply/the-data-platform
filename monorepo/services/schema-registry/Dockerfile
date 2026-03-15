@@ -1,4 +1,4 @@
-# Build context: monorepo/ (run with docker build -f services/schema-registry/Dockerfile .)
+# Build context: monorepo/
 
 # ---------------------------------------------------------------------------
 # Stage 1 — builder (install service dependencies into /opt/venv)
