@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.7](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.6...schema-registry-v0.1.7) (2026-03-15)
+
+
+### Features
+
+* [TDP-007-03] define schema registry SQLAlchemy models ([8170345](https://github.com/chiply/the-data-platform/commit/8170345df88ef726cd83fbfea85e6092fefdaad3))
+* [TDP-007-04] create initial Alembic migration ([11e7fd9](https://github.com/chiply/the-data-platform/commit/11e7fd97f497983e5308fa59631a9293cafe9da1))
+* [TDP-007-05] wire database session into schema registry routers ([8c5b112](https://github.com/chiply/the-data-platform/commit/8c5b1121c8d92065516c860be4af68426a59b9ae))
+* [TDP-007-06] implement migration execution strategy ([df55aa2](https://github.com/chiply/the-data-platform/commit/df55aa230ba9dd2d1342abd53e50a0e5ff68d8d7))
+* [TDP-007-07] configure DATABASE_URL injection via K8s secrets ([33f9e45](https://github.com/chiply/the-data-platform/commit/33f9e45b65c54b4f54ffbe23febbef0fe57aa802))
+* [TDP-007-08] update Copier template database defaults ([652a7e7](https://github.com/chiply/the-data-platform/commit/652a7e7243f787edafcad56a71614fdf9021f603))
+* add Conflict exception and handle duplicate subject creation ([fe6c847](https://github.com/chiply/the-data-platform/commit/fe6c847c3daba94fcf77b41ac378f58e940cf725))
+* PostgreSQL infrastructure (design doc 007) ([#32](https://github.com/chiply/the-data-platform/issues/32)) ([f707357](https://github.com/chiply/the-data-platform/commit/f707357b1b9b4e6f56dd400b9ffa942774ea8ff7))
+
+
+### Bug Fixes
+
+* address Copilot review feedback on PR [#32](https://github.com/chiply/the-data-platform/issues/32) ([3e50449](https://github.com/chiply/the-data-platform/commit/3e5044976fa97178e83a700d16f588c6b22c3193))
+* resolve CNPG initdb failures and schema-registry local dev issues ([dcbe903](https://github.com/chiply/the-data-platform/commit/dcbe9037abc8c0dfff7212a561cec57665c3a8b2))
+* use nested transactions in test fixtures for session.commit() ([5d4565a](https://github.com/chiply/the-data-platform/commit/5d4565a5063b3ab6c2b4aebf64e9dc65df1f64c6))
+
 ## [0.1.6](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.5...schema-registry-v0.1.6) (2026-03-13)
 
 
