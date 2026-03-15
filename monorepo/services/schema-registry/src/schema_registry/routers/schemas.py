@@ -21,7 +21,7 @@ router = APIRouter(prefix="/schemas", tags=["schemas"])
 async def list_schemas(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[Subject]:
-    """List all registered subjects."""
+    """List all registered subjects in alphabetical order."""
     result = await session.execute(select(Subject).order_by(Subject.name))
     return list(result.scalars().all())
 

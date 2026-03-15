@@ -263,7 +263,7 @@ if not argocd_mode:
         "k3d-tdp-local-registry:5111/schema-registry",
         context=".",
         dockerfile="services/schema-registry/Dockerfile",
-        entrypoint="/opt/venv/bin/uvicorn schema_registry.main:app --host 0.0.0.0 --port 8000 --reload --app-dir /app/src",
+        entrypoint="cd /app && PYTHONPATH=/app/src alembic upgrade head && /opt/venv/bin/uvicorn schema_registry.main:app --host 0.0.0.0 --port 8000 --reload --app-dir /app/src",
         live_update=[
             # If the Dockerfile itself changes, do a full rebuild (no live update).
             fall_back_on(["services/schema-registry/Dockerfile"]),
@@ -292,6 +292,7 @@ if not argocd_mode:
         helm(
             "deploy/charts/schema-registry",
             name="schema-registry",
+            namespace="tdp",
             values=["deploy/charts/schema-registry/values-local.yaml"],
         )
     )

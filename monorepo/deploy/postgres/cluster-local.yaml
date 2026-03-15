@@ -35,8 +35,8 @@ spec:
       owner: tdp
       secret:
         name: tdp-postgres-superuser
-      postInitApplicationSQL:
-        # Create per-service databases and users
+      postInitSQL:
+        # Create per-service databases — runs as superuser so OWNER is applied.
         - CREATE DATABASE schema_registry OWNER tdp;
 
   # No WAL archiving for local development
