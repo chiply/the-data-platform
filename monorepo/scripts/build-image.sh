@@ -144,13 +144,32 @@ fi
 
 # Build tdp-python-base if not already available
 BASE_IMAGE_TAG="tdp-python-base"
-if ! docker image inspect "${BASE_IMAGE_TAG}" &>/dev/null; then
-  BASE_DOCKERFILE="${MONOREPO_DIR}/services/Dockerfile.base"
+BASE_DOCKERFILE="${MONOREPO_DIR}/services/Dockerfile.base"
+BASE_CONTEXT_ARGS=()
+
+if [ "$PUSH" = true ]; then
+  # CI mode: the docker-container buildx driver cannot access local daemon images.
+  # Push the base image to the registry and use --build-context to redirect the
+  # unqualified FROM name so buildkit resolves it from the registry.
+  BASE_REGISTRY_TAG="${REGISTRY}/${ORG}/tdp-python-base:latest"
   if [ -f "$BASE_DOCKERFILE" ]; then
-    echo "Building base image: ${BASE_IMAGE_TAG}"
-    docker buildx build --tag "${BASE_IMAGE_TAG}" --file "${BASE_DOCKERFILE}" --load "${MONOREPO_DIR}/services/"
-  else
-    echo "WARNING: ${BASE_DOCKERFILE} not found, skipping base image build" >&2
+    echo "Building and pushing base image: ${BASE_REGISTRY_TAG}"
+    docker buildx build \
+      --tag "${BASE_REGISTRY_TAG}" \
+      --file "${BASE_DOCKERFILE}" \
+      --push \
+      "${MONOREPO_DIR}/services/"
+  fi
+  BASE_CONTEXT_ARGS+=("--build-context" "tdp-python-base=docker-image://${BASE_REGISTRY_TAG}")
+else
+  # Local mode: build into the local daemon so FROM tdp-python-base resolves directly.
+  if ! docker image inspect "${BASE_IMAGE_TAG}" &>/dev/null; then
+    if [ -f "$BASE_DOCKERFILE" ]; then
+      echo "Building base image: ${BASE_IMAGE_TAG}"
+      docker buildx build --tag "${BASE_IMAGE_TAG}" --file "${BASE_DOCKERFILE}" --load "${MONOREPO_DIR}/services/"
+    else
+      echo "WARNING: ${BASE_DOCKERFILE} not found, skipping base image build" >&2
+    fi
   fi
 fi
 
@@ -166,6 +185,11 @@ BUILD_ARGS=(
   "--tag" "${IMAGE_TAG}"
   "--file" "${DOCKERFILE_PATH}"
 )
+
+# Redirect tdp-python-base to registry image when in CI/push mode
+if [ ${#BASE_CONTEXT_ARGS[@]} -gt 0 ]; then
+  BUILD_ARGS+=("${BASE_CONTEXT_ARGS[@]}")
+fi
 
 # Add cache args if provided
 if [ ${#CACHE_FROM_ARGS[@]} -gt 0 ]; then
