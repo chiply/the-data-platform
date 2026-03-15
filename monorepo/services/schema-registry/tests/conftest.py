@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 from schema_registry.config import Settings
 from schema_registry.dependencies import get_settings
 from schema_registry.main import app
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -64,16 +65,28 @@ async def client(settings_override: Settings) -> AsyncClient:
 async def db_session(settings_override: Settings) -> AsyncSession:
     """Yield an async database session connected to the test database.
 
-    Each test gets its own session that is rolled back after the test
-    completes, ensuring test isolation.
+    Uses a nested transaction (SAVEPOINT) so that route handlers can call
+    session.commit() without closing the outer transaction. The outer
+    transaction is rolled back after each test for isolation.
     """
     engine = create_async_engine(settings_override.database_url, echo=True)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with async_session() as session:
-        async with session.begin():
-            yield session
-            await session.rollback()
+    async with engine.connect() as conn:
+        trans = await conn.begin()
+        session = AsyncSession(bind=conn, expire_on_commit=False)
+        nested = await conn.begin_nested()
+
+        @event.listens_for(session.sync_session, "after_transaction_end")
+        def restart_savepoint(sync_session, transaction):
+            nonlocal nested
+            if transaction.nested and not transaction._parent.nested:
+                nested = conn.sync_connection.begin_nested()
+
+        yield session
+
+        await session.close()
+        await trans.rollback()
 
     await engine.dispose()
 
