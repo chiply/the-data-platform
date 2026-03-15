@@ -94,6 +94,8 @@ export interface CnpgArgs {
   namespace: k8s.core.v1.Namespace;
   /** Resources that must exist before CNPG is installed. */
   dependsOn?: pulumi.Resource[];
+  /** Cluster stack reference for consuming WAL archive and password outputs. */
+  clusterStackRef?: pulumi.StackReference;
 }
 
 export interface CnpgResult {
@@ -108,7 +110,7 @@ export interface CnpgResult {
 }
 
 export function installCnpg(args: CnpgArgs): CnpgResult {
-  const { provider, namespace, dependsOn } = args;
+  const { provider, namespace, dependsOn, clusterStackRef } = args;
 
   const config = new pulumi.Config();
   const resourceTier = config.get("resourceTier") || "minimal";
@@ -143,19 +145,48 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
   // Backup retention (days)
   const backupRetentionDays = cnpgConfig.get("backupRetentionDays") || "7";
 
-  // Object Storage configuration for WAL archiving (non-local only)
-  const objectStorageEndpoint = cnpgConfig.get("objectStorageEndpoint") || "";
-  const objectStorageBucket = cnpgConfig.get("objectStorageBucket") || "";
+  // Object Storage configuration for WAL archiving (non-local only).
+  // Prefer cluster stack reference outputs; fall back to cnpg config for
+  // backwards compatibility or manual overrides.
+  const objectStorageEndpoint = clusterStackRef
+    ? clusterStackRef.getOutput("walArchiveEndpoint").apply((v) => (v as string) || "")
+    : pulumi.output(cnpgConfig.get("objectStorageEndpoint") || "");
+  const objectStorageBucket = clusterStackRef
+    ? clusterStackRef.getOutput("walArchiveBucket").apply((v) => (v as string) || "")
+    : pulumi.output(cnpgConfig.get("objectStorageBucket") || "");
   const objectStoragePath = cnpgConfig.get("objectStoragePath") || "cnpg";
-  const objectStorageAccessKey = cnpgConfig.getSecret("objectStorageAccessKey");
-  const objectStorageSecretKey = cnpgConfig.getSecret("objectStorageSecretKey");
+  const objectStorageAccessKey = clusterStackRef
+    ? clusterStackRef.getOutput("walArchiveAccessKey") as pulumi.Output<string> | undefined
+    : cnpgConfig.getSecret("objectStorageAccessKey");
+  const objectStorageSecretKey = clusterStackRef
+    ? clusterStackRef.getOutput("walArchiveSecretKey") as pulumi.Output<string> | undefined
+    : cnpgConfig.getSecret("objectStorageSecretKey");
 
-  // Per-service database passwords
+  // Per-service database passwords.
+  // Non-local: read from cluster stack reference (generated random passwords).
+  // Local: use hardcoded defaults.
   const servicePasswords: Record<string, pulumi.Output<string> | string> = {};
-  for (const svc of serviceDatabases) {
-    servicePasswords[svc.name] = isLocal
-      ? (cnpgConfig.getSecret(`${svc.name}Password`) ?? `${svc.database}_local_password`)
-      : cnpgConfig.requireSecret(`${svc.name}Password`);
+  if (isLocal) {
+    for (const svc of serviceDatabases) {
+      servicePasswords[svc.name] =
+        cnpgConfig.getSecret(`${svc.name}Password`) ?? `${svc.database}_local_password`;
+    }
+  } else if (clusterStackRef) {
+    // Map service names to cluster stack output names
+    const passwordOutputs: Record<string, string> = {
+      "schema-registry": "schemaRegistryDbPassword",
+      "feed-service": "feedServiceDbPassword",
+    };
+    for (const svc of serviceDatabases) {
+      const outputName = passwordOutputs[svc.name];
+      servicePasswords[svc.name] = clusterStackRef.getOutput(outputName).apply(
+        (v) => v as string,
+      );
+    }
+  } else {
+    for (const svc of serviceDatabases) {
+      servicePasswords[svc.name] = cnpgConfig.requireSecret(`${svc.name}Password`);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -188,12 +219,18 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
     "app.kubernetes.io/part-of": "the-data-platform",
   };
 
+  // Create Object Storage credentials Secret for non-local stacks.
+  // When using a cluster stack reference, the bucket and keys are always
+  // available (created by the cluster stack). When using manual config,
+  // require the keys to be set explicitly.
   let objectStorageSecret: k8s.core.v1.Secret | undefined;
-  if (!isLocal && objectStorageEndpoint && objectStorageBucket) {
+  const walArchivingEnabled = !isLocal && (clusterStackRef || cnpgConfig.get("objectStorageEndpoint"));
+
+  if (walArchivingEnabled) {
     if (!objectStorageAccessKey || !objectStorageSecretKey) {
       throw new Error(
-        "cnpg:objectStorageAccessKey and cnpg:objectStorageSecretKey are required " +
-        "when WAL archiving is enabled (objectStorageEndpoint and objectStorageBucket are set).",
+        "Object storage access and secret keys are required for WAL archiving. " +
+        "Provide them via cluster stack reference or cnpg config.",
       );
     }
     objectStorageSecret = new k8s.core.v1.Secret(
@@ -302,9 +339,9 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
   };
 
   // Add WAL archiving for non-local environments
-  if (!isLocal && objectStorageEndpoint && objectStorageBucket && objectStorageSecret) {
+  if (walArchivingEnabled && objectStorageSecret) {
     const barmanObjectStore: Record<string, unknown> = {
-      destinationPath: `s3://${objectStorageBucket}/${objectStoragePath}`,
+      destinationPath: pulumi.interpolate`s3://${objectStorageBucket}/${objectStoragePath}`,
       endpointURL: objectStorageEndpoint,
       s3Credentials: {
         accessKeyId: {
@@ -385,7 +422,7 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
   // ---------------------------------------------------------------------------
 
   let scheduledBackup: k8s.apiextensions.CustomResource | undefined;
-  if (!isLocal && objectStorageEndpoint && objectStorageBucket) {
+  if (walArchivingEnabled) {
     scheduledBackup = new k8s.apiextensions.CustomResource(
       "cnpg-scheduled-backup",
       {
