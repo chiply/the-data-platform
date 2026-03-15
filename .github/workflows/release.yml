@@ -98,17 +98,14 @@ jobs:
           git add "monorepo/deploy/argocd/apps/dev/${COMPONENT}.yaml"
           git commit -m "chore: promote ${COMPONENT} v${VERSION} to dev"
           git push -u origin "$branch"
+          body="## Summary"
+          body="${body}\n- Promotes \`${COMPONENT}\` release \`${TAG_NAME}\` to the dev environment"
+          body="${body}\n- Updates \`targetRevision\` to \`${TAG_NAME}\`"
+          body="${body}\n- Updates \`image.tag\` to \`${VERSION}\`"
+          body="${body}\n\nMerging this PR will deploy the new version to dev via the App-of-Apps."
           gh pr create \
             --title "chore: promote ${COMPONENT} v${VERSION} to dev" \
-            --body "$(cat <<EOF
-## Summary
-- Promotes \`${COMPONENT}\` release \`${TAG_NAME}\` to the dev environment
-- Updates \`targetRevision\` to \`${TAG_NAME}\`
-- Updates \`image.tag\` to \`${VERSION}\`
-
-Merging this PR will deploy the new version to dev via the App-of-Apps.
-EOF
-          )" \
+            --body "$(echo -e "$body")" \
             --label "promotion"
 
   build-container:
