@@ -93,7 +93,7 @@ jobs:
 
       - name: Install service dependencies
         working-directory: monorepo/services/schema-registry
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Run Alembic migrations
         working-directory: monorepo/services/schema-registry
