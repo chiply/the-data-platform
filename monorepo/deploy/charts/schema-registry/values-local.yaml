@@ -20,8 +20,9 @@ podSecurityContext:
   runAsGroup: 1000
   fsGroup: 1000
 
-# Database connection — password sourced from the CNPG-managed superuser
-# secret so it stays in sync even if CNPG regenerates credentials.
+# Database connection — password sourced from the tdp-db-credentials secret
+# (applied by Tilt from deploy/postgres/db-credentials-local.yaml) to match
+# the secretKeyRef pattern used in dev/production values.
 env:
   - name: DB_HOST
     value: tdp-postgres-rw.tdp.svc.cluster.local
@@ -34,7 +35,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: tdp-postgres-superuser
+        name: tdp-db-credentials
         key: password
 
 ingress:
