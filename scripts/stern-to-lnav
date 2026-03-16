@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# stern-to-lnav — Transform stern JSON output for lnav consumption.
+#
+# Stern's --output json omits timestamps. This script:
+#   1. Filters to valid JSON lines
+#   2. Extracts the RFC3339 timestamp from the start of the message field
+#   3. Strips the timestamp prefix from the message body
+#   4. Attempts to extract a log level from the message
+#   5. Outputs clean JSON that matches the stern_log lnav format
+#
+# Usage:
+#   stern ... --output json --color never | stern-to-lnav | lnav
+
+set -euo pipefail
+
+JQ_FILTER='
+select(type == "object" and .message != null) |
+
+# Extract timestamp from start of message.
+# Matches RFC3339:  2024-01-15T10:30:00.123Z
+# Matches Python:   2024-01-15 10:30:00,123
+# Matches ISO bare: 2024-01-15 10:30:00.123
+(.message | capture("^(?<t>[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}(?:[.,][0-9]+)?Z?) ?(?<rest>.*)$") // null) as $ts_match |
+
+# Normalize timestamp for lnav: space→T, comma→dot, Z→+0000 (so lnav parses as UTC)
+.timestamp = (
+    if $ts_match then
+        ($ts_match.t | gsub(" "; "T") | gsub(","; ".")) as $norm |
+        if ($norm | endswith("Z")) then ($norm | rtrimstr("Z")) + "+0000"
+        else $norm + "+0000"
+        end
+    else (now | strftime("%Y-%m-%dT%H:%M:%S+0000"))
+    end
+) |
+
+# Strip timestamp prefix from message
+(if $ts_match then .message = $ts_match.rest else . end) |
+
+# Extract level from the (now stripped) message.
+# Handles: "[WARNING] ...", "INFO: ...", "ERROR ...", Python "[LEVEL]" format
+(.message | capture("^\\[?(?<l>(?i:DEBUG|TRACE|INFO|WARN(?:ING)?|ERROR|FATAL|PANIC|CRITICAL|LOG))\\]?[: ] "; "x") // null) as $lvl_match |
+
+# For structured JSON messages (e.g. CNPG postgres), try to extract level from inner JSON
+(if $lvl_match then null else (.message | try (fromjson | .level // .log_level // .severity) catch null) end) as $json_lvl |
+
+.level = (
+    if $lvl_match then ($lvl_match.l | ascii_upcase)
+    elif $json_lvl then ($json_lvl | ascii_upcase)
+    else "INFO"
+    end
+)
+'
+
+# -R reads each line as a raw string; fromjson? silently drops non-JSON lines
+exec jq --unbuffered -Rc "fromjson? | $JQ_FILTER"
