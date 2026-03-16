@@ -93,6 +93,10 @@ windows:
             sleep 1;
             lnav "$LOG"
 
+  - ktop:
+      panes:
+        - ktop --kubeconfig ~/.kube/tdp-production.yaml -A
+
   - cluster-health:
       layout: even-vertical
       panes:
