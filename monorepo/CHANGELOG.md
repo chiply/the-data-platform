@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.21](https://github.com/chiply/the-data-platform/compare/platform-v0.1.20...platform-v0.1.21) (2026-03-16)
+
+
+### Features
+
+* tmux dashboard configs, lnav log viewer, and db credential fixes ([#54](https://github.com/chiply/the-data-platform/issues/54)) ([844e048](https://github.com/chiply/the-data-platform/commit/844e04846a851a506ece43436c4dfefb4f20ca9f))
+
 ## [0.1.20](https://github.com/chiply/the-data-platform/compare/platform-v0.1.19...platform-v0.1.20) (2026-03-15)
 
 
