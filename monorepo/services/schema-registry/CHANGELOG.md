@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.10...schema-registry-v0.1.11) (2026-03-16)
+
+
+### Features
+
+* tmux dashboard configs, lnav log viewer, and db credential fixes ([#54](https://github.com/chiply/the-data-platform/issues/54)) ([844e048](https://github.com/chiply/the-data-platform/commit/844e04846a851a506ece43436c4dfefb4f20ca9f))
+
 ## [0.1.10](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.9...schema-registry-v0.1.10) (2026-03-15)
 
 
