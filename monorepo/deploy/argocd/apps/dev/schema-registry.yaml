@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/chiply/the-data-platform.git
     # Pinned to a release tag — updated by the promote-dev workflow.
-    targetRevision: schema-registry-v0.1.7
+    targetRevision: schema-registry-v0.1.11
     path: monorepo/deploy/charts/schema-registry
     helm:
       valueFiles:
@@ -21,7 +21,7 @@ spec:
       # reads value files from that tag, not from main.
       parameters:
         - name: image.tag
-          value: "0.1.7"
+          value: "0.1.11"
   destination:
     server: https://kubernetes.default.svc
     namespace: tdp
