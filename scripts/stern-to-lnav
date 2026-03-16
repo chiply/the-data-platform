@@ -10,9 +10,6 @@
 #
 # Usage:
 #   stern ... --output json --color never | stern-to-lnav | lnav
-#   stern ... --output json --color never | stern-to-lnav  # (auto-pipes to lnav)
-#
-# If no arguments are given, reads stdin. Pass --no-lnav to skip auto-piping.
 
 set -euo pipefail
 

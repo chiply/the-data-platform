@@ -265,14 +265,17 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
       password.apply((pw) => {
         // Use dollar-quoting to avoid SQL injection from passwords containing quotes
         const escaped = pw.replace(/'/g, "''");
-        return [
+        const stmts = [
           `CREATE DATABASE ${svc.database};`,
           `CREATE USER ${svc.username} WITH PASSWORD '${escaped}';`,
           `GRANT ALL PRIVILEGES ON DATABASE ${svc.database} TO ${svc.username};`,
           `ALTER DATABASE ${svc.database} OWNER TO ${svc.username};`,
+        ];
+        if (isLocal) {
           // Grant the initdb owner (tdp) access so local dev can use a single user.
-          `GRANT ALL PRIVILEGES ON DATABASE ${svc.database} TO tdp;`,
-        ].join("\n");
+          stmts.push(`GRANT ALL PRIVILEGES ON DATABASE ${svc.database} TO tdp;`);
+        }
+        return stmts.join("\n");
       }),
     );
   }

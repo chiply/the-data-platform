@@ -55,7 +55,7 @@ windows:
               until nc -z localhost 5434 2>/dev/null; do sleep 2; done &&
               export PGPASSWORD=$(kubectl --kubeconfig ~/.kube/tdp-production.yaml get secret tdp-schema-registry-db-credentials -n tdp -o jsonpath='{.data.password}' | base64 --decode) &&
               echo "Connecting to PRODUCTION postgres..." &&
-              PGSSLMODE=disable pgcli -h localhost -p 5434 -U schema_registry_app -d schema_registry
+              PGSSLMODE=require pgcli -h localhost -p 5434 -U schema_registry_app -d schema_registry
 
   - logs-postgres:
       layout: even-vertical
