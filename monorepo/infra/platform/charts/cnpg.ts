@@ -116,6 +116,7 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
   const resourceTier = config.get("resourceTier") || "minimal";
   const stackName = pulumi.getStack();
   const isLocal = stackName === "local";
+  const isProduction = stackName === "production";
 
   const preset = resourcePresets[resourceTier] ?? resourcePresets["minimal"];
 
@@ -269,6 +270,8 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
           `CREATE USER ${svc.username} WITH PASSWORD '${escaped}';`,
           `GRANT ALL PRIVILEGES ON DATABASE ${svc.database} TO ${svc.username};`,
           `ALTER DATABASE ${svc.database} OWNER TO ${svc.username};`,
+          // Grant the initdb owner (tdp) access so local dev can use a single user.
+          `GRANT ALL PRIVILEGES ON DATABASE ${svc.database} TO tdp;`,
         ].join("\n");
       }),
     );
@@ -299,6 +302,11 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
     effective_cache_size: preset.tuning.effective_cache_size,
     max_connections: preset.tuning.max_connections,
     wal_level: "logical",  // Enable CDC use cases
+    // Logging: log all statements in local/dev for debugging;
+    // in production, only log slow queries (>1s) to limit noise.
+    ...(isProduction
+      ? { log_min_duration_statement: "1000" }
+      : { log_statement: "all" }),
   };
 
   // Build the Cluster spec
@@ -316,6 +324,9 @@ export function installCnpg(args: CnpgArgs): CnpgResult {
         dataChecksums: true,
         database: "tdp",
         owner: "tdp",
+        secret: {
+          name: "tdp-db-credentials",
+        },
         postInitSQL: combinedPostInitSQL.apply((sql) =>
           sql.split("\n").filter((line) => line.trim() !== ""),
         ),

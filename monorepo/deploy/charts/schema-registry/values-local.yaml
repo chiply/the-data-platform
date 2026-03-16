@@ -20,9 +20,9 @@ podSecurityContext:
   runAsGroup: 1000
   fsGroup: 1000
 
-# Database connection — password sourced from the tdp-db-credentials secret
-# (applied by Tilt from deploy/postgres/db-credentials-local.yaml) to match
-# the secretKeyRef pattern used in dev/production values.
+# Database connection — uses per-service credentials consistent with dev/production.
+# The schema_registry_app user owns the schema_registry database, avoiding
+# PG 15+ public schema privilege issues with the generic tdp user.
 env:
   - name: DB_HOST
     value: tdp-postgres-rw.tdp.svc.cluster.local
@@ -31,12 +31,14 @@ env:
   - name: DB_NAME
     value: schema_registry
   - name: DB_USER
-    value: tdp
+    value: schema_registry_app
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: tdp-db-credentials
+        name: tdp-schema-registry-db-credentials
         key: password
+  - name: DB_SSLMODE
+    value: "disable"
 
 ingress:
   enabled: true

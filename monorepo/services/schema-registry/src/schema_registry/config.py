@@ -67,7 +67,8 @@ class Settings(BaseSettings):
         if all([self.db_host, self.db_port, self.db_name, self.db_user, self.db_password]):
             user = quote_plus(self.db_user)  # type: ignore[arg-type]
             password = quote_plus(self.db_password)  # type: ignore[arg-type]
-            sslmode_param = f"?sslmode={self.db_sslmode}" if self.db_sslmode else ""
+            # asyncpg uses 'ssl' parameter (not libpq's 'sslmode')
+            sslmode_param = f"?ssl={self.db_sslmode}" if self.db_sslmode else ""
             self.database_url = (
                 f"postgresql+asyncpg://{user}:{password}"
                 f"@{self.db_host}:{self.db_port}/{self.db_name}{sslmode_param}"
