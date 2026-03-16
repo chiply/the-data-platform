@@ -1,0 +1,137 @@
+# tmuxinator start -p tmuxinator/production.yml
+#
+# CAUTION: This connects to the production cluster. Be careful with any
+# write operations against the database.
+#
+# Ports: ArgoCD 8081, Grafana 3003, Postgres 5434, schema-registry 8002
+name: tdp-production
+root: <%= ENV["HOME"] %>/source_code/the-data-platform/monorepo
+
+startup_window: shell
+
+windows:
+  - k9s:
+      panes:
+        - k9s --kubeconfig ~/.kube/tdp-production.yaml
+
+  - argocd:
+      panes:
+        - >-
+            PASSWORD=$(kubectl --kubeconfig ~/.kube/tdp-production.yaml -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null) &&
+            echo "ArgoCD: http://localhost:8081" &&
+            echo "Username: admin" &&
+            echo "Password: ${PASSWORD}" &&
+            echo "" &&
+            SVC=$(kubectl --kubeconfig ~/.kube/tdp-production.yaml get svc -n argocd -l app.kubernetes.io/component=server -o name 2>/dev/null | head -1) &&
+            kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n argocd "$SVC" 8081:80
+
+  - grafana:
+      panes:
+        - >-
+            SVC=$(kubectl --kubeconfig ~/.kube/tdp-production.yaml get svc -n monitoring -l app.kubernetes.io/name=grafana -o name 2>/dev/null | head -1 | sed 's|service/||') &&
+            PASSWORD=$(kubectl --kubeconfig ~/.kube/tdp-production.yaml -n monitoring get secret -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' 2>/dev/null | base64 --decode 2>/dev/null) &&
+            echo "Grafana: http://localhost:3003" &&
+            echo "Username: admin" &&
+            echo "Password: ${PASSWORD}" &&
+            echo "" &&
+            kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n monitoring "svc/${SVC}" 3003:80
+
+  - schema-registry:
+      panes:
+        - >-
+            echo "schema-registry: http://localhost:8002" &&
+            kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n tdp svc/schema-registry 8002:80
+
+  - postgres:
+      layout: even-vertical
+      panes:
+        - port-forward:
+          - >-
+              echo "PRODUCTION Postgres port-forward on localhost:5434" &&
+              kubectl --kubeconfig ~/.kube/tdp-production.yaml port-forward -n tdp svc/tdp-postgres-rw 5434:5432
+        - pgcli:
+          - >-
+              echo "Waiting for port-forward..." &&
+              until nc -z localhost 5434 2>/dev/null; do sleep 2; done &&
+              export PGPASSWORD=$(kubectl --kubeconfig ~/.kube/tdp-production.yaml get secret tdp-schema-registry-db-credentials -n tdp -o jsonpath='{.data.password}' | base64 --decode) &&
+              echo "Connecting to PRODUCTION postgres..." &&
+              PGSSLMODE=disable pgcli -h localhost -p 5434 -U schema_registry_app -d schema_registry
+
+  - logs-postgres:
+      layout: even-vertical
+      panes:
+        - stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --since 15m
+        - >-
+            LOG=/tmp/tdp-production-postgres.log;
+            : > "$LOG";
+            stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --output json --color never --since 15m
+            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
+            sleep 1;
+            lnav "$LOG"
+
+  - logs-schema-registry:
+      layout: even-vertical
+      panes:
+        - stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l app.kubernetes.io/name=schema-registry --since 15m
+        - >-
+            LOG=/tmp/tdp-production-schema-registry.log;
+            : > "$LOG";
+            stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l app.kubernetes.io/name=schema-registry --output json --color never --since 15m
+            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
+            sleep 1;
+            lnav "$LOG"
+
+  - logs-combined:
+      layout: even-vertical
+      panes:
+        - stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp "tdp-postgres|schema-registry" --since 15m
+        - >-
+            LOG=/tmp/tdp-production-combined.log;
+            : > "$LOG";
+            stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp "tdp-postgres|schema-registry" --output json --color never --since 15m
+            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
+            sleep 1;
+            lnav "$LOG"
+
+  - cluster-health:
+      layout: even-vertical
+      panes:
+        - >-
+            watch -n 300 -c --no-title
+            popeye --kubeconfig ~/.kube/tdp-production.yaml
+            -n tdp -c
+        - >-
+            watch -n 30 --no-title
+            kube-capacity --kubeconfig ~/.kube/tdp-production.yaml
+            --pods --util --sort cpu.util
+
+  - audit:
+      layout: even-vertical
+      panes:
+        - >-
+            echo "=== Outdated Helm Releases ===" &&
+            nova find --kubeconfig ~/.kube/tdp-production.yaml
+            --format table --show-old ;
+            exec $SHELL
+        - >-
+            echo "=== Deprecated API Versions ===" &&
+            pluto detect-all-in-cluster
+            --kubeconfig ~/.kube/tdp-production.yaml ;
+            exec $SHELL
+
+  - resource-score:
+      panes:
+        - >-
+            echo "=== Resource Score: tdp namespace ===" &&
+            kubectl --kubeconfig ~/.kube/tdp-production.yaml
+            -n tdp get deployments,services
+            -l '!cnpg.io/cluster'
+            -o yaml 2>/dev/null |
+            kube-score score -
+            --ignore-test container-security-context-user-group-id
+            --ignore-test container-image-pull-policy ;
+            exec $SHELL
+
+  - shell:
+      panes:
+        - # general purpose shell — PRODUCTION cluster

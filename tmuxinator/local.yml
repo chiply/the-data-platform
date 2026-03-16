@@ -1,0 +1,127 @@
+# tmuxinator start -p tmuxinator/local.yml
+#
+# Ports: Grafana 3001, Postgres 5432, schema-registry 8000 (all via Tilt)
+# ArgoCD: http://argocd.localhost (ingress, no port-forward)
+name: tdp-local
+root: <%= ENV["HOME"] %>/source_code/the-data-platform/monorepo
+
+windows:
+  - tilt:
+      layout: even-vertical
+      panes:
+        - tilt up
+
+  - k9s:
+      panes:
+        - k9s --kubeconfig ~/.kube/tdp-local.yaml
+
+  - argocd:
+      panes:
+        - >-
+            echo "ArgoCD UI: http://argocd.localhost" &&
+            echo "" &&
+            PASSWORD=$(kubectl --kubeconfig ~/.kube/tdp-local.yaml -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null) &&
+            echo "Username: admin" &&
+            echo "Password: ${PASSWORD}" ;
+            exec $SHELL
+
+  - grafana:
+      panes:
+        - >-
+            SVC=$(kubectl --kubeconfig ~/.kube/tdp-local.yaml get svc -n monitoring -l app.kubernetes.io/name=grafana -o name 2>/dev/null | head -1 | sed 's|service/||') &&
+            PASSWORD=$(kubectl --kubeconfig ~/.kube/tdp-local.yaml -n monitoring get secret -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' 2>/dev/null | base64 --decode 2>/dev/null || echo "admin") &&
+            echo "Grafana: http://localhost:3001" &&
+            echo "Username: admin" &&
+            echo "Password: ${PASSWORD}" &&
+            echo "" &&
+            kubectl --kubeconfig ~/.kube/tdp-local.yaml port-forward -n monitoring "svc/${SVC}" 3001:80
+
+  - postgres:
+      panes:
+        - >-
+            echo "Waiting for Tilt port-forward on localhost:5432..." &&
+            until nc -z localhost 5432 2>/dev/null; do
+              sleep 2;
+            done &&
+            echo "Port-forward is up. Connecting..." &&
+            export PGPASSWORD=$(kubectl --kubeconfig ~/.kube/tdp-local.yaml get secret tdp-schema-registry-db-credentials -n tdp -o jsonpath='{.data.password}' | base64 --decode) &&
+            PGSSLMODE=disable pgcli -h localhost -p 5432 -U schema_registry_app -d schema_registry
+
+  - logs-postgres:
+      layout: even-vertical
+      panes:
+        - stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --since 15m
+        - >-
+            LOG=/tmp/tdp-local-postgres.log;
+            : > "$LOG";
+            stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --output json --color never --since 15m
+            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
+            sleep 1;
+            lnav "$LOG"
+
+  - logs-schema-registry:
+      layout: even-vertical
+      panes:
+        - stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l app.kubernetes.io/name=schema-registry --since 15m
+        - >-
+            LOG=/tmp/tdp-local-schema-registry.log;
+            : > "$LOG";
+            stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l app.kubernetes.io/name=schema-registry --output json --color never --since 15m
+            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
+            sleep 1;
+            lnav "$LOG"
+
+  - logs-combined:
+      layout: even-vertical
+      panes:
+        - stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp "tdp-postgres|schema-registry" --since 15m
+        - >-
+            LOG=/tmp/tdp-local-combined.log;
+            : > "$LOG";
+            stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp "tdp-postgres|schema-registry" --output json --color never --since 15m
+            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
+            sleep 1;
+            lnav "$LOG"
+
+  - cluster-health:
+      layout: even-vertical
+      panes:
+        - >-
+            watch -n 300 -c --no-title
+            popeye --kubeconfig ~/.kube/tdp-local.yaml
+            -n tdp -c
+        - >-
+            watch -n 30 --no-title
+            kube-capacity --kubeconfig ~/.kube/tdp-local.yaml
+            --pods --util --sort cpu.util
+
+  - audit:
+      layout: even-vertical
+      panes:
+        - >-
+            echo "=== Outdated Helm Releases ===" &&
+            nova find --kubeconfig ~/.kube/tdp-local.yaml
+            --format table --show-old ;
+            exec $SHELL
+        - >-
+            echo "=== Deprecated API Versions ===" &&
+            pluto detect-all-in-cluster
+            --kubeconfig ~/.kube/tdp-local.yaml ;
+            exec $SHELL
+
+  - resource-score:
+      panes:
+        - >-
+            echo "=== Resource Score: tdp namespace ===" &&
+            kubectl --kubeconfig ~/.kube/tdp-local.yaml
+            -n tdp get deployments,services
+            -l '!cnpg.io/cluster'
+            -o yaml 2>/dev/null |
+            kube-score score -
+            --ignore-test container-security-context-user-group-id
+            --ignore-test container-image-pull-policy ;
+            exec $SHELL
+
+  - shell:
+      panes:
+        - # general purpose shell
