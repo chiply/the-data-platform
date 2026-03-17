@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.23](https://github.com/chiply/the-data-platform/compare/platform-v0.1.22...platform-v0.1.23) (2026-03-17)
+
+
+### Bug Fixes
+
+* **schema-registry:** add writable /tmp volume for dev ([#67](https://github.com/chiply/the-data-platform/issues/67)) ([9466d56](https://github.com/chiply/the-data-platform/commit/9466d5627db5998a69307df53f94e2ccbfac4f8a))
+* **schema-registry:** increase dev memory limit to 256Mi ([#68](https://github.com/chiply/the-data-platform/issues/68)) ([c38f399](https://github.com/chiply/the-data-platform/commit/c38f399d90a41a861fff18a3656c7427cfed155f))
+* **schema-registry:** use per-service DB credentials on dev ([#65](https://github.com/chiply/the-data-platform/issues/65)) ([6e849e7](https://github.com/chiply/the-data-platform/commit/6e849e7bb1cf5dccea905f8d80986941a74a9912))
+
 ## [0.1.22](https://github.com/chiply/the-data-platform/compare/platform-v0.1.21...platform-v0.1.22) (2026-03-17)
 
 
