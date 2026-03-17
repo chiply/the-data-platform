@@ -52,7 +52,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Depends on Tempo being deployed (US-001)."
     },
@@ -68,7 +68,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Depends on Alloy being deployed (US-002)."
     },
