@@ -6,6 +6,8 @@ import { installMonitoring } from "./charts/monitoring";
 import { installArgoCD } from "./charts/argocd";
 import { installCnpg } from "./charts/cnpg";
 import { installCnpgMonitoring } from "./charts/cnpg-monitoring";
+import { installTempo } from "./charts/tempo";
+import { installAlloy } from "./charts/alloy";
 import { createAppSecrets } from "./app-secrets";
 
 // ---------------------------------------------------------------------------
@@ -113,6 +115,24 @@ const monitoring = installMonitoring({
 });
 
 // ---------------------------------------------------------------------------
+// Tempo (distributed tracing backend)
+// ---------------------------------------------------------------------------
+
+const tempo = installTempo({
+  provider: k8sProvider,
+  dependsOn: [monitoring],
+});
+
+// ---------------------------------------------------------------------------
+// Grafana Alloy (OTLP collector — DaemonSet)
+// ---------------------------------------------------------------------------
+
+const alloy = installAlloy({
+  provider: k8sProvider,
+  dependsOn: [tempo],
+});
+
+// ---------------------------------------------------------------------------
 // CloudNativePG (operator + Postgres Cluster)
 // ---------------------------------------------------------------------------
 //
@@ -160,6 +180,8 @@ export const dbSecretName = appSecrets.dbSecretName;
 export const appSecretName = appSecrets.appSecretName;
 export const certManagerStatus = certManager.status;
 export const monitoringStatus = monitoring.status;
+export const tempoStatus = tempo.status;
+export const alloyStatus = alloy.status;
 export const argocdStatus = argocd.status;
 export const cnpgOperatorStatus = cnpg.operator.status;
 export const cnpgClusterName = cnpg.cluster.metadata.name;
