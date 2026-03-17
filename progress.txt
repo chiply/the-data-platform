@@ -50,3 +50,8 @@ PRD: tasks/prd-distributed-tracing.json
 - What was implemented: Created charts/tempo.ts deploying grafana/tempo Helm chart in monolithic mode, environment-aware retention/storage, wired into index.ts after monitoring
 - Files changed: charts/tempo.ts (new), index.ts, Pulumi.local.yaml, Pulumi.dev.yaml, Pulumi.production.yaml
 - Status: SUCCESS
+
+## US-002 - Deploy Grafana Alloy via Pulumi
+- What was implemented: Created charts/alloy.ts with DaemonSet deployment, OTLP gRPC receiver on port 4317, batch processor, export to Tempo. Release named "alloy-otlp" for ClusterIP at alloy-otlp.monitoring.svc.cluster.local:4317. Wired into index.ts after tempo.
+- Files changed: charts/alloy.ts (new), index.ts (updated)
+- Status: SUCCESS

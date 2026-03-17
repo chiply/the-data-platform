@@ -37,7 +37,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: M. Alloy config uses River syntax for receive → batch → export pipeline."
     },
