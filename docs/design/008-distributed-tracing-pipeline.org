@@ -1,0 +1,236 @@
+#+TITLE: 008 - Distributed Tracing Pipeline
+#+AUTHOR: Charlie Holland
+#+STATUS: Accepted
+#+CATEGORY: infra
+#+CREATED: [2026-03-17]
+#+LAST_MODIFIED: [2026-03-17]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Deploy Grafana Tempo and Grafana Alloy to provide OTLP trace collection on
+both local (k3d) and dev (Linode k3s) environments. Services are already
+instrumented with OpenTelemetry via =tdp-fastapi-core=, but there is no trace
+backend — the OTLP exporter sends to =localhost:4317= where nothing is
+listening, producing continuous error logs.
+
+This design adds the missing trace pipeline: services → Alloy (OTLP
+receiver) → Tempo (storage) → Grafana (query/visualisation).
+
+* Motivation
+
+- FastAPI services are instrumented with OpenTelemetry (=setup_telemetry()= in
+  =tdp-fastapi-core=) but traces are dropped because no collector exists
+- The schema-registry logs are flooded with =StatusCode.UNAVAILABLE= errors
+  every few seconds as the OTLP exporter retries against =localhost:4317=
+- Distributed tracing is essential for debugging request flows across
+  services, especially as the platform adds more FastAPI services and
+  orchestration pipelines
+- Prometheus + Grafana are already deployed via Pulumi — adding Tempo and
+  Alloy extends the existing stack rather than introducing new tooling
+
+* Design
+
+** Architecture
+
+#+begin_src
+  FastAPI services (OTel SDK)
+        │
+        │ OTLP gRPC (:4317)
+        ▼
+  Grafana Alloy (DaemonSet)
+        │
+        │ OTLP gRPC
+        ▼
+  Grafana Tempo (StatefulSet)
+        │
+        │ Tempo API
+        ▼
+  Grafana (datasource: Tempo)
+#+end_src
+
+*** Component Roles
+
+| Component | Role | Deployment |
+|-----------+------+------------|
+| Grafana Alloy | OTLP receiver, batching, retry | DaemonSet in =monitoring= namespace |
+| Grafana Tempo | Trace storage and query backend | StatefulSet in =monitoring= namespace |
+| Grafana | Trace visualisation via Tempo datasource | Already deployed |
+
+** Option A — Alloy + Tempo (Recommended)
+
+Both are Grafana-native, lightweight, and integrate seamlessly with the
+existing kube-prometheus-stack Grafana deployment.
+
+- *Alloy* replaces the need for a standalone OpenTelemetry Collector — it
+  speaks OTLP natively and can also collect logs/metrics in future
+- *Tempo* is purpose-built for trace storage with minimal resource usage
+- Grafana already has built-in Tempo datasource support
+
+Tradeoffs:
+- Grafana ecosystem lock-in (acceptable — we already use Prometheus + Grafana)
+- Alloy is relatively new but is Grafana's official replacement for Grafana Agent
+
+** Option B — Standalone OpenTelemetry Collector + Tempo
+
+Use the vendor-neutral OTel Collector instead of Alloy.
+
+Tradeoffs:
+- More configuration complexity (OTel Collector config is verbose)
+- Extra dependency to maintain
+- No advantage over Alloy for our use case (single-backend, Grafana stack)
+
+** Option C — Skip Alloy, send directly to Tempo
+
+Services export OTLP directly to Tempo's OTLP endpoint (Tempo supports OTLP
+ingestion natively).
+
+Tradeoffs:
+- Simpler (one fewer component)
+- Loses batching, retry, and future flexibility (log/metric collection)
+- Tight coupling between services and Tempo endpoint
+
+* Decision
+
+Option A — Alloy + Tempo. Alloy provides a clean separation between
+ingestion and storage, supports future expansion (logs, metrics forwarding),
+and is the Grafana-recommended approach.
+
+* Implementation Details
+
+** Tempo Deployment
+
+- Deploy via Helm chart =grafana/tempo= in =monitoring= namespace
+- Use monolithic mode (single binary) — appropriate for local/dev scale
+- Storage: ephemeral for local, =local-path= PV for dev
+- Retention: 6h local, 48h dev
+- Resource tier: follow existing =minimal= / =standard= pattern from monitoring.ts
+
+** Alloy Deployment
+
+- Deploy via Helm chart =grafana/alloy= in =monitoring= namespace
+- DaemonSet mode — one instance per node receives OTLP from local pods
+- Expose OTLP gRPC on port 4317 via a ClusterIP Service
+  (=alloy-otlp.monitoring.svc.cluster.local:4317=)
+- Configuration: receive OTLP → batch → export to Tempo
+
+** Service Configuration
+
+- Set =OTEL_EXPORTER_OTLP_ENDPOINT= env var in Helm values to point at
+  the Alloy service: =http://alloy-otlp.monitoring.svc.cluster.local:4317=
+- Update =values.yaml= (default), =values-dev.yaml=, and =values-local.yaml=
+- The common chart or Copier template should include this env var by default
+  for new services
+
+** Grafana Datasource
+
+- Add Tempo as a Grafana datasource in the kube-prometheus-stack Helm values
+- Configure trace-to-metrics correlation (link traces to Prometheus metrics)
+
+** Pulumi Integration
+
+- Create =infra/platform/charts/tempo.ts= — Tempo Helm deployment
+- Create =infra/platform/charts/alloy.ts= — Alloy Helm deployment
+- Wire both into =infra/platform/index.ts= deployment sequence (after monitoring)
+- Add config keys for retention, storage, and resource tiers
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+** TODO [TDP-008-01] Deploy Grafana Tempo via Pulumi                    :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =infra/platform/charts/tempo.ts= with Helm chart deployment.
+Monolithic mode, environment-aware retention and storage config.
+Add to =infra/platform/index.ts= deployment sequence.
+
+** TODO [TDP-008-02] Deploy Grafana Alloy via Pulumi                    :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Create =infra/platform/charts/alloy.ts= with Helm chart deployment.
+DaemonSet mode, OTLP gRPC receiver on port 4317, export to Tempo.
+ClusterIP Service for in-cluster access.
+
+** TODO [TDP-008-03] Wire Tempo datasource into Grafana                 :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add Tempo as an additional datasource in the kube-prometheus-stack
+Helm values (=monitoring.ts=). Configure trace-to-metrics links.
+
+** TODO [TDP-008-04] Configure OTEL_EXPORTER_OTLP_ENDPOINT in services  :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add =OTEL_EXPORTER_OTLP_ENDPOINT= env var to schema-registry
+=values.yaml=, =values-dev.yaml=, and =values-local.yaml= pointing at the
+Alloy ClusterIP service. Update the Copier service template to include
+this by default.
+
+** TODO [TDP-008-05] Add NetworkPolicy for service → Alloy egress       :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add a NetworkPolicy allowing pods with =app.kubernetes.io/part-of:
+the-data-platform= to reach Alloy on port 4317 in the =monitoring=
+namespace. Required on dev where default-deny is enforced.
+
+** TODO [TDP-008-06] Verify traces appear in Grafana on local and dev   :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+End-to-end verification: make requests to schema-registry, confirm
+traces appear in Grafana Explore → Tempo datasource on both local
+and dev environments. Update CONTRIBUTING.md with access instructions.
+
+** TODO [TDP-008-07] Add Pulumi config keys for tracing                 :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add =tempoRetention=, =tempoStorageSize= to Pulumi stack configs.
+Local: 6h retention, no PV. Dev: 48h retention, 5Gi PV.
+Production: 7d retention, 20Gi PV.
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Use Alloy over standalone OTel Collector
+:PROPERTIES:
+:DECIDED: [2026-03-17]
+:END:
+
+Alloy is Grafana-native, lighter config, and supports future
+log/metric collection. No benefit to the vendor-neutral OTel
+Collector when we're already in the Grafana ecosystem.
+
+** DECIDED Tail-based sampling policy for production
+:PROPERTIES:
+:DECIDED: [2026-03-17]
+:END:
+
+Keep 100% sampling across all environments. Revisit if production
+trace volume becomes a storage or cost concern.
+
+** DECIDED Cross-namespace NetworkPolicy for monitoring
+:PROPERTIES:
+:DECIDED: [2026-03-17]
+:END:
+
+Add egress policy in =tdp= namespace allowing pods with
+=app.kubernetes.io/part-of: the-data-platform= to reach =monitoring=
+namespace on port 4317, plus ingress policy on Alloy pods. Same
+pattern as the existing =allow-app-to-postgres= policy. Covered by
+task TDP-008-05.

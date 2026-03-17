@@ -61,37 +61,19 @@ windows:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --since 15m
-        - >-
-            LOG=/tmp/tdp-production-postgres.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern production postgres
 
   - logs-schema-registry:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l app.kubernetes.io/name=schema-registry --since 15m
-        - >-
-            LOG=/tmp/tdp-production-schema-registry.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp -l app.kubernetes.io/name=schema-registry --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern production schema-registry
 
   - logs-combined:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp "tdp-postgres|schema-registry" --since 15m
-        - >-
-            LOG=/tmp/tdp-production-combined.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-production.yaml -n tdp "tdp-postgres|schema-registry" --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern production combined
 
   - ktop:
       panes:

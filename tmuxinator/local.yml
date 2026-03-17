@@ -5,6 +5,8 @@
 name: tdp-local
 root: <%= ENV["HOME"] %>/source_code/the-data-platform/monorepo
 
+startup_window: shell
+
 windows:
   - tilt:
       layout: even-vertical
@@ -51,37 +53,19 @@ windows:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --since 15m
-        - >-
-            LOG=/tmp/tdp-local-postgres.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern local postgres
 
   - logs-schema-registry:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l app.kubernetes.io/name=schema-registry --since 15m
-        - >-
-            LOG=/tmp/tdp-local-schema-registry.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp -l app.kubernetes.io/name=schema-registry --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern local schema-registry
 
   - logs-combined:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp "tdp-postgres|schema-registry" --since 15m
-        - >-
-            LOG=/tmp/tdp-local-combined.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-local.yaml -n tdp "tdp-postgres|schema-registry" --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern local combined
 
   - ktop:
       panes:

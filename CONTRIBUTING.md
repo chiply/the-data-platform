@@ -414,6 +414,78 @@ config:
 ./monorepo/infra/scripts/local-up.sh
 ```
 
+## Local Resource Management
+
+### Memory budget
+
+The local k3d cluster runs in Docker containers. A rough memory budget:
+
+| Component | Memory |
+|---|---|
+| k3d control plane (server-0) | ~2 GB (fixed) |
+| k3d worker node (base overhead) | ~500 MB each |
+| Each FastAPI service (gunicorn + 2 workers) | ~128–256 MB |
+| CNPG Postgres | ~512 MB |
+| ArgoCD (if running) | ~300–500 MB |
+| Observability stack (otel-lgtm) | ~680 MB |
+| Registry + serverlb | ~50 MB |
+
+The default configuration creates 2 worker nodes. For most development work, 1 worker
+node is sufficient — check Docker Desktop memory allocation if you experience OOM kills
+or sluggish performance.
+
+### Selective local development
+
+As the platform grows, running every service locally becomes impractical. The strategy
+is to use the **C4 architecture diagram** to determine which services are relevant to
+the feature you're working on, and only spin up those components.
+
+#### How it works
+
+1. **Consult the C4 diagram** — identify which containers interact with the service
+   you're changing (direct dependencies and callers)
+2. **Start only those resources** — use Tilt resource labels to selectively bring up
+   the relevant subset
+3. **Stub or point elsewhere** for services outside your boundary — either connect to
+   the dev environment or use mocks
+
+#### Tilt resource labels
+
+Resources in the Tiltfile can be tagged with labels that correspond to C4 container
+boundaries:
+
+```python
+# Tag resources by which features/boundaries they belong to
+k8s_resource('schema-registry', labels=['schema-registry', 'core'])
+k8s_resource('tdp-postgres',    labels=['schema-registry', 'feed-reader', 'core'])
+k8s_resource('feed-reader',     labels=['feed-reader'])
+k8s_resource('workflow-engine', labels=['orchestration'])
+```
+
+Then start only what you need:
+
+```bash
+tilt up schema-registry tdp-postgres   # just these resources
+```
+
+#### Connecting to services outside your boundary
+
+For dependencies you're not running locally, you have three options:
+
+| Approach | When to use |
+|---|---|
+| Point at dev | Service is deployed and stable on dev — set `SERVICE_URL` env vars to the dev endpoint |
+| Lightweight mock/stub | Service API is simple and you need predictable responses |
+| Skip it | The feature doesn't exercise that dependency — test it on dev later |
+
+#### Progression as the platform scales
+
+| Platform size | Local dev approach |
+|---|---|
+| Small (now) | `tilt up` — run everything |
+| Medium (5–10 services) | `tilt up <boundary resources>` — run only your C4 boundary |
+| Large (many services) | Run boundary locally + stubs, full integration testing on dev |
+
 ## Development Workflow
 
 ### Conventional commits

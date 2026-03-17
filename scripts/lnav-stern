@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# lnav-stern — Start a stern-to-lnav pipeline for a given environment and target.
+#
+# Moving this out of tmuxinator inline YAML solves the main source of stray
+# escape sequences: tmuxinator uses `tmux send-keys` to inject pane commands,
+# and long inline scripts (with ; : & characters) are vulnerable to TTY buffer
+# races during rapid window creation.  A short `send-keys` payload avoids this.
+#
+# Usage: lnav-stern <env> <target>
+#   env:    local | dev | production
+#   target: postgres | schema-registry | combined
+
+set -euo pipefail
+
+ENV="${1:?Usage: lnav-stern <env> <target>}"
+TARGET="${2:?Usage: lnav-stern <env> <target>}"
+
+KUBECONFIG="$HOME/.kube/tdp-${ENV}.yaml"
+LOG="/tmp/tdp-${ENV}-${TARGET}.log"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+: > "$LOG"
+
+case "$TARGET" in
+  postgres)
+    stern --kubeconfig "$KUBECONFIG" -n tdp -l cnpg.io/cluster=tdp-postgres \
+      --output json --color never --since 15m \
+      | "$SCRIPT_DIR/stern-to-lnav" >> "$LOG" &
+    ;;
+  schema-registry)
+    stern --kubeconfig "$KUBECONFIG" -n tdp -l app.kubernetes.io/name=schema-registry \
+      --output json --color never --since 15m \
+      | "$SCRIPT_DIR/stern-to-lnav" >> "$LOG" &
+    ;;
+  combined)
+    stern --kubeconfig "$KUBECONFIG" -n tdp "tdp-postgres|schema-registry" \
+      --output json --color never --since 15m \
+      | "$SCRIPT_DIR/stern-to-lnav" >> "$LOG" &
+    ;;
+  *)
+    echo "Unknown target: $TARGET" >&2
+    exit 1
+    ;;
+esac
+
+# Wait for tmuxinator to finish creating all windows (12+ windows takes
+# several seconds).  During this sleep the *shell* absorbs any stray escape
+# sequences from focus events / DA responses so lnav never sees them.
+sleep 5
+
+# Disable focus-events for this tmux session so that subsequent window
+# switches don't send \e[I / \e[O into lnav's input buffer.  Session-level
+# (no -g) so other tmux sessions are unaffected.
+tmux set-option focus-events off 2>/dev/null || true
+
+exec lnav "$LOG"

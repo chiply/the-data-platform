@@ -58,37 +58,19 @@ windows:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-dev.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --since 15m
-        - >-
-            LOG=/tmp/tdp-dev-postgres.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-dev.yaml -n tdp -l cnpg.io/cluster=tdp-postgres --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern dev postgres
 
   - logs-schema-registry:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-dev.yaml -n tdp -l app.kubernetes.io/name=schema-registry --since 15m
-        - >-
-            LOG=/tmp/tdp-dev-schema-registry.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-dev.yaml -n tdp -l app.kubernetes.io/name=schema-registry --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern dev schema-registry
 
   - logs-combined:
       layout: even-vertical
       panes:
         - stern --kubeconfig ~/.kube/tdp-dev.yaml -n tdp "tdp-postgres|schema-registry" --since 15m
-        - >-
-            LOG=/tmp/tdp-dev-combined.log;
-            : > "$LOG";
-            stern --kubeconfig ~/.kube/tdp-dev.yaml -n tdp "tdp-postgres|schema-registry" --output json --color never --since 15m
-            | <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/stern-to-lnav >> "$LOG" &
-            sleep 1;
-            lnav "$LOG"
+        - <%= ENV["HOME"] %>/source_code/the-data-platform/scripts/lnav-stern dev combined
 
   - ktop:
       panes:
