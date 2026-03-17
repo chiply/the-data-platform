@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.12](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.11...schema-registry-v0.1.12) (2026-03-17)
+
+
+### Features
+
+* **schema-registry:** include environment in /version response ([#57](https://github.com/chiply/the-data-platform/issues/57)) ([5cd961c](https://github.com/chiply/the-data-platform/commit/5cd961c84896c3b6a96a50ef231d7a112e7e2192))
+
 ## [0.1.11](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.10...schema-registry-v0.1.11) (2026-03-16)
 
 
