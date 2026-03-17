@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: network-policies
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: tdp
+  source:
+    repoURL: https://github.com/chiply/the-data-platform.git
+    targetRevision: main
+    path: monorepo/deploy/argocd/network-policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tdp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
