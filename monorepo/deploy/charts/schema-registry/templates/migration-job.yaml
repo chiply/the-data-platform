@@ -24,6 +24,7 @@ spec:
     metadata:
       labels:
         {{- include "common.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/part-of: the-data-platform
         app.kubernetes.io/component: migration
     spec:
       {{- with .Values.imagePullSecrets }}
