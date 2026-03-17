@@ -36,4 +36,5 @@ async def version(settings: Settings = Depends(get_settings)) -> dict[str, str]:
     return {
         "service": settings.service_name,
         "version": settings.service_version,
+        "environment": settings.environment.value,
     }
