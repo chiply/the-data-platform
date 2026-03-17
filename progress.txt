@@ -61,6 +61,11 @@ PRD: tasks/prd-distributed-tracing.json
 - Files changed: values-local.yaml, values-dev.yaml, values-production.yaml, config.py.jinja
 - Status: SUCCESS
 
+## US-005 - Add NetworkPolicy for service to Alloy egress
+- What was implemented: Created tdp-allow-alloy.yaml with cross-namespace egress (tdp→monitoring:4317) and ingress (monitoring Alloy←tdp) policies.
+- Files changed: monorepo/deploy/argocd/network-policies/tdp-allow-alloy.yaml (new)
+- Status: SUCCESS
+
 ## US-002 - Deploy Grafana Alloy via Pulumi
 - What was implemented: Created charts/alloy.ts with DaemonSet deployment, OTLP gRPC receiver on port 4317, batch processor, export to Tempo. Release named "alloy-otlp" for ClusterIP at alloy-otlp.monitoring.svc.cluster.local:4317. Wired into index.ts after tempo.
 - Files changed: charts/alloy.ts (new), index.ts (updated)

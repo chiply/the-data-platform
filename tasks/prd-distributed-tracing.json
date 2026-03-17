@@ -83,7 +83,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "humanReview": false,
       "notes": "Effort: S. Required on dev where default-deny is enforced."
     },
