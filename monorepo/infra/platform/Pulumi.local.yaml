@@ -3,3 +3,4 @@ config:
   tdp-platform:resourceTier: minimal
   tdp-platform:prometheusRetention: "6h"
   tdp-platform:prometheusScrapeInterval: "30s"
+  tdp-platform:tempoRetention: "6h"
