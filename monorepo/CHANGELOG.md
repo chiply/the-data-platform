@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/chiply/the-data-platform/compare/platform-v0.1.21...platform-v0.1.22) (2026-03-17)
+
+
+### Features
+
+* add ArgoCD Application for network policies on dev ([#63](https://github.com/chiply/the-data-platform/issues/63)) ([4474f4d](https://github.com/chiply/the-data-platform/commit/4474f4d99959672942d7c3066b84fbd66fc589d4))
+
 ## [0.1.21](https://github.com/chiply/the-data-platform/compare/platform-v0.1.20...platform-v0.1.21) (2026-03-16)
 
 
