@@ -136,6 +136,37 @@ export function installMonitoring(args: MonitoringArgs): k8s.helm.v3.Release {
         grafana: {
           resources: preset.grafana,
           adminPassword: grafanaAdminPassword,
+          additionalDataSources: [
+            {
+              name: "Tempo",
+              type: "tempo",
+              url: "http://tempo.monitoring.svc.cluster.local:3100",
+              access: "proxy",
+              isDefault: false,
+              jsonData: {
+                tracesToMetrics: {
+                  datasourceUid: "prometheus",
+                  tags: [
+                    { key: "service.name", value: "service" },
+                    { key: "job" },
+                  ],
+                  queries: [
+                    {
+                      name: "Request rate",
+                      query:
+                        "sum(rate(http_server_request_duration_seconds_count{$$__tags}[5m]))",
+                    },
+                  ],
+                },
+                serviceMap: {
+                  datasourceUid: "prometheus",
+                },
+                nodeGraph: {
+                  enabled: true,
+                },
+              },
+            },
+          ],
         },
 
         // Alertmanager configuration
