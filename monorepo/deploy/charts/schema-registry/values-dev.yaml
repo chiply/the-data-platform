@@ -51,6 +51,14 @@ env:
   - name: DB_SSLMODE
     value: "require"
 
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+volumes:
+  - name: tmp
+    emptyDir: {}
+
 ingress:
   enabled: true
   className: ""
