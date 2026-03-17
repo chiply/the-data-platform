@@ -12,10 +12,14 @@ WORKDIR /build
 COPY libs/tdp-fastapi-core ./libs/tdp-fastapi-core
 COPY libs/tdp-db ./libs/tdp-db
 
-# Copy service dependency manifests and install
+# Copy service dependency manifests first (for layer caching)
 COPY services/schema-registry/pyproject.toml services/schema-registry/uv.lock ./services/schema-registry/
 WORKDIR /build/services/schema-registry
 ENV UV_PROJECT_ENVIRONMENT="/opt/venv"
+RUN uv sync --frozen --no-dev --no-editable --no-install-project
+
+# Copy source and install the project package
+COPY services/schema-registry/src/ ./src/
 RUN uv sync --frozen --no-dev --no-editable
 
 # ---------------------------------------------------------------------------
