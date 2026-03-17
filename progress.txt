@@ -1,0 +1,52 @@
+# Ralph Progress Log
+Started: 2026-03-17
+Tool: Claude Code (native subagent mode)
+PRD: tasks/prd-distributed-tracing.json
+
+## Codebase Patterns
+
+### Pulumi Helm Chart Pattern (from monitoring.ts)
+- Export a function that takes {provider, dependsOn?} args
+- Define resource presets as Record<string, Presets> (minimal|standard tiers)
+- Read config from pulumi.Config() with namespace matching Pulumi.yaml project name
+- Return k8s.helm.v3.Release with chart, version, repositoryOpts, namespace, values, {provider}
+- Wire into index.ts: import function, call with provider, export status
+
+### Config Pattern (from Pulumi.*.yaml)
+- Config keys prefixed with "tdp-platform:" (matches Pulumi.yaml name)
+- Chart-specific configs use their own namespace (e.g., "argocd:", "cnpg:")
+- local: minimal tier, short retention, no PV
+- dev: minimal tier, longer retention, PV with size
+- production: higher retention, larger PV
+
+### NetworkPolicy Pattern (from deploy/argocd/network-policies/)
+- YAML files in deploy/argocd/network-policies/
+- Follow existing tdp-allow-postgres.yaml pattern for cross-namespace access
+- Pair egress (from app namespace) with ingress (on target namespace)
+- Match pods via app.kubernetes.io/part-of: the-data-platform label
+
+### Service Helm Values Pattern
+- values.yaml: defaults with empty env
+- values-local.yaml: k3d registry, direct values
+- values-dev.yaml: GHCR, secretKeyRef for sensitive values
+- env vars as list of {name, value} or {name, valueFrom.secretKeyRef}
+
+### Key File Paths
+- Platform charts: monorepo/infra/platform/charts/
+- Platform index: monorepo/infra/platform/index.ts
+- Stack configs: monorepo/infra/platform/Pulumi.*.yaml
+- Network policies: monorepo/deploy/argocd/network-policies/
+- Schema registry values: monorepo/deploy/charts/schema-registry/
+- Copier template: enterprise-patterns/python/enterprise-pattern-fastapi/
+
+### Tempo Helm Chart Pattern (from US-001)
+- grafana/tempo chart uses `persistence.enabled` + `persistence.size` for storage (not volumeClaimTemplate)
+- Monolithic mode is the default for grafana/tempo chart
+- OTLP receivers configured under `tempo.receivers.otlp.protocols.grpc/http`
+- Chart version: 1.12.0, repo: https://grafana.github.io/helm-charts
+---
+
+## US-001 - Deploy Grafana Tempo via Pulumi
+- What was implemented: Created charts/tempo.ts deploying grafana/tempo Helm chart in monolithic mode, environment-aware retention/storage, wired into index.ts after monitoring
+- Files changed: charts/tempo.ts (new), index.ts, Pulumi.local.yaml, Pulumi.dev.yaml, Pulumi.production.yaml
+- Status: SUCCESS
