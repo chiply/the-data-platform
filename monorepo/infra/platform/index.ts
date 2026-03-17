@@ -4,6 +4,7 @@ import * as k8s from "@pulumi/kubernetes";
 import { installCertManager } from "./charts/cert-manager";
 import { installMonitoring } from "./charts/monitoring";
 import { installTempo } from "./charts/tempo";
+import { installAlloy } from "./charts/alloy";
 import { installArgoCD } from "./charts/argocd";
 import { installCnpg } from "./charts/cnpg";
 import { installCnpgMonitoring } from "./charts/cnpg-monitoring";
@@ -113,9 +114,23 @@ const monitoring = installMonitoring({
   provider: k8sProvider,
 });
 
+// ---------------------------------------------------------------------------
+// Distributed Tracing (Tempo + Alloy)
+// ---------------------------------------------------------------------------
+//
+// Tempo provides trace storage; Alloy acts as the OTLP collector (DaemonSet)
+// receiving traces from services and forwarding to Tempo. Alloy is reachable
+// at alloy-otlp.monitoring.svc.cluster.local:4317.
+// ---------------------------------------------------------------------------
+
 const tempo = installTempo({
   provider: k8sProvider,
   dependsOn: [monitoring],
+});
+
+const alloy = installAlloy({
+  provider: k8sProvider,
+  dependsOn: [tempo],
 });
 
 // ---------------------------------------------------------------------------
@@ -167,6 +182,7 @@ export const appSecretName = appSecrets.appSecretName;
 export const certManagerStatus = certManager.status;
 export const monitoringStatus = monitoring.status;
 export const tempoStatus = tempo.status;
+export const alloyStatus = alloy.status;
 export const argocdStatus = argocd.status;
 export const cnpgOperatorStatus = cnpg.operator.status;
 export const cnpgClusterName = cnpg.cluster.metadata.name;
