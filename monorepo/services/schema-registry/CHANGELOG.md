@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.12...schema-registry-v0.1.13) (2026-03-17)
+
+
+### Bug Fixes
+
+* **schema-registry:** install project package into venv in Dockerfile ([#60](https://github.com/chiply/the-data-platform/issues/60)) ([7ef50c9](https://github.com/chiply/the-data-platform/commit/7ef50c997004b02184c08313c3ca7ac00860229d))
+
 ## [0.1.12](https://github.com/chiply/the-data-platform/compare/schema-registry-v0.1.11...schema-registry-v0.1.12) (2026-03-17)
 
 

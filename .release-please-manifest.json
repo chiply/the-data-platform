@@ -1,4 +1,4 @@
 {
   "monorepo": "0.1.21",
-  "monorepo/services/schema-registry": "0.1.12"
+  "monorepo/services/schema-registry": "0.1.13"
 }
