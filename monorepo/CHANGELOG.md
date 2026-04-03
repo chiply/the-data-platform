@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.25](https://github.com/chiply/the-data-platform/compare/platform-v0.1.24...platform-v0.1.25) (2026-04-03)
+
+
+### Bug Fixes
+
+* **infra:** bump production to standard resources and extend Tempo timeout ([bbda368](https://github.com/chiply/the-data-platform/commit/bbda368199fe2db034ea9f49d551ab554222b4ee))
+
 ## [0.1.24](https://github.com/chiply/the-data-platform/compare/platform-v0.1.23...platform-v0.1.24) (2026-04-03)
 
 
