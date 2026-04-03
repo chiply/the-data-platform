@@ -98,6 +98,10 @@ export function installAlloy(args: AlloyArgs): k8s.helm.v3.Release {
       },
       namespace: "monitoring",
       values: {
+        // Pin the resource names so the ClusterIP Service is always
+        // alloy-otlp.monitoring.svc.cluster.local (Pulumi appends a
+        // random suffix to Helm release names by default).
+        fullnameOverride: "alloy-otlp",
         // Deploy as DaemonSet so every node has a local OTLP endpoint
         alloy: {
           configMap: {

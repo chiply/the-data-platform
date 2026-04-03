@@ -77,6 +77,10 @@ export function installTempo(args: TempoArgs): k8s.helm.v3.Release {
       namespace: "monitoring",
       createNamespace: true,
       values: {
+        // Pin the resource names so the ClusterIP Service is always
+        // tempo.monitoring.svc.cluster.local (Pulumi appends a random
+        // suffix to Helm release names by default).
+        fullnameOverride: "tempo",
         // Monolithic (single-binary) mode is the default for the grafana/tempo chart
         tempo: {
           resources: preset.tempo,
