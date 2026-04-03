@@ -1,9 +1,16 @@
 # tmuxinator start -p tmuxinator/local.yml
+# tmuxinator start -p tmuxinator/local.yml worktree=.claude/worktrees/grafana
 #
 # Ports: Grafana 3001, Postgres 5432, schema-registry 8000 (all via Tilt)
 # ArgoCD: http://argocd.localhost (ingress, no port-forward)
+#
+# Optional: pass worktree=<relative-path> to run Tilt from a git worktree
+# instead of the main checkout. The worktree path is relative to the repo root.
+# All kubectl/k9s/stern commands still target the same cluster.
 name: tdp-local
-root: <%= ENV["HOME"] %>/source_code/the-data-platform/monorepo
+<% repo_root = "#{ENV["HOME"]}/source_code/the-data-platform" %>
+<% wt = @args&.find { |a| a.start_with?("worktree=") }&.split("=", 2)&.last %>
+root: <%= wt ? "#{repo_root}/#{wt}/monorepo" : "#{repo_root}/monorepo" %>
 
 startup_window: shell
 

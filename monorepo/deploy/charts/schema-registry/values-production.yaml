@@ -43,6 +43,8 @@ env:
         key: password
   - name: DB_SSLMODE
     value: "require"
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://alloy-otlp.monitoring.svc.cluster.local:4317"
 
 podDisruptionBudget:
   enabled: true

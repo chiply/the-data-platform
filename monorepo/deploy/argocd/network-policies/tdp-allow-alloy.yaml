@@ -1,0 +1,61 @@
+# Allow application pods in tdp namespace to send traces to Alloy pods in the
+# monitoring namespace on port 4317 (OTLP gRPC).
+#
+# This policy works within the existing default-deny-all framework defined in
+# tdp-default-deny.yaml. Without it, application pods cannot export traces to
+# the Alloy collector.
+#
+# Alloy runs in the monitoring namespace, so cross-namespace policies are
+# required for app → Alloy traffic.
+#
+# NOTE: Flannel (the default CNI in k3d) does NOT enforce NetworkPolicies.
+# This policy has no effect locally but is enforced in production with a
+# CNI that supports NetworkPolicies (e.g., Calico, Cilium).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-app-to-alloy
+  namespace: tdp
+  labels:
+    app.kubernetes.io/part-of: the-data-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: the-data-platform
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alloy
+      ports:
+        - protocol: TCP
+          port: 4317
+---
+# Allow Alloy pods in monitoring namespace to receive connections from
+# application pods in the tdp namespace on port 4317 (OTLP gRPC).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alloy-ingress-from-apps
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: the-data-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tdp
+      ports:
+        - protocol: TCP
+          port: 4317

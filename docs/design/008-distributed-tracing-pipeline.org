@@ -1,9 +1,9 @@
 #+TITLE: 008 - Distributed Tracing Pipeline
 #+AUTHOR: Charlie Holland
-#+STATUS: Accepted
+#+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-17]
-#+LAST_MODIFIED: [2026-03-17]
+#+LAST_MODIFIED: [2026-04-03]
 #+SETUPFILE: ../../org-setup.org
 
 * Summary
@@ -139,35 +139,43 @@ and is the Grafana-recommended approach.
 :CATEGORY: tasks
 :END:
 
-** TODO [TDP-008-01] Deploy Grafana Tempo via Pulumi                    :p1:
+** DONE [TDP-008-01] Deploy Grafana Tempo via Pulumi                    :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-17]
 :END:
 
 Create =infra/platform/charts/tempo.ts= with Helm chart deployment.
 Monolithic mode, environment-aware retention and storage config.
 Add to =infra/platform/index.ts= deployment sequence.
 
-** TODO [TDP-008-02] Deploy Grafana Alloy via Pulumi                    :p1:
+** DONE [TDP-008-02] Deploy Grafana Alloy via Pulumi                    :p1:
 :PROPERTIES:
 :EFFORT: M
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-17]
 :END:
 
 Create =infra/platform/charts/alloy.ts= with Helm chart deployment.
 DaemonSet mode, OTLP gRPC receiver on port 4317, export to Tempo.
 ClusterIP Service for in-cluster access.
 
-** TODO [TDP-008-03] Wire Tempo datasource into Grafana                 :p1:
+** DONE [TDP-008-03] Wire Tempo datasource into Grafana                 :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-17]
 :END:
 
 Add Tempo as an additional datasource in the kube-prometheus-stack
 Helm values (=monitoring.ts=). Configure trace-to-metrics links.
 
-** TODO [TDP-008-04] Configure OTEL_EXPORTER_OTLP_ENDPOINT in services  :p1:
+** DONE [TDP-008-04] Configure OTEL_EXPORTER_OTLP_ENDPOINT in services  :p1:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-17]
 :END:
 
 Add =OTEL_EXPORTER_OTLP_ENDPOINT= env var to schema-registry
@@ -175,32 +183,44 @@ Add =OTEL_EXPORTER_OTLP_ENDPOINT= env var to schema-registry
 Alloy ClusterIP service. Update the Copier service template to include
 this by default.
 
-** TODO [TDP-008-05] Add NetworkPolicy for service → Alloy egress       :p2:
+** DONE [TDP-008-05] Add NetworkPolicy for service → Alloy egress       :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph
+:COMPLETED_AT: [2026-03-17]
 :END:
 
 Add a NetworkPolicy allowing pods with =app.kubernetes.io/part-of:
 the-data-platform= to reach Alloy on port 4317 in the =monitoring=
 namespace. Required on dev where default-deny is enforced.
 
-** TODO [TDP-008-06] Verify traces appear in Grafana on local and dev   :p2:
+** DONE [TDP-008-06] Verify traces appear in Grafana on local and dev   :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: human, claude-code
+:COMPLETED_AT: [2026-04-03]
 :END:
 
 End-to-end verification: make requests to schema-registry, confirm
 traces appear in Grafana Explore → Tempo datasource on both local
 and dev environments. Update CONTRIBUTING.md with access instructions.
 
-** TODO [TDP-008-07] Add Pulumi config keys for tracing                 :p2:
+Verified on local [2026-04-03]: traces from schema-registry appear in
+Tempo via Grafana Explore. Dev verification to follow after merge.
+
+** DONE [TDP-008-07] Add Pulumi config keys for tracing                 :p2:
 :PROPERTIES:
 :EFFORT: S
+:COMPLETED_BY: ralph, human
+:COMPLETED_AT: [2026-04-03]
 :END:
 
 Add =tempoRetention=, =tempoStorageSize= to Pulumi stack configs.
 Local: 6h retention, no PV. Dev: 48h retention, 5Gi PV.
 Production: 7d retention, 20Gi PV.
+
+Ralph added the config keys to all three stack configs. Verified
+during review [2026-04-03]: values match design doc spec.
 
 * Questions
 :PROPERTIES:

@@ -39,6 +39,8 @@ env:
         key: password
   - name: DB_SSLMODE
     value: "disable"
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://alloy-otlp.monitoring.svc.cluster.local:4317"
 
 ingress:
   enabled: true
