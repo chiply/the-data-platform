@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     environment: Environment = Environment.LOCAL
     service_port: int = {{ service_port }}
     log_level: str = "INFO"
+
+    # OpenTelemetry — OTEL_EXPORTER_OTLP_ENDPOINT is set via Helm values in
+    # each environment to point at the Alloy OTLP collector. The OTel SDK reads
+    # this env var automatically; no application-level plumbing is needed.
 {% if use_database %}
 
     # Database configuration — individual fields (from K8s secretKeyRef)
