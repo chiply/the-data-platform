@@ -103,6 +103,7 @@ export function installTempo(args: TempoArgs): k8s.helm.v3.Release {
         },
         persistence,
       },
+      timeout: 600,
     },
     { provider, dependsOn },
   );

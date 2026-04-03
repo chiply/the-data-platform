@@ -2,7 +2,7 @@ environment:
   - tdp/production
 config:
   tdp-platform:clusterStackRef: chiply-org/tdp-cluster/production
-  tdp-platform:resourceTier: minimal
+  tdp-platform:resourceTier: standard
   tdp-platform:prometheusRetention: "30d"
   tdp-platform:prometheusScrapeInterval: "15s"
   tdp-platform:prometheusStorageSize: "50Gi"
