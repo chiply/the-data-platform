@@ -49,7 +49,7 @@ this table to determine valid categories.
 | 005 | [[file:005-argocd-gitops-deployment.org][ArgoCD GitOps Deployment & Local Dev]] | Accepted |
 | 006 | [[file:006-copier-service-templates.org][Copier-Based Service Templates & Pattern Inheritance]] | Accepted |
 | 007 | [[file:007-postgres-infra.org][PostgreSQL Infrastructure]] | Accepted |
-| 008 | [[file:008-distributed-tracing-pipeline.org][Distributed Tracing Pipeline]] | Accepted |
+| 008 | [[file:008-distributed-tracing-pipeline.org][Distributed Tracing Pipeline]] | Complete |
 
 * Elisp Setup
 :PROPERTIES:
