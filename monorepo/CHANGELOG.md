@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.24](https://github.com/chiply/the-data-platform/compare/platform-v0.1.23...platform-v0.1.24) (2026-04-03)
+
+
+### Features
+
+* **tracing:** distributed tracing pipeline (design doc 008) ([3211b24](https://github.com/chiply/the-data-platform/commit/3211b24eba6d4f83960bae1b809a42c2a63c6c5d))
+* US-001 - Deploy Grafana Tempo via Pulumi ([9201890](https://github.com/chiply/the-data-platform/commit/920189042be060c9c09efcc73f94c623bb14fc7f))
+* US-002 - Deploy Grafana Alloy via Pulumi ([c0593ca](https://github.com/chiply/the-data-platform/commit/c0593ca22fe41e541d8455336ffd159d9a29dafb))
+* US-002 - Deploy Grafana Alloy via Pulumi ([93edf16](https://github.com/chiply/the-data-platform/commit/93edf16b4018e8f654fce67a4ac4934fc38d00f2))
+* US-003 + US-004 - Tempo datasource and OTEL endpoint config ([1bec212](https://github.com/chiply/the-data-platform/commit/1bec212614385e00cd67bb963edbb5c2a2d8af42))
+* US-004 - Configure OTEL_EXPORTER_OTLP_ENDPOINT in services ([34cd2f0](https://github.com/chiply/the-data-platform/commit/34cd2f044185d27bf122ffa93b94e22b49fbf48d))
+* US-005 - Add NetworkPolicy for service to Alloy egress ([8a8eeeb](https://github.com/chiply/the-data-platform/commit/8a8eeebd83e596899734dfb1fdd9538f6336f348))
+* wire Tempo datasource into Grafana with trace-to-metrics correlation ([c760a75](https://github.com/chiply/the-data-platform/commit/c760a7516f7164129784a7a348597a266eb1c7b6))
+
+
+### Bug Fixes
+
+* address coderabbit feedback ([ef31d75](https://github.com/chiply/the-data-platform/commit/ef31d75219cfb47ca06a99736717a79fbd75da7b))
+* **tracing:** add fullnameOverride to Tempo and Alloy Helm releases ([be836d2](https://github.com/chiply/the-data-platform/commit/be836d2fe4c92d938861a01626779db44809d980))
+* **tracing:** review fixes for Alloy Helm chart and cleanup Ralph artifacts ([1d5ba7e](https://github.com/chiply/the-data-platform/commit/1d5ba7e1b4647619dd03c043f75e6a70a4448a84))
+
 ## [0.1.23](https://github.com/chiply/the-data-platform/compare/platform-v0.1.22...platform-v0.1.23) (2026-03-17)
 
 
