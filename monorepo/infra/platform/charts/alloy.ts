@@ -92,7 +92,7 @@ export function installAlloy(args: AlloyArgs): k8s.helm.v3.Release {
     "alloy-otlp",
     {
       chart: "alloy",
-      version: "0.12.0",
+      version: "1.6.2",
       repositoryOpts: {
         repo: "https://grafana.github.io/helm-charts",
       },
@@ -104,6 +104,17 @@ export function installAlloy(args: AlloyArgs): k8s.helm.v3.Release {
             content: alloyConfig,
           },
           resources: preset.alloy,
+          // Expose the OTLP gRPC port on the ClusterIP Service so services
+          // can reach it at alloy-otlp.monitoring.svc.cluster.local:4317.
+          // The default service only exposes the metrics port (12345).
+          extraPorts: [
+            {
+              name: "otlp-grpc",
+              port: 4317,
+              targetPort: 4317,
+              protocol: "TCP",
+            },
+          ],
         },
         controller: {
           type: "daemonset",
