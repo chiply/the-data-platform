@@ -3,7 +3,7 @@
 #+STATUS: Complete
 #+CATEGORY: infra
 #+CREATED: [2026-03-17]
-#+LAST_MODIFIED: [2026-03-17]
+#+LAST_MODIFIED: [2026-04-03]
 #+SETUPFILE: ../../org-setup.org
 
 * Summary
@@ -206,7 +206,7 @@ traces appear in Grafana Explore → Tempo datasource on both local
 and dev environments. Update CONTRIBUTING.md with access instructions.
 
 Verified on local [2026-04-03]: traces from schema-registry appear in
-Tempo via Grafana Explore. Dev verification pending.
+Tempo via Grafana Explore. Dev verification to follow after merge.
 
 ** DONE [TDP-008-07] Add Pulumi config keys for tracing                 :p2:
 :PROPERTIES:
