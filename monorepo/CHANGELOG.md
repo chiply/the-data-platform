@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.27](https://github.com/chiply/the-data-platform/compare/platform-v0.1.26...platform-v0.1.27) (2026-04-04)
+
+
+### Bug Fixes
+
+* **infra:** use Go duration format for Tempo retention (168h not 7d) ([fccc0b8](https://github.com/chiply/the-data-platform/commit/fccc0b80807ea51bbb50b205d761453eb4cec3f2))
+
 ## [0.1.26](https://github.com/chiply/the-data-platform/compare/platform-v0.1.25...platform-v0.1.26) (2026-04-04)
 
 
