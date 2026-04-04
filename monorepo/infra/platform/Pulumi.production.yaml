@@ -6,7 +6,7 @@ config:
   tdp-platform:prometheusRetention: "30d"
   tdp-platform:prometheusScrapeInterval: "15s"
   tdp-platform:prometheusStorageSize: "50Gi"
-  tdp-platform:tempoRetention: "7d"
+  tdp-platform:tempoRetention: "168h"
   tdp-platform:tempoStorageSize: "20Gi"
   argocd:repoUrl: ${argocd.repoUrl}
   argocd:sshPrivateKey:
