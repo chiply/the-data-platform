@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.26](https://github.com/chiply/the-data-platform/compare/platform-v0.1.25...platform-v0.1.26) (2026-04-04)
+
+
+### Bug Fixes
+
+* **infra:** upgrade production to g6-standard-4 for sufficient CPU ([e2c4607](https://github.com/chiply/the-data-platform/commit/e2c460740a3d5ba25a1473b2c7f522a191193dd9))
+
 ## [0.1.25](https://github.com/chiply/the-data-platform/compare/platform-v0.1.24...platform-v0.1.25) (2026-04-03)
 
 
