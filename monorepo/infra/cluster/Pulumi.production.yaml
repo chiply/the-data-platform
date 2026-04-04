@@ -3,3 +3,4 @@ environment:
 config:
   tdp-cluster:clusterType: linode-k3s
   tdp-cluster:clusterName: tdp-production
+  tdp-cluster:linodeInstanceType: g6-standard-4
