@@ -1,0 +1,323 @@
+#+TITLE: 009 - Cluster Access Management
+#+AUTHOR: Charlie Holland
+#+STATUS: Accepted
+#+CATEGORY: security
+#+CREATED: [2026-04-04]
+#+LAST_MODIFIED: [2026-04-04]
+#+SETUPFILE: ../../org-setup.org
+
+* Summary
+
+Replace manual SSH key management with a phased approach: (1) SSH keys
+provisioned via Pulumi, (2) Tailscale VPN to remove public exposure of
+SSH and the Kubernetes API, (3) SSO-based access with short-lived
+credentials for SSH and kubectl.
+
+* Motivation
+
+Currently, server access requires someone to SSH into each machine and
+manually append a developer's public key to =~/.ssh/authorized_keys=.
+Everyone authenticates as root with no audit trail. The Kubernetes API
+(port 6443) and SSH (port 22) are exposed to the public internet via
+=firewallAllowedIPs: 0.0.0.0/0=.
+
+Problems:
+- *Onboarding friction*: Every new developer needs someone already on the
+  machine to add their key.
+- *No access revocation*: Removing a developer requires logging into every
+  server and editing authorized_keys.
+- *Shared root*: No per-user accounts, no audit trail of who did what.
+- *Public attack surface*: SSH and K8s API are reachable from the internet.
+- *Long-lived credentials*: Kubeconfigs contain static client certificates
+  that never expire.
+
+* Design
+
+Three phases, each building on the previous.
+
+** Phase 1: SSH Keys in Pulumi (Now)
+
+Move SSH public keys into Pulumi config so they are provisioned
+automatically when instances are created or updated.
+
+*** How it works
+
+Linode's =authorizedKeys= parameter accepts a list of SSH public keys that
+are written to =~/.ssh/authorized_keys= on instance creation. For existing
+instances, Pulumi's =command.remote.Command= can update the file.
+
+*** Changes
+
+- Add an =sshAuthorizedKeys= config list to the cluster Pulumi stack.
+- Pass keys to =linode.Instance.authorizedKeys=.
+- Add a remote command resource to sync keys on existing instances
+  (since =authorizedKeys= only applies at creation time).
+- Store keys in Pulumi ESC so they are not hardcoded in YAML.
+
+*** What this solves
+
+- Adding/removing developers is a config change + =pulumi up=.
+- Keys are version-controlled and auditable.
+- No manual SSH sessions needed for onboarding.
+
+*** What this does NOT solve
+
+- Still root-only, no per-user accounts.
+- SSH and K8s API still publicly exposed.
+- No short-lived credentials.
+
+** Phase 2: Tailscale VPN (Soon)
+
+Add Tailscale to all cluster nodes so that SSH and the Kubernetes API are
+only reachable through a private WireGuard mesh network.
+
+*** What is a VPN?
+
+A VPN (Virtual Private Network) creates an encrypted tunnel between
+devices. Think of it as a private hallway — you must enter the hallway
+before you can reach any doors. Devices on the VPN get private IP
+addresses (e.g., =100.x.y.z=) and can communicate as if they are on the
+same local network, regardless of physical location.
+
+*** What is Tailscale?
+
+Tailscale is a zero-config VPN built on WireGuard. Each device installs a
+small agent, authenticates via an identity provider (GitHub, Google, etc.),
+and joins a private mesh network called a "tailnet." No central VPN server
+to manage — devices connect peer-to-peer.
+
+*** How it works
+
+1. Install Tailscale on each Linode instance (via Pulumi user-data or
+   remote command).
+2. Install Tailscale on developer machines (=brew install tailscale=).
+3. Developers join the tailnet using their identity (e.g., GitHub account).
+4. Update firewall rules to restrict SSH (22) and K8s API (6443) to
+   Tailscale IPs only. HTTP/HTTPS (80/443) remain public for ingress.
+5. Update kubeconfigs to use Tailscale IPs instead of public IPs.
+
+*** Tailscale ACLs
+
+Tailscale supports access control lists (ACLs) defined in a JSON policy
+file. This controls which users/groups can reach which machines and ports:
+
+#+begin_src json
+{
+  "acls": [
+    {"action": "accept", "src": ["group:devs"], "dst": ["tag:k8s:22,6443"]},
+    {"action": "accept", "src": ["group:devs"], "dst": ["tag:k8s:*"]}
+  ],
+  "tagOwners": {
+    "tag:k8s": ["group:admins"]
+  }
+}
+#+end_src
+
+*** What this solves
+
+- SSH and K8s API are no longer publicly accessible.
+- Developers authenticate to the VPN with their identity provider.
+- Adding/removing access is managed via Tailscale admin console or ACLs.
+- Encrypted traffic between developer machines and servers.
+
+*** What this does NOT solve
+
+- Still using long-lived SSH keys and kubeconfig certificates.
+- Still root-only SSH (no per-user accounts on the server).
+
+** Phase 3: SSO-Based Access (Later)
+
+Replace long-lived SSH keys and kubeconfig certificates with short-lived
+credentials issued via Single Sign-On.
+
+*** What is SSO?
+
+Single Sign-On means authenticating once with a central identity provider
+(e.g., Google Workspace, GitHub) to gain access to multiple systems. Instead
+of each system having its own passwords/keys, they all trust the identity
+provider. Revoke someone's identity provider account and they lose access
+to everything.
+
+*** SSH via Certificate Authority
+
+Instead of adding individual public keys to servers, set up an SSH
+Certificate Authority (CA):
+
+1. Developer authenticates with the identity provider (e.g., GitHub OAuth).
+2. A service (e.g., Teleport, Smallstep, or Tailscale SSH) issues a
+   short-lived SSH certificate (e.g., valid for 8 hours).
+3. The server trusts the CA, not individual keys.
+4. When the certificate expires, the developer must re-authenticate.
+
+This means:
+- No permanent SSH keys on servers.
+- Access is automatically revoked when certificates expire.
+- Per-user identity on every SSH session (audit trail).
+
+*** Kubernetes via OIDC
+
+Instead of static kubeconfig certificates, configure the K8s API server
+to trust an OIDC (OpenID Connect) identity provider:
+
+1. Developer runs =kubectl=, which opens a browser for authentication.
+2. They log in with their identity provider (Google, GitHub, etc.).
+3. kubectl receives a short-lived token.
+4. The K8s API server validates the token against the identity provider.
+5. RBAC policies map identity provider groups to Kubernetes roles.
+
+Tools: Dex (OIDC connector, already deployed with ArgoCD), Pinniped,
+or Tailscale Kubernetes operator.
+
+*** What this solves
+
+- No long-lived credentials anywhere.
+- Per-user identity and audit trail for both SSH and kubectl.
+- Centralized access management through identity provider.
+- Automatic revocation — disable the IdP account, access is gone.
+
+* Decision
+
+Phased rollout in order: Phase 1 → Phase 2 → Phase 3. Each phase is
+independently valuable and does not require the next.
+
+* Tasks
+:PROPERTIES:
+:CATEGORY: tasks
+:END:
+
+** Phase 1: SSH Keys in Pulumi
+
+*** TODO [TDP-009-01] Add SSH authorized keys to Pulumi cluster config :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add =sshAuthorizedKeys= config parameter. Pass to =linode.Instance.authorizedKeys=
+for new instances. Add a =command.remote.Command= to sync keys on existing
+instances. Store keys in Pulumi ESC.
+
+*** TODO [TDP-009-02] Remove public key from manual authorized_keys    :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Once keys are Pulumi-managed, remove any manually-added keys from servers
+to ensure Pulumi is the single source of truth.
+
+*** TODO [TDP-009-03] Document SSH access onboarding in CONTRIBUTING   :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Add developer onboarding instructions: how to add your SSH key to the
+Pulumi config and get access to dev/production.
+
+** Phase 2: Tailscale VPN
+
+*** TODO [TDP-009-04] Install Tailscale on dev and production instances :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Add Tailscale installation to Pulumi provisioning (remote command or
+user-data). Register nodes to the tailnet with appropriate tags.
+
+*** TODO [TDP-009-05] Restrict SSH and K8s API to Tailscale IPs        :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Update =firewallAllowedIPs= in Pulumi cluster config to only allow Tailscale
+CIDR (=100.64.0.0/10=) for ports 22 and 6443. Keep 80/443 public for ingress.
+
+*** TODO [TDP-009-06] Configure Tailscale ACLs                         :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Define ACL policy: which groups can access which servers and ports.
+Version-control the ACL JSON in the repo.
+
+*** TODO [TDP-009-07] Update kubeconfigs to use Tailscale IPs          :p1:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Modify the =get-kubeconfig= Pulumi command to emit Tailscale IPs instead of
+public IPs. Update local kubeconfigs for dev and production.
+
+*** TODO [TDP-009-08] Document VPN setup for developers                :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Instructions for installing Tailscale, joining the tailnet, and connecting
+to clusters.
+
+** Phase 3: SSO-Based Access
+
+*** TODO [TDP-009-09] Evaluate SSO tooling (Teleport vs Tailscale SSH) :p1:
+:PROPERTIES:
+:EFFORT: M
+:END:
+
+Spike: compare Teleport, Smallstep, and Tailscale SSH for SSH certificate
+issuance. Consider complexity, cost, and integration with existing IdP.
+
+*** TODO [TDP-009-10] Configure OIDC authentication for Kubernetes     :p1:
+:PROPERTIES:
+:EFFORT: L
+:END:
+
+Set up OIDC on the k3s API server. Evaluate using the existing Dex
+instance (from ArgoCD) as the OIDC connector. Define RBAC role bindings
+mapped to IdP groups.
+
+*** TODO [TDP-009-11] Implement SSH CA and short-lived certificates    :p1:
+:PROPERTIES:
+:EFFORT: L
+:END:
+
+Deploy chosen SSH CA solution. Configure servers to trust the CA.
+Set up certificate issuance flow with identity provider authentication.
+
+*** TODO [TDP-009-12] Remove static kubeconfig certificates            :p2:
+:PROPERTIES:
+:EFFORT: S
+:END:
+
+Once OIDC is working, stop exporting static kubeconfigs from Pulumi.
+Update CI to use service account tokens or workload identity instead.
+
+* Questions
+:PROPERTIES:
+:CATEGORY: questions
+:END:
+
+** DECIDED Which identity provider to use for Tailscale and SSO?
+:PROPERTIES:
+:DECIDED: [2026-04-04]
+:END:
+
+GitHub. All developers already have accounts and the repo is hosted there.
+GitHub integrates directly with Tailscale and can serve as an OIDC provider
+for Kubernetes via Dex.
+
+** DECIDED Should CI runners use Tailscale or a separate service account?
+:PROPERTIES:
+:DECIDED: [2026-04-04]
+:END:
+
+Use the Tailscale GitHub Action to connect CI runners to the tailnet for
+the duration of each workflow job. This keeps the firewall locked down with
+no IP exceptions for GitHub Actions runners. Every workflow that touches the
+K8s API will need the Tailscale action step.
+
+** DECIDED Per-user Linux accounts or root-only with audit via SSH CA?
+:PROPERTIES:
+:DECIDED: [2026-04-04]
+:END:
+
+Root-only with SSH CA audit trail. SSH certificates will encode the
+developer's identity for audit purposes. Per-user accounts can be
+revisited if the team grows or compliance requires it.
